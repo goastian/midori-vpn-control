@@ -36,6 +36,9 @@ export const useAuthStore = defineStore('auth', () => {
 
     sessionStorage.setItem('pkce_verifier', verifier)
 
+    const state = crypto.randomUUID()
+    sessionStorage.setItem('oauth_state', state)
+
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: CLIENT_ID,
@@ -43,7 +46,7 @@ export const useAuthStore = defineStore('auth', () => {
       scope: 'openid email profile',
       code_challenge: challenge,
       code_challenge_method: 'S256',
-      state: crypto.randomUUID(),
+      state,
     })
 
     window.location.href = `${ISSUER}/authorize/?${params.toString()}`
