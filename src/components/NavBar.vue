@@ -1,16 +1,30 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
 
 const auth = useAuthStore()
 const router = useRouter()
 
-const navItems = [
+const userNav = [
   { name: 'Dashboard', path: '/' },
   { name: 'Servidores', path: '/servers' },
-  { name: 'Conexiones', path: '/peers' },
+  { name: 'Conexiones', path: '/connections' },
   { name: 'Auditoría', path: '/audit' },
 ]
+
+const adminNav = [
+  { name: 'Usuarios', path: '/admin/users' },
+  { name: 'Admin Servers', path: '/admin/servers' },
+  { name: 'Admin Peers', path: '/admin/peers' },
+  { name: 'Admin Logs', path: '/admin/audit' },
+]
+
+const navItems = computed(() => {
+  const items = [...userNav]
+  if (auth.isAdmin) items.push(...adminNav)
+  return items
+})
 </script>
 
 <template>
@@ -21,7 +35,7 @@ const navItems = [
           <router-link to="/" class="text-xl font-bold text-midori-600">
             MidoriVPN
           </router-link>
-          <div class="hidden sm:flex space-x-4">
+          <div class="hidden sm:flex space-x-1">
             <router-link
               v-for="item in navItems"
               :key="item.path"
@@ -34,7 +48,9 @@ const navItems = [
           </div>
         </div>
         <div class="flex items-center space-x-4">
-          <span class="text-sm text-gray-500">{{ auth.user?.email }}</span>
+          <div class="text-right">
+            <p class="text-sm text-gray-600">{{ auth.user?.email }}</p>
+          </div>
           <button
             @click="auth.logout()"
             class="text-sm text-gray-500 hover:text-red-600 transition-colors"
