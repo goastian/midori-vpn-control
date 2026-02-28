@@ -11,7 +11,9 @@ interface User {
   id: string
   authentik_uid: string
   email: string
+  display_name: string
   groups: string[]
+  is_banned: boolean
   created_at: string
   updated_at: string
 }
