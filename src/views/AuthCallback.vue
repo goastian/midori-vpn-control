@@ -11,6 +11,7 @@ const errorMsg = ref('')
 onMounted(async () => {
   const code = route.query.code as string
   const error = route.query.error as string
+  const returnedState = route.query.state as string
 
   if (error) {
     errorMsg.value = route.query.error_description as string || error
@@ -19,6 +20,14 @@ onMounted(async () => {
 
   if (!code) {
     errorMsg.value = 'No se recibió código de autorización'
+    return
+  }
+
+  // Validate OAuth state to prevent CSRF
+  const savedState = sessionStorage.getItem('oauth_state')
+  sessionStorage.removeItem('oauth_state')
+  if (!savedState || savedState !== returnedState) {
+    errorMsg.value = 'Estado OAuth inválido — posible ataque CSRF. Intenta iniciar sesión de nuevo.'
     return
   }
 
