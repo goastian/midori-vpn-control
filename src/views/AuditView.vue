@@ -15,7 +15,7 @@ const loading = ref(true)
 
 onMounted(async () => {
   try {
-    logs.value = (await api.get<AuditLog[]>('/api/v1/control/audit')) || []
+    logs.value = (await api.get<AuditLog[]>('/api/v1/control/audit-logs')) || []
   } catch (e) {
     console.error('Failed to load audit logs', e)
   } finally {
@@ -27,7 +27,9 @@ function actionLabel(action: string): string {
   const map: Record<string, string> = {
     'peer.connect': 'Conexión VPN',
     'peer.disconnect': 'Desconexión VPN',
+    'peer.cleanup': 'Limpieza automática',
     'server.create': 'Servidor creado',
+    'server.update': 'Servidor actualizado',
     'server.delete': 'Servidor eliminado',
   }
   return map[action] || action
@@ -35,8 +37,9 @@ function actionLabel(action: string): string {
 
 function actionColor(action: string): string {
   if (action.includes('connect') && !action.includes('disconnect')) return 'bg-green-100 text-green-700'
-  if (action.includes('disconnect') || action.includes('delete')) return 'bg-red-100 text-red-600'
+  if (action.includes('disconnect') || action.includes('delete') || action.includes('ban')) return 'bg-red-100 text-red-600'
   if (action.includes('create')) return 'bg-blue-100 text-blue-700'
+  if (action.includes('cleanup')) return 'bg-yellow-100 text-yellow-700'
   return 'bg-gray-100 text-gray-600'
 }
 </script>
