@@ -1,46 +1,26 @@
 {
-    "private": true,
-    "scripts": {
-        "dev": "npm run development",
-        "development": "mix",
-        "watch": "mix watch",
-        "watch-poll": "mix watch -- --watch-options-poll=1000",
-        "hot": "mix watch --hot",
-        "prod": "npm run production",
-        "production": "mix --production",
-        "prepare": "husky install",
-        "test": "echo \"No tests defined\" && exit 0"
-    },
-    "devDependencies": {
-        "@commitlint/cli": "^19.7.1",
-        "@commitlint/config-conventional": "^19.7.1",
-        "@tailwindcss/forms": "^0.5.9",
-        "autoprefixer": "^10.4.21",
-        "axios": "^1.7.7",
-        "concurrently": "^9.0.1",
-        "husky": "^8.0.0",
-        "laravel-mix": "^6.0.49",
-        "postcss": "^8.5.4",
-        "resolve-url-loader": "^5.0.0",
-        "sass-embedded": "^1.80.5",
-        "tailwindcss": "^3.4.17",
-        "vue": "^3.4.0",
-        "vue-loader": "^16.8.3"
-    },
-    "dependencies": {
-        "@inertiajs/vue3": "^2.0.11",
-        "@jamescoyle/vue-icon": "^0.1.2",
-        "@mdi/font": "^7.4.47",
-        "@mdi/js": "^7.4.47",
-        "@quasar/extras": "^1.16.17",
-        "@tailwindcss/postcss": "^4.0.9",
-        "js-cookie": "^3.0.5",
-        "notyf": "^3.10.0",
-        "qrious": "^4.0.2",
-        "quasar": "^2.18.0",
-        "sass": "^1.85.1",
-        "sass-loader": "^16.0.5",
-        "stream-http": "^3.2.0",
-        "vue-router": "^4.4.5"
-    }
+  "name": "midori-vpn-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.4.30",
+    "vue-router": "^4.4.0",
+    "pinia": "^2.1.7",
+    "@vueuse/core": "^10.11.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.5",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.4",
+    "vue-tsc": "^2.0.24",
+    "tailwindcss": "^3.4.6",
+    "postcss": "^8.4.39",
+    "autoprefixer": "^10.4.19"
+  }
 }
