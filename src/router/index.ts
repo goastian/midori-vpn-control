@@ -27,14 +27,45 @@ const router = createRouter({
       component: () => import('../views/ServersView.vue'),
     },
     {
-      path: '/peers',
-      name: 'peers',
+      path: '/connections',
+      name: 'connections',
       component: () => import('../views/PeersView.vue'),
     },
     {
       path: '/audit',
       name: 'audit',
       component: () => import('../views/AuditView.vue'),
+    },
+    // Admin routes
+    {
+      path: '/admin/users',
+      name: 'admin-users',
+      component: () => import('../views/admin/AdminUsersView.vue'),
+      meta: { admin: true },
+    },
+    {
+      path: '/admin/users/:id',
+      name: 'admin-user-detail',
+      component: () => import('../views/admin/AdminUserDetailView.vue'),
+      meta: { admin: true },
+    },
+    {
+      path: '/admin/servers',
+      name: 'admin-servers',
+      component: () => import('../views/admin/AdminServersView.vue'),
+      meta: { admin: true },
+    },
+    {
+      path: '/admin/peers',
+      name: 'admin-peers',
+      component: () => import('../views/admin/AdminPeersView.vue'),
+      meta: { admin: true },
+    },
+    {
+      path: '/admin/audit',
+      name: 'admin-audit',
+      component: () => import('../views/admin/AdminAuditView.vue'),
+      meta: { admin: true },
     },
   ],
 })
@@ -43,6 +74,9 @@ router.beforeEach((to) => {
   const auth = useAuthStore()
   if (!to.meta.public && !auth.isAuthenticated) {
     return { name: 'login' }
+  }
+  if (to.meta.admin && !auth.isAdmin) {
+    return { name: 'dashboard' }
   }
 })
 
