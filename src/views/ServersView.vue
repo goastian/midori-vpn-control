@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useAuthStore } from '../stores/auth'
 import { api } from '../lib/api'
-
-const auth = useAuthStore()
 
 interface Server {
   id: string
@@ -21,19 +18,6 @@ interface Server {
 
 const servers = ref<Server[]>([])
 const loading = ref(true)
-const showForm = ref(false)
-
-const form = ref({
-  name: '',
-  host: '',
-  port: 8080,
-  wg_port: 51820,
-  public_key: '',
-  core_token: '',
-  location: '',
-  country_code: '',
-  max_peers: 250,
-})
 
 onMounted(async () => {
   await loadServers()
@@ -50,68 +34,28 @@ async function loadServers() {
   }
 }
 
-async function createServer() {
-  try {
-    await api.post('/api/v1/control/servers', form.value)
-    showForm.value = false
-    form.value = { name: '', host: '', port: 8080, wg_port: 51820, public_key: '', core_token: '', location: '', country_code: '', max_peers: 250 }
-    await loadServers()
-  } catch (e: any) {
-    alert(e.message)
-  }
+function loadPercent(server: Server): number {
+  if (server.max_peers === 0) return 0
+  return Math.round((server.current_peers / server.max_peers) * 100)
 }
 
-async function deleteServer(id: string) {
-  if (!confirm('¿Eliminar este servidor?')) return
-  try {
-    await api.delete(`/api/v1/control/servers/${id}`)
-    await loadServers()
-  } catch (e: any) {
-    alert(e.message)
-  }
+function loadColor(pct: number): string {
+  if (pct >= 90) return 'bg-red-500'
+  if (pct >= 70) return 'bg-yellow-500'
+  return 'bg-midori-500'
 }
 </script>
 
 <template>
   <div>
-    <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Servidores VPN</h1>
-      <button
-        v-if="auth.isAdmin"
-        @click="showForm = !showForm"
-        class="bg-midori-600 hover:bg-midori-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-      >
-        {{ showForm ? 'Cancelar' : 'Agregar servidor' }}
-      </button>
-    </div>
-
-    <!-- Create form -->
-    <div v-if="showForm && auth.isAdmin" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-      <h2 class="text-lg font-semibold mb-4">Nuevo servidor</h2>
-      <form @submit.prevent="createServer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <input v-model="form.name" placeholder="Nombre" required class="border rounded-lg px-3 py-2 text-sm" />
-        <input v-model="form.host" placeholder="Host (IP/dominio)" required class="border rounded-lg px-3 py-2 text-sm" />
-        <input v-model.number="form.port" type="number" placeholder="Puerto API" class="border rounded-lg px-3 py-2 text-sm" />
-        <input v-model.number="form.wg_port" type="number" placeholder="Puerto WireGuard" class="border rounded-lg px-3 py-2 text-sm" />
-        <input v-model="form.public_key" placeholder="Clave pública WireGuard" required class="border rounded-lg px-3 py-2 text-sm" />
-        <input v-model="form.core_token" placeholder="Core Token" required class="border rounded-lg px-3 py-2 text-sm" />
-        <input v-model="form.location" placeholder="Ubicación" class="border rounded-lg px-3 py-2 text-sm" />
-        <input v-model="form.country_code" placeholder="Código país (US, DE...)" class="border rounded-lg px-3 py-2 text-sm" />
-        <input v-model.number="form.max_peers" type="number" placeholder="Max peers" class="border rounded-lg px-3 py-2 text-sm" />
-        <div class="md:col-span-2">
-          <button type="submit" class="bg-midori-600 hover:bg-midori-700 text-white font-medium px-6 py-2 rounded-lg transition-colors">
-            Crear servidor
-          </button>
-        </div>
-      </form>
-    </div>
+    <h1 class="text-2xl font-bold text-gray-900 mb-6">Servidores VPN</h1>
 
     <div v-if="loading" class="flex justify-center py-12">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
     </div>
 
     <div v-else-if="servers.length === 0" class="text-center py-12 text-gray-400">
-      No hay servidores registrados.
+      No hay servidores disponibles.
     </div>
 
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -125,18 +69,23 @@ async function deleteServer(id: string) {
             {{ server.is_active ? 'Activo' : 'Inactivo' }}
           </span>
         </div>
-        <div class="space-y-1 text-sm text-gray-500">
+        <div class="space-y-2 text-sm text-gray-500">
           <p>{{ server.location }} {{ server.country_code ? `(${server.country_code})` : '' }}</p>
           <p class="font-mono text-xs">{{ server.host }}:{{ server.wg_port }}</p>
-          <p>Peers: {{ server.current_peers }} / {{ server.max_peers }}</p>
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span>Carga</span>
+              <span>{{ server.current_peers }}/{{ server.max_peers }}</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div
+                :class="loadColor(loadPercent(server))"
+                class="h-2 rounded-full transition-all"
+                :style="{ width: loadPercent(server) + '%' }"
+              ></div>
+            </div>
+          </div>
         </div>
-        <button
-          v-if="auth.isAdmin"
-          @click="deleteServer(server.id)"
-          class="mt-4 text-xs text-red-500 hover:text-red-700 transition-colors"
-        >
-          Eliminar
-        </button>
       </div>
     </div>
   </div>
