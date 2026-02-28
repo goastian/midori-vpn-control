@@ -1,143 +1,184 @@
-# VPN Control (Administrator) 
-VPN Manager is a managed VPN server that centralizes all VPN configurations, providing an efficient and scalable way to handle multiple servers and instances.
-Features 🚀
+```md
+# MidoriVPN Control — Frontend
 
-- Centralized management: Control all VPN configurations from a single interface.
-- WireGuard support: Currently compatible with WireGuard for fast and secure connections.
-- Multi-server: Manage multiple VPN servers simultaneously.
-- Multi-instance: Run multiple VPN instances within the same system.
+Web control panel for MidoriVPN. SPA application built with **Vue 3**, **TypeScript**, **Vite**, and **TailwindCSS**.
 
-## Upcoming Improvements ✨
+## Tech Stack
 
-- Support for additional VPN protocols.
-- Integration with admin panels.
-- Advanced deployment automation.
+| Technology | Version | Purpose |
+|---|---|---|
+| Vue 3 | ^3.4 | Reactive UI framework (Composition API + `<script setup>`) |
+| TypeScript | ^5.5 | Static typing |
+| Vite | ^5.3 | Bundler and development server |
+| Pinia | ^2.1 | State management |
+| Vue Router | ^4.4 | SPA routing |
+| TailwindCSS | ^3.4 | Utility-first styling |
+| VueUse | ^10.11 | Utility composables |
 
-## License
+## Project Structure
 
-This project is licensed under the GNU Affero General Public License v3.0. See the [LICENSE](./LICENSE) file for details.
-
-
-## Contact
-
-For direct contact, visit [Telegram](https://t.me/elyerr).
-
-# 🚀 Deploy Setup
-
-This project uses Docker and Laravel for OAuth2 authentication. Follow the steps below to deploy the production environment and create the first user.
-
-## 🔑 Environment Configuration
-
-Before deployment, make sure to copy the environment file and configure the necessary variables:
-
-# 📄 Environment Configuration (`.env`)
-
-This file contains environment-specific settings for your application. Below is a breakdown of the configuration variables:
-
----
-
-## 🌐 Application Settings
-
-- `APP_ENV=env`: The current environment the application is running in (e.g., `production`, `local`, `staging`).
-- `APP_KEY=`: Application encryption key (must be set for security).
-- `APP_DEBUG=true`: Enables debug mode (set to `false` in production).
-- `APP_TIMEZONE=UTC`: Default timezone used by the application.
-- `APP_URL="https://vpn.elyerr.xyz"`: The base URL of your application.
-
----
-
-## 🔐 OAuth2 Passport Server Configuration
-
-- `PASSPORT_SERVER=https://auth.elyerr.xyz`: Base URL of the OAuth2 authentication server.
-- `PASSPORT_SERVER_ID="9e77717c-d78f-4fcc-853d-036135405471"`: OAuth2 client ID used to authenticate this application with the Passport server.
-- `PASSPORT_PROMPT_MODE=none`: Defines the prompt behavior (`none`, `consent`, or `login`).
-- `PASSPORT_DOMAIN_SERVER=".elyerr.xyz"`: Cookie domain scope for passport authentication.
-- `PASSPORT_TOKEN_NAME="passport_server"`: Name of the cookie used to store the access token.
-- `PASSPORT_SECURE_COOKIE=true`: Ensures the cookie is only sent over HTTPS.
-- `PASSPORT_HTTP_ONLY_COOKIE=true`: Restricts cookie access to HTTP(S) requests only (not available to JavaScript).
-- `PASSPORT_PARTITIONED_COOKIE=true`: Enables support for partitioned cookies for cross-site scenarios.
-
----
-
-## ⚙️ PHP Server Workers
-
-- `PHP_CLI_SERVER_WORKERS=4`: Number of workers for the built-in PHP CLI server.
-
----
-
-## 📋 Logging Configuration
-
-- `LOG_CHANNEL=daily`: Logging channel (`daily`, `single`, etc.).
-- `LOG_STACK=single`: Logging stack used for writing logs.
-- `LOG_DEPRECATIONS_CHANNEL=null`: Channel used for logging deprecation notices.
-- `LOG_LEVEL=debug`: Minimum log level (e.g., `debug`, `info`, `error`).
-
----
-
-## 🗄️ Database Configuration
-
-- `DB_CONNECTION=pgsql`: Database driver (`pgsql` for PostgreSQL).
-- `DB_HOST=127.0.0.1`: Host address of the database server.
-- `DB_PORT=5432`: Port on which the database listens.
-- `DB_DATABASE=vpn`: Name of the database.
-- `DB_USERNAME=admin`: Database username.
-- `DB_PASSWORD=admin`: Database password.
-
-```bash
-cp .env.example .env
 ```
 
-Then, edit the .env file with your specific settings.
+control/
+├── .env                    → Environment variables (Vite)
+├── index.html              → HTML entry point
+├── package.json            → Dependencies and scripts
+├── vite.config.ts          → Vite config + API proxy
+├── tailwind.config.js      → Tailwind configuration (midori palette)
+├── postcss.config.js       → PostCSS plugins
+├── tsconfig.json           → TypeScript config
+├── tsconfig.node.json      → TypeScript config (Node)
+├── env.d.ts                → Environment variable types
+└── src/
+├── main.ts             → Bootstrap: Vue + Pinia + Router
+├── App.vue             → Main layout with conditional NavBar
+├── assets/
+│   └── main.css        → Tailwind base imports
+├── components/
+│   └── NavBar.vue      → Navigation bar (Dashboard, Servers, Peers, Audit)
+├── lib/
+│   ├── api.ts          → HTTP client with automatic Bearer token
+│   └── pkce.ts         → PKCE utilities (code_verifier, code_challenge SHA-256)
+├── router/
+│   └── index.ts        → Routes + navigation guard (auth required)
+├── stores/
+│   └── auth.ts         → Authentication store (login, callback, logout, profile)
+└── views/
+├── LoginView.vue       → Login screen with OAuth button
+├── AuthCallback.vue    → Processes Authentik redirect (code → token)
+├── DashboardView.vue   → Overview: active servers, peers, account
+├── ServersView.vue     → VPN server CRUD (admin)
+├── PeersView.vue       → User VPN connection management
+└── AuditView.vue       → Audit log
 
-## Deploy to Production
+````
 
-Run the following command to deploy the application in a production environment:
+## Requirements
+
+- **Node.js 20+** and **npm 10+**
+- `vpn-core` backend running at `localhost:8080` (or configure `VITE_API_URL`)
+
+## Installation
 
 ```bash
-./deploy-prod.sh
-```
+cd control
+npm install
+````
 
-## Proxy settings Nginx server
+## Development
 
 ```bash
-server {
-
-    listen 80;
-    server_name vpn.server.org;
-
-    # Logging
-    access_log /var/log/nginx/accounts_access.log main;
-    error_log /var/log/nginx/accounts_error.log warn;
-
-    location / {
-        proxy_pass http://127.0.0.1:8002;
-        proxy_http_version 1.1;
-
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-
-        proxy_set_header X-Forwarded-Host $http_x_forwarded_host;
-        proxy_set_header X-Forwarded-Port $http_x_forwarded_port;
-        proxy_set_header X-Forwarded-AWS-ELB $http_x_forwarded_aws_elb;
-
-        proxy_read_timeout 720s;
-        proxy_connect_timeout 720s;
-        proxy_send_timeout 720s;
-
-        proxy_buffering on;
-        proxy_buffer_size 128k;
-        proxy_buffers 4 256k;
-        proxy_busy_buffers_size 256k;
-        proxy_temp_file_write_size 256k;
-
-        proxy_redirect off;
-    }
-}
+npm run dev
 ```
 
-## VPN Core (Core of system)
+Open `http://localhost:5173`. Vite’s proxy forwards `/api/*`, `/auth/*`, and `/health` to the backend at `:8080`.
 
-You can use the nex image [Docker Image](https://hub.docker.com/r/elyerr/vpn-core)
+## Production Build
 
+```bash
+npm run build
+```
+
+Static files are generated in `control/dist/`. They can be served with Nginx, Caddy, or any static web server.
+
+## Environment Variables
+
+`.env` file at the root of `control/`:
+
+| Variable                      | Example                                               | Description                               |
+| ----------------------------- | ----------------------------------------------------- | ----------------------------------------- |
+| `VITE_API_URL`                | `http://localhost:8080`                               | Backend API URL                           |
+| `VITE_AUTHENTIK_ISSUER`       | `https://accounts.astian.org/application/o/midorivpn` | Authentik OIDC issuer                     |
+| `VITE_AUTHENTIK_CLIENT_ID`    | `60mBgw8BHTvK...`                                     | OAuth2 application Client ID in Authentik |
+| `VITE_AUTHENTIK_REDIRECT_URI` | `http://localhost:5173/auth/callback`                 | Post-login redirect URI                   |
+
+## Authentication Flow (OAuth2/OIDC + PKCE)
+
+```
+┌──────────┐     1. startLogin()      ┌──────────────────┐
+│  Browser │ ──────────────────────→  │  accounts.astian │
+│ (Vue SPA)│                          │   .org (Authentik)│
+│          │  ← 2. redirect with code │                  │
+│          │ ──────────────────────→  │                  │
+└─────┬────┘                          └──────────────────┘
+      │
+      │ 3. POST /auth/callback
+      │    { code, redirect_uri, code_verifier }
+      ▼
+┌──────────┐     4. Token exchange     ┌──────────────────┐
+│ vpn-core │ ──────────────────────→  │    Authentik     │
+│ (Go API) │  ← access_token, id_tok  │    Token endpoint│
+│          │                          └──────────────────┘
+└─────┬────┘
+      │ 5. Returns tokens to frontend
+      ▼
+┌──────────┐
+│  Browser │  → Stores access_token in localStorage
+│          │  → GET /api/v1/control/me (profile)
+│          │  → Redirects to Dashboard
+└──────────┘
+```
+
+### Detailed Steps
+
+1. **`startLogin()`** — Generates `code_verifier` (128 random chars), computes `code_challenge` (SHA-256 + base64url), stores the verifier in `sessionStorage`, and redirects to Authentik’s authorization endpoint with PKCE parameters.
+
+2. **Authentik** — Displays login, the user authenticates, and is redirected to `/auth/callback?code=...`
+
+3. **`AuthCallback.vue`** — Reads the `code` from the URL, retrieves the `code_verifier` from `sessionStorage`, and sends both to the backend.
+
+4. **Backend** (`POST /auth/callback`) — Exchanges the code + verifier with Authentik and returns the tokens to the frontend.
+
+5. **Frontend** — Stores `access_token` in `localStorage`, loads the user profile, and redirects to the Dashboard.
+
+## Routes
+
+| Route            | View            | Auth      | Description                    |
+| ---------------- | --------------- | --------- | ------------------------------ |
+| `/login`         | `LoginView`     | Public    | Login button with Astian       |
+| `/auth/callback` | `AuthCallback`  | Public    | Processes Authentik redirect   |
+| `/`              | `DashboardView` | Protected | General overview               |
+| `/servers`       | `ServersView`   | Protected | Server management (admin CRUD) |
+| `/peers`         | `PeersView`     | Protected | User VPN connections           |
+| `/audit`         | `AuditView`     | Protected | Audit logs                     |
+
+## Consumed API
+
+All protected endpoints automatically send `Authorization: Bearer <token>` via `lib/api.ts`.
+
+| Method   | Endpoint                      | Purpose                  |
+| -------- | ----------------------------- | ------------------------ |
+| `GET`    | `/auth/config`                | OIDC configuration       |
+| `POST`   | `/auth/callback`              | Exchange code → tokens   |
+| `GET`    | `/api/v1/control/me`          | Current user profile     |
+| `GET`    | `/api/v1/control/servers`     | List active VPN servers  |
+| `POST`   | `/api/v1/control/servers`     | Create server (admin)    |
+| `DELETE` | `/api/v1/control/servers/:id` | Delete server (admin)    |
+| `GET`    | `/api/v1/control/peers`       | List my VPN connections  |
+| `POST`   | `/api/v1/control/peers`       | Connect to a server      |
+| `DELETE` | `/api/v1/control/peers/:id`   | Disconnect from a server |
+| `GET`    | `/api/v1/control/audit`       | My audit logs            |
+
+## Color Palette
+
+Defined in `tailwind.config.js` under the `midori` key:
+
+| Name         | Hex       | Usage                    |
+| ------------ | --------- | ------------------------ |
+| `midori-50`  | `#f0fdf4` | Light backgrounds, hover |
+| `midori-100` | `#dcfce7` | Login gradients          |
+| `midori-500` | `#22c55e` | Accents                  |
+| `midori-600` | `#16a34a` | Primary buttons          |
+| `midori-700` | `#15803d` | Button hover             |
+
+## Backend Relationship
+
+This frontend **does not contain backend logic**. All business logic, JWT authentication, database management, and WireGuard handling reside in the `vpn-core` (Go) service running at the repository root.
+
+The two backend middlewares are complementary:
+
+* **`internal/api/middleware.go`** — Validates `X-Core-Token` (shared secret for the WireGuard core API)
+* **`internal/auth/middleware.go`** — Validates Authentik JWT Bearer (for the Control API consumed by this frontend)
+
+```
+```
