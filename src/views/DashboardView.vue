@@ -59,9 +59,10 @@ onMounted(async () => {
     loading.value = false
   }
 
-  // Connect WebSocket for real-time stats
+  // Connect WebSocket for real-time stats (JWT authenticated)
   try {
-    const wsUrl = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`
+    const token = encodeURIComponent(auth.accessToken)
+    const wsUrl = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws?token=${token}`
     ws = new WebSocket(wsUrl)
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data)
