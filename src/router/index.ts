@@ -5,6 +5,12 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
+      path: '/',
+      name: 'landing',
+      component: () => import('../views/LandingView.vue'),
+      meta: { public: true, fullPage: true },
+    },
+    {
       path: '/login',
       name: 'login',
       component: () => import('../views/LoginView.vue'),
@@ -17,7 +23,7 @@ const router = createRouter({
       meta: { public: true },
     },
     {
-      path: '/',
+      path: '/dashboard',
       name: 'dashboard',
       component: () => import('../views/DashboardView.vue'),
     },
@@ -73,7 +79,7 @@ const router = createRouter({
 router.beforeEach((to) => {
   const auth = useAuthStore()
   if (!to.meta.public && !auth.isAuthenticated) {
-    return { name: 'login' }
+    return { name: 'landing' }
   }
   if (to.meta.admin && !auth.isAdmin) {
     return { name: 'dashboard' }

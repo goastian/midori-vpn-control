@@ -7,7 +7,7 @@ const auth = useAuthStore()
 const router = useRouter()
 
 const userNav = [
-  { name: 'Dashboard', path: '/' },
+  { name: 'Dashboard', path: '/dashboard' },
   { name: 'Servidores', path: '/servers' },
   { name: 'Conexiones', path: '/connections' },
   { name: 'Auditoría', path: '/audit' },
@@ -32,7 +32,7 @@ const navItems = computed(() => {
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex justify-between h-16">
         <div class="flex items-center space-x-8">
-          <router-link to="/" class="text-xl font-bold text-midori-600">
+          <router-link to="/dashboard" class="text-xl font-bold text-midori-600">
             MidoriVPN
           </router-link>
           <div class="hidden sm:flex space-x-1">

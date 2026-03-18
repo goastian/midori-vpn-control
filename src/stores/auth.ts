@@ -96,7 +96,7 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
 
-    const logoutUrl = `${ISSUER}/end-session/?post_logout_redirect_uri=${encodeURIComponent(window.location.origin + '/login')}`
+    const logoutUrl = `${ISSUER}/end-session/?post_logout_redirect_uri=${encodeURIComponent(window.location.origin + '/')}`
     window.location.href = logoutUrl
   }
 
