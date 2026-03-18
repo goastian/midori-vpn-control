@@ -6,7 +6,47 @@ interface ApiResponse<T = any> {
   error?: string
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+let isRefreshing = false
+let refreshQueue: Array<{ resolve: (token: string) => void; reject: (err: Error) => void }> = []
+
+function processRefreshQueue(error: Error | null, token: string | null) {
+  refreshQueue.forEach(({ resolve, reject }) => {
+    if (error) reject(error)
+    else resolve(token!)
+  })
+  refreshQueue = []
+}
+
+async function tryRefreshToken(): Promise<string> {
+  const refreshToken = localStorage.getItem('refresh_token')
+  if (!refreshToken) {
+    throw new Error('No refresh token available')
+  }
+
+  const res = await fetch(`${API_URL}/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  })
+
+  if (!res.ok) {
+    throw new Error('Token refresh failed')
+  }
+
+  const json: ApiResponse<{ access_token: string; refresh_token?: string }> = await res.json()
+  if (!json.ok || !json.data?.access_token) {
+    throw new Error('Invalid refresh response')
+  }
+
+  localStorage.setItem('access_token', json.data.access_token)
+  if (json.data.refresh_token) {
+    localStorage.setItem('refresh_token', json.data.refresh_token)
+  }
+
+  return json.data.access_token
+}
+
+async function request<T>(path: string, options: RequestInit = {}, _isRetry = false): Promise<T> {
   const token = localStorage.getItem('access_token')
 
   const headers: Record<string, string> = {
@@ -23,7 +63,36 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers,
   })
 
-  if (res.status === 401) {
+  if (res.status === 401 && !_isRetry) {
+    // Attempt token refresh
+    if (!isRefreshing) {
+      isRefreshing = true
+      try {
+        const newToken = await tryRefreshToken()
+        isRefreshing = false
+        processRefreshQueue(null, newToken)
+        // Retry original request with new token
+        return request<T>(path, options, true)
+      } catch (err) {
+        isRefreshing = false
+        processRefreshQueue(err as Error, null)
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        window.location.href = '/login'
+        throw new Error('Unauthorized')
+      }
+    } else {
+      // Another refresh is in progress — wait for it
+      return new Promise<T>((resolve, reject) => {
+        refreshQueue.push({
+          resolve: () => resolve(request<T>(path, options, true)),
+          reject,
+        })
+      })
+    }
+  }
+
+  if (res.status === 401 && _isRetry) {
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     window.location.href = '/login'
