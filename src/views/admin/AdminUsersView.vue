@@ -1,18 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '../../lib/api'
-
-interface User {
-  id: string
-  authentik_uid: string
-  email: string
-  display_name: string
-  groups: string[]
-  is_banned: boolean
-  banned_at: string | null
-  ban_reason: string
-  created_at: string
-}
+import type { User } from '../../lib/schemas'
 
 const users = ref<User[]>([])
 const loading = ref(true)

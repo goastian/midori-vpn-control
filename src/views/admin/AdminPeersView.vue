@@ -1,22 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '../../lib/api'
+import type { AdminPeer } from '../../lib/schemas'
 
-interface Peer {
-  id: string
-  user_id: string
-  server_id: string
-  public_key: string
-  assigned_ip: string
-  device_name: string
-  is_active: boolean
-  bytes_sent: number
-  bytes_received: number
-  last_handshake: string | null
-  created_at: string
-}
-
-const peers = ref<Peer[]>([])
+const peers = ref<AdminPeer[]>([])
 const loading = ref(true)
 
 onMounted(() => loadPeers())
@@ -24,7 +11,7 @@ onMounted(() => loadPeers())
 async function loadPeers() {
   loading.value = true
   try {
-    peers.value = (await api.get<Peer[]>('/api/v1/admin/peers')) || []
+    peers.value = (await api.get<AdminPeer[]>('/api/v1/admin/peers')) || []
   } catch (e) {
     console.error('Failed to load peers', e)
   } finally {

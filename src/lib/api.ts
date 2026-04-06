@@ -1,5 +1,7 @@
 const API_URL = import.meta.env.VITE_API_URL || ''
 
+import type { ZodType } from 'zod'
+
 interface ApiResponse<T = any> {
   ok: boolean
   data: T
@@ -115,7 +117,13 @@ export const api = {
   put: <T>(path: string, body?: any) =>
     request<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+
+  /** Type-safe request with Zod schema validation on the response. */
+  validated: <T>(path: string, schema: ZodType<T>, options?: RequestInit) =>
+    request<unknown>(path, options).then((data) => schema.parse(data)),
 }
+
+import { TokenResponseSchema } from './schemas'
 
 export async function exchangeCode(code: string, redirectUri: string, codeVerifier: string) {
   const res = await fetch(`${API_URL}/auth/callback`, {
@@ -130,11 +138,5 @@ export async function exchangeCode(code: string, redirectUri: string, codeVerifi
   }
 
   const json = await res.json()
-  return json.data as {
-    access_token: string
-    token_type: string
-    expires_in: number
-    refresh_token?: string
-    id_token?: string
-  }
+  return TokenResponseSchema.parse(json.data)
 }

@@ -2,31 +2,9 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { api } from '../lib/api'
+import type { AdminStats, Connection } from '../lib/schemas'
 
 const auth = useAuthStore()
-
-interface AdminStats {
-  total_users: number
-  total_servers: number
-  active_servers: number
-  total_peers: number
-  active_peers: number
-  total_bytes_sent: number
-  total_bytes_received: number
-}
-
-interface Connection {
-  id: string
-  server_id: string
-  public_key: string
-  assigned_ip: string
-  device_name: string
-  is_active: boolean
-  bytes_sent: number
-  bytes_received: number
-  last_handshake: string | null
-  created_at: string
-}
 
 const connections = ref<Connection[]>([])
 const adminStats = ref<AdminStats | null>(null)

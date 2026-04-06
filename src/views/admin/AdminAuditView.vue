@@ -1,15 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '../../lib/api'
-
-interface AuditLog {
-  id: string
-  user_id: string | null
-  action: string
-  metadata: Record<string, any>
-  ip_address: string
-  created_at: string
-}
+import type { AuditLog } from '../../lib/schemas'
 
 const logs = ref<AuditLog[]>([])
 const loading = ref(true)

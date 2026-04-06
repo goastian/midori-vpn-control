@@ -2,37 +2,18 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '../../lib/api'
+import type { User, AdminPeer } from '../../lib/schemas'
 
 const route = useRoute()
 const userId = route.params.id as string
 
-interface User {
-  id: string
-  email: string
-  display_name: string
-  groups: string[]
-  is_banned: boolean
-  ban_reason: string
-  created_at: string
-}
-
-interface Peer {
-  id: string
-  server_id: string
-  assigned_ip: string
-  device_name: string
-  is_active: boolean
-  bytes_sent: number
-  bytes_received: number
-}
-
 const user = ref<User | null>(null)
-const peers = ref<Peer[]>([])
+const peers = ref<AdminPeer[]>([])
 const loading = ref(true)
 
 onMounted(async () => {
   try {
-    const data = await api.get<{ user: User; peers: Peer[] }>(
+    const data = await api.get<{ user: User; peers: AdminPeer[] }>(
       `/api/v1/admin/users/${userId}`
     )
     user.value = data.user

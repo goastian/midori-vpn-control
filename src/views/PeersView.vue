@@ -1,37 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { api } from '../lib/api'
-
-interface Server {
-  id: string
-  name: string
-  location: string
-  country_code: string
-  current_peers: number
-  max_peers: number
-}
-
-interface Connection {
-  id: string
-  server_id: string
-  public_key: string
-  assigned_ip: string
-  device_name: string
-  is_active: boolean
-  bytes_sent: number
-  bytes_received: number
-  last_handshake: string | null
-  created_at: string
-}
-
-interface ConnectionConfig {
-  peer_id: string
-  peer_ip: string
-  server_public_key: string
-  server_endpoint: string
-  dns: string
-  allowed_ips: string
-}
+import type { Server, Connection, ConnectionConfig } from '../lib/schemas'
 
 const servers = ref<Server[]>([])
 const connections = ref<Connection[]>([])

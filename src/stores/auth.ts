@@ -2,21 +2,11 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { generateCodeVerifier, generateCodeChallenge } from '../lib/pkce'
 import { exchangeCode, api } from '../lib/api'
+import { UserSchema, type User } from '../lib/schemas'
 
 const ISSUER = import.meta.env.VITE_AUTHENTIK_ISSUER
 const CLIENT_ID = import.meta.env.VITE_AUTHENTIK_CLIENT_ID
 const REDIRECT_URI = import.meta.env.VITE_AUTHENTIK_REDIRECT_URI
-
-interface User {
-  id: string
-  authentik_uid: string
-  email: string
-  display_name: string
-  groups: string[]
-  is_banned: boolean
-  created_at: string
-  updated_at: string
-}
 
 interface JWTPayload {
   sub?: string
@@ -124,7 +114,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function fetchProfile() {
     try {
-      user.value = await api.get<User>('/api/v1/control/me')
+      user.value = await api.validated('/api/v1/control/me', UserSchema)
     } catch (e: any) {
       if (e.message === 'Unauthorized') {
         logout()

@@ -1,20 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '../lib/api'
-
-interface Server {
-  id: string
-  name: string
-  host: string
-  port: number
-  wg_port: number
-  public_key: string
-  location: string
-  country_code: string
-  max_peers: number
-  current_peers: number
-  is_active: boolean
-}
+import type { Server } from '../lib/schemas'
 
 const servers = ref<Server[]>([])
 const loading = ref(true)
