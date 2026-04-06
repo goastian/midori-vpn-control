@@ -1,4 +1,3 @@
-```md
 # MidoriVPN Control — Frontend
 
 Web control panel for MidoriVPN. SPA application built with **Vue 3**, **TypeScript**, **Vite**, and **TailwindCSS**.
@@ -18,7 +17,6 @@ Web control panel for MidoriVPN. SPA application built with **Vue 3**, **TypeScr
 ## Project Structure
 
 ```
-
 control/
 ├── .env                    → Environment variables (Vite)
 ├── index.html              → HTML entry point
@@ -50,8 +48,7 @@ control/
 ├── ServersView.vue     → VPN server CRUD (admin)
 ├── PeersView.vue       → User VPN connection management
 └── AuditView.vue       → Audit log
-
-````
+```
 
 ## Requirements
 
@@ -63,7 +60,7 @@ control/
 ```bash
 cd control
 npm install
-````
+```
 
 ## Development
 
@@ -180,5 +177,4 @@ The two backend middlewares are complementary:
 * **`internal/api/middleware.go`** — Validates `X-Core-Token` (shared secret for the WireGuard core API)
 * **`internal/auth/middleware.go`** — Validates Authentik JWT Bearer (for the Control API consumed by this frontend)
 
-```
-```
+
