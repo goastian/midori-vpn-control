@@ -18,6 +18,41 @@ interface User {
   updated_at: string
 }
 
+interface JWTPayload {
+  sub?: string
+  iss?: string
+  exp?: number
+  iat?: number
+  email?: string
+  groups?: string[]
+  [key: string]: unknown
+}
+
+function decodeJWTPayload(token: string): JWTPayload | null {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const payload = parts[1]
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
+    return JSON.parse(json)
+  } catch {
+    return null
+  }
+}
+
+function isTokenExpired(token: string, skewSeconds = 60): boolean {
+  const payload = decodeJWTPayload(token)
+  if (!payload?.exp) return true
+  return Date.now() / 1000 > payload.exp - skewSeconds
+}
+
+function isTokenIssuerValid(token: string): boolean {
+  if (!ISSUER) return true
+  const payload = decodeJWTPayload(token)
+  if (!payload?.iss) return false
+  return payload.iss === ISSUER
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref(localStorage.getItem('access_token') || '')
   const refreshToken = ref(localStorage.getItem('refresh_token') || '')
@@ -62,6 +97,14 @@ export const useAuthStore = defineStore('auth', () => {
 
       const tokens = await exchangeCode(code, REDIRECT_URI, verifier)
 
+      // Validate token before storing
+      if (!isTokenIssuerValid(tokens.access_token)) {
+        throw new Error('Token issuer mismatch')
+      }
+      if (isTokenExpired(tokens.access_token)) {
+        throw new Error('Received expired token')
+      }
+
       accessToken.value = tokens.access_token
       localStorage.setItem('access_token', tokens.access_token)
 
@@ -100,9 +143,13 @@ export const useAuthStore = defineStore('auth', () => {
     window.location.href = logoutUrl
   }
 
-  // Auto-fetch profile on init if token exists
+  // Auto-fetch profile on init if token exists and is valid
   if (accessToken.value) {
-    fetchProfile()
+    if (isTokenExpired(accessToken.value) || !isTokenIssuerValid(accessToken.value)) {
+      logout()
+    } else {
+      fetchProfile()
+    }
   }
 
   return {
@@ -113,6 +160,7 @@ export const useAuthStore = defineStore('auth', () => {
     error,
     isAuthenticated,
     isAdmin,
+    isTokenExpired: () => isTokenExpired(accessToken.value),
     startLogin,
     handleCallback,
     fetchProfile,
