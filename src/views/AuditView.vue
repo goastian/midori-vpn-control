@@ -42,6 +42,18 @@ function actionColor(action: string): string {
   if (action.includes('cleanup')) return 'bg-yellow-100 text-yellow-700'
   return 'bg-gray-100 text-gray-600'
 }
+
+function safeMetadata(metadata: Record<string, any>): string {
+  try {
+    const safe: Record<string, string> = {}
+    for (const [key, value] of Object.entries(metadata)) {
+      safe[String(key).slice(0, 64)] = String(value).slice(0, 256)
+    }
+    return JSON.stringify(safe)
+  } catch {
+    return '{}'
+  }
+}
 </script>
 
 <template>
@@ -78,7 +90,7 @@ function actionColor(action: string): string {
             </td>
             <td class="px-6 py-4 font-mono text-gray-500 hidden md:table-cell">{{ log.ip_address }}</td>
             <td class="px-6 py-4 text-xs text-gray-400 hidden lg:table-cell font-mono">
-              {{ JSON.stringify(log.metadata) }}
+              {{ safeMetadata(log.metadata) }}
             </td>
           </tr>
         </tbody>
