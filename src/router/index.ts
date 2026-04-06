@@ -76,13 +76,22 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore()
   if (!to.meta.public && !auth.isAuthenticated) {
     return { name: 'landing' }
   }
-  if (to.meta.admin && !auth.isAdmin) {
-    return { name: 'dashboard' }
+
+  // Revalidate profile from server on every admin navigation
+  if (to.meta.admin) {
+    try {
+      await auth.fetchProfile()
+    } catch {
+      return { name: 'landing' }
+    }
+    if (!auth.isAdmin) {
+      return { name: 'dashboard' }
+    }
   }
 })
 
