@@ -146,10 +146,10 @@ function scrollTo(id: string) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-white text-gray-900 overflow-x-hidden">
+  <div class="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-x-hidden">
 
     <!-- ═══════════════════════ NAVBAR ═══════════════════════ -->
-    <nav class="fixed top-0 inset-x-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-100">
+    <nav class="fixed top-0 inset-x-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-100 dark:border-gray-800">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between h-16">
           <!-- Logo -->
@@ -261,7 +261,7 @@ function scrollTo(id: string) {
               <!-- Mock header -->
               <div class="flex items-center justify-between">
                 <div>
-                  <p class="text-sm font-semibold text-gray-900">Network Traffic</p>
+                  <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">Network Traffic</p>
                   <p class="text-xs text-gray-400 mt-0.5">Last 24 hours — real-time</p>
                 </div>
                 <div class="flex items-center gap-1.5 px-2.5 py-1 bg-midori-50 rounded-lg">
@@ -309,7 +309,7 @@ function scrollTo(id: string) {
                 </svg>
               </div>
               <div>
-                <p class="text-xs font-semibold text-gray-900">Encrypted</p>
+                <p class="text-xs font-semibold text-gray-900 dark:text-gray-100">Encrypted</p>
                 <p class="text-[10px] text-gray-400">WireGuard / AES-256</p>
               </div>
             </div>
@@ -324,7 +324,7 @@ function scrollTo(id: string) {
         <div class="text-center max-w-2xl mx-auto mb-16">
           <p class="text-sm font-semibold text-midori-600 uppercase tracking-wide">Features</p>
           <h2 class="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight">Everything you need for secure networking</h2>
-          <p class="mt-4 text-lg text-gray-500">Built for speed, privacy, and developer experience. Every feature is designed to just work.</p>
+          <p class="mt-4 text-lg text-gray-500 dark:text-gray-400">Built for speed, privacy, and developer experience. Every feature is designed to just work.</p>
         </div>
 
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
@@ -363,7 +363,7 @@ function scrollTo(id: string) {
               </svg>
             </div>
 
-            <h3 class="text-base font-semibold text-gray-900">{{ f.title }}</h3>
+            <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">{{ f.title }}</h3>
             <p class="mt-2 text-sm text-gray-500 leading-relaxed">{{ f.desc }}</p>
           </div>
         </div>
@@ -376,7 +376,7 @@ function scrollTo(id: string) {
         <div class="text-center max-w-2xl mx-auto mb-12">
           <p class="text-sm font-semibold text-midori-600 uppercase tracking-wide">Pricing</p>
           <h2 class="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight">Simple, transparent pricing</h2>
-          <p class="mt-4 text-lg text-gray-500">Start free. Upgrade when you need more. No hidden fees, ever.</p>
+          <p class="mt-4 text-lg text-gray-500 dark:text-gray-400">Start free. Upgrade when you need more. No hidden fees, ever.</p>
 
           <!-- Annual/Monthly toggle -->
           <div class="mt-8 inline-flex items-center gap-3 bg-gray-100 rounded-full p-1">
@@ -454,7 +454,7 @@ function scrollTo(id: string) {
         <div class="text-center max-w-2xl mx-auto mb-16">
           <p class="text-sm font-semibold text-midori-600 uppercase tracking-wide">Trust &amp; Security</p>
           <h2 class="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight">Built on transparency</h2>
-          <p class="mt-4 text-lg text-gray-500">Open-source. Audited. No compromises on privacy.</p>
+          <p class="mt-4 text-lg text-gray-500 dark:text-gray-400">Open-source. Audited. No compromises on privacy.</p>
         </div>
 
         <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">

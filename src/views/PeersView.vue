@@ -130,16 +130,16 @@ AllowedIPs = ${c.allowed_ips}`
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Mis Conexiones VPN</h1>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Mis Conexiones VPN</h1>
 
     <!-- Connect form -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-      <h2 class="text-lg font-semibold mb-4">Nueva conexión</h2>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-6">
+      <h2 class="text-lg font-semibold mb-4 dark:text-gray-100">Nueva conexión</h2>
       <form @submit.prevent="connect" class="space-y-3">
         <div class="flex flex-col sm:flex-row gap-3">
           <select
             v-model="form.server_id"
-            class="border rounded-lg px-3 py-2 text-sm flex-1"
+            class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm flex-1 bg-white dark:bg-gray-700 dark:text-gray-200"
           >
             <option value="">Auto (menos cargado)</option>
             <option v-for="s in servers" :key="s.id" :value="s.id">
@@ -149,7 +149,7 @@ AllowedIPs = ${c.allowed_ips}`
           <input
             v-model="form.device_name"
             placeholder="Nombre del dispositivo (opcional)"
-            class="border rounded-lg px-3 py-2 text-sm flex-1"
+            class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm flex-1 bg-white dark:bg-gray-700 dark:text-gray-200"
           />
         </div>
         <div class="flex flex-col sm:flex-row gap-3">
@@ -157,7 +157,7 @@ AllowedIPs = ${c.allowed_ips}`
             v-model="form.public_key"
             placeholder="Tu clave pública WireGuard"
             required
-            class="border rounded-lg px-3 py-2 text-sm flex-1 font-mono"
+            class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm flex-1 font-mono bg-white dark:bg-gray-700 dark:text-gray-200"
           />
           <button
             type="submit"
@@ -171,14 +171,14 @@ AllowedIPs = ${c.allowed_ips}`
     </div>
 
     <!-- WireGuard config result -->
-    <div v-if="lastConfig" class="bg-green-50 border border-green-200 rounded-xl p-6 mb-6">
+    <div v-if="lastConfig" class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-6 mb-6">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="font-semibold text-green-800">Configuración WireGuard</h3>
+        <h3 class="font-semibold text-green-800 dark:text-green-400">Configuración WireGuard</h3>
         <button @click="copyConfig" class="text-sm text-green-700 hover:text-green-900 font-medium">
           Copiar
         </button>
       </div>
-      <pre class="text-xs bg-white rounded-lg p-4 font-mono text-gray-700 overflow-x-auto">[Interface]
+      <pre class="text-xs bg-white dark:bg-gray-800 rounded-lg p-4 font-mono text-gray-700 dark:text-gray-300 overflow-x-auto">[Interface]
 Address = {{ lastConfig.peer_ip }}/32
 DNS = {{ lastConfig.dns }}
 
@@ -193,13 +193,13 @@ AllowedIPs = {{ lastConfig.allowed_ips }}</pre>
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
     </div>
 
-    <div v-else-if="connections.length === 0" class="text-center py-12 text-gray-400">
+    <div v-else-if="connections.length === 0" class="text-center py-12 text-gray-400 dark:text-gray-500">
       No tienes conexiones activas.
     </div>
 
-    <div v-else class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div v-else class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
       <table class="w-full text-sm">
-        <thead class="bg-gray-50 text-left text-xs text-gray-500 uppercase tracking-wider">
+        <thead class="bg-gray-50 dark:bg-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           <tr>
             <th class="px-6 py-3">Dispositivo</th>
             <th class="px-6 py-3">Servidor</th>
@@ -209,8 +209,8 @@ AllowedIPs = {{ lastConfig.allowed_ips }}</pre>
             <th class="px-6 py-3"></th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-50">
-          <tr v-for="conn in connections" :key="conn.id" class="hover:bg-gray-50 transition-colors">
+        <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
+          <tr v-for="conn in connections" :key="conn.id" class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
             <td class="px-6 py-4 text-gray-900">{{ conn.device_name || 'Sin nombre' }}</td>
             <td class="px-6 py-4 font-medium text-gray-700">{{ serverName(conn.server_id) }}</td>
             <td class="px-6 py-4 font-mono text-gray-600 text-xs">{{ conn.assigned_ip }}</td>

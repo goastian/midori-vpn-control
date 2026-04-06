@@ -58,19 +58,19 @@ function safeMetadata(metadata: Record<string, any>): string {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Registro de Auditoría</h1>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Registro de Auditoría</h1>
 
     <div v-if="loading" class="flex justify-center py-12">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
     </div>
 
-    <div v-else-if="logs.length === 0" class="text-center py-12 text-gray-400">
+    <div v-else-if="logs.length === 0" class="text-center py-12 text-gray-400 dark:text-gray-500">
       No hay registros de auditoría.
     </div>
 
-    <div v-else class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div v-else class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
       <table class="w-full text-sm">
-        <thead class="bg-gray-50 text-left text-xs text-gray-500 uppercase tracking-wider">
+        <thead class="bg-gray-50 dark:bg-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           <tr>
             <th class="px-6 py-3">Fecha</th>
             <th class="px-6 py-3">Acción</th>
@@ -78,9 +78,9 @@ function safeMetadata(metadata: Record<string, any>): string {
             <th class="px-6 py-3 hidden lg:table-cell">Detalles</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-50">
-          <tr v-for="log in logs" :key="log.id" class="hover:bg-gray-50 transition-colors">
-            <td class="px-6 py-4 text-gray-500 whitespace-nowrap">
+        <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
+          <tr v-for="log in logs" :key="log.id" class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+            <td class="px-6 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">
               {{ new Date(log.created_at).toLocaleString() }}
             </td>
             <td class="px-6 py-4">
@@ -88,8 +88,8 @@ function safeMetadata(metadata: Record<string, any>): string {
                 {{ actionLabel(log.action) }}
               </span>
             </td>
-            <td class="px-6 py-4 font-mono text-gray-500 hidden md:table-cell">{{ log.ip_address }}</td>
-            <td class="px-6 py-4 text-xs text-gray-400 hidden lg:table-cell font-mono">
+            <td class="px-6 py-4 font-mono text-gray-500 dark:text-gray-400 hidden md:table-cell">{{ log.ip_address }}</td>
+            <td class="px-6 py-4 text-xs text-gray-400 dark:text-gray-500 hidden lg:table-cell font-mono">
               {{ safeMetadata(log.metadata) }}
             </td>
           </tr>

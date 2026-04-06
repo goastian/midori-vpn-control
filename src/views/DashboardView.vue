@@ -84,7 +84,7 @@ const activeConnections = () => connections.value.filter((c) => c.is_active).len
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Dashboard</h1>
 
     <div v-if="loading" class="flex justify-center py-12">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
@@ -93,21 +93,21 @@ const activeConnections = () => connections.value.filter((c) => c.is_active).len
     <template v-else>
       <!-- Admin stats -->
       <div v-if="auth.isAdmin && adminStats" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <p class="text-xs text-gray-500 mb-1">Usuarios</p>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
+          <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Usuarios</p>
           <p class="text-2xl font-bold text-midori-600">{{ adminStats.total_users }}</p>
         </div>
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <p class="text-xs text-gray-500 mb-1">Servidores</p>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
+          <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Servidores</p>
           <p class="text-2xl font-bold text-midori-600">{{ adminStats.active_servers }}<span class="text-sm text-gray-400">/{{ adminStats.total_servers }}</span></p>
         </div>
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <p class="text-xs text-gray-500 mb-1">Peers activos</p>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
+          <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Peers activos</p>
           <p class="text-2xl font-bold text-midori-600">{{ adminStats.active_peers }}<span class="text-sm text-gray-400">/{{ adminStats.total_peers }}</span></p>
         </div>
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <p class="text-xs text-gray-500 mb-1">Tráfico total</p>
-          <p class="text-lg font-bold text-gray-700">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
+          <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Tráfico total</p>
+          <p class="text-lg font-bold text-gray-700 dark:text-gray-300">
             <span class="text-green-600">↑{{ formatBytes(adminStats.total_bytes_sent) }}</span>
             <span class="text-blue-600 ml-1">↓{{ formatBytes(adminStats.total_bytes_received) }}</span>
           </p>
@@ -116,28 +116,28 @@ const activeConnections = () => connections.value.filter((c) => c.is_active).len
 
       <!-- User info cards -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <p class="text-sm text-gray-500 mb-1">Mis conexiones</p>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Mis conexiones</p>
           <p class="text-3xl font-bold text-midori-600">{{ activeConnections() }}</p>
         </div>
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <p class="text-sm text-gray-500 mb-1">Cuenta</p>
-          <p class="text-lg font-semibold text-gray-700 truncate">{{ auth.user?.email }}</p>
-          <p v-if="auth.user?.display_name" class="text-sm text-gray-400">{{ auth.user.display_name }}</p>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Cuenta</p>
+          <p class="text-lg font-semibold text-gray-700 dark:text-gray-200 truncate">{{ auth.user?.email }}</p>
+          <p v-if="auth.user?.display_name" class="text-sm text-gray-400 dark:text-gray-500">{{ auth.user.display_name }}</p>
           <p v-if="auth.isAdmin" class="text-xs text-midori-600 font-medium mt-1">Admin</p>
         </div>
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <p class="text-sm text-gray-500 mb-1">Total conexiones</p>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Total conexiones</p>
           <p class="text-3xl font-bold text-gray-700">{{ connections.length }}</p>
         </div>
       </div>
 
       <!-- Recent connections -->
-      <div v-if="connections.length > 0" class="bg-white rounded-xl shadow-sm border border-gray-100">
+      <div v-if="connections.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
         <div class="px-6 py-4 border-b border-gray-100">
-          <h2 class="text-lg font-semibold text-gray-900">Conexiones recientes</h2>
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Conexiones recientes</h2>
         </div>
-        <div class="divide-y divide-gray-50">
+        <div class="divide-y divide-gray-50 dark:divide-gray-700">
           <div v-for="conn in connections.slice(0, 5)" :key="conn.id" class="px-6 py-4 flex items-center justify-between">
             <div>
               <p class="text-sm font-mono text-gray-700">{{ conn.assigned_ip }}</p>

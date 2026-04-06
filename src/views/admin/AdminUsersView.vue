@@ -82,7 +82,7 @@ async function deleteUser(id: string) {
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Gestión de Usuarios</h1>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Gestión de Usuarios</h1>
       <button
         @click="showCreate = !showCreate"
         class="bg-midori-600 hover:bg-midori-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
@@ -91,12 +91,12 @@ async function deleteUser(id: string) {
       </button>
     </div>
 
-    <div v-if="showCreate" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+    <div v-if="showCreate" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-6">
       <form @submit.prevent="createUser" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <input v-model="form.authentik_uid" placeholder="Authentik UID" required class="border rounded-lg px-3 py-2 text-sm" />
-        <input v-model="form.email" placeholder="Email" required class="border rounded-lg px-3 py-2 text-sm" />
-        <input v-model="form.display_name" placeholder="Nombre" class="border rounded-lg px-3 py-2 text-sm" />
-        <input v-model="groupInput" placeholder="Grupos (separados por coma)" class="border rounded-lg px-3 py-2 text-sm" />
+        <input v-model="form.authentik_uid" placeholder="Authentik UID" required class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model="form.email" placeholder="Email" required class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model="form.display_name" placeholder="Nombre" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model="groupInput" placeholder="Grupos (separados por coma)" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
         <div class="md:col-span-2">
           <button type="submit" class="bg-midori-600 hover:bg-midori-700 text-white font-medium px-6 py-2 rounded-lg">
             Crear
@@ -109,9 +109,9 @@ async function deleteUser(id: string) {
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
     </div>
 
-    <div v-else class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div v-else class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
       <table class="w-full text-sm">
-        <thead class="bg-gray-50 text-left text-xs text-gray-500 uppercase tracking-wider">
+        <thead class="bg-gray-50 dark:bg-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           <tr>
             <th class="px-6 py-3">Email</th>
             <th class="px-6 py-3">Nombre</th>
@@ -120,12 +120,12 @@ async function deleteUser(id: string) {
             <th class="px-6 py-3">Acciones</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-50">
-          <tr v-for="u in users" :key="u.id" class="hover:bg-gray-50">
-            <td class="px-6 py-4 text-gray-900">{{ u.email }}</td>
-            <td class="px-6 py-4 text-gray-600">{{ u.display_name || '—' }}</td>
+        <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
+          <tr v-for="u in users" :key="u.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+            <td class="px-6 py-4 text-gray-900 dark:text-gray-100">{{ u.email }}</td>
+            <td class="px-6 py-4 text-gray-600 dark:text-gray-400">{{ u.display_name || '—' }}</td>
             <td class="px-6 py-4 hidden md:table-cell">
-              <span v-for="g in u.groups" :key="g" class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded mr-1">
+              <span v-for="g in u.groups" :key="g" class="text-xs bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded mr-1">
                 {{ g }}
               </span>
             </td>

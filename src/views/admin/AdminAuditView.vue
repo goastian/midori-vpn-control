@@ -57,10 +57,10 @@ function actionColor(action: string): string {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Admin — Audit Logs</h1>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Admin — Audit Logs</h1>
 
     <div class="flex items-center gap-3 mb-6">
-      <select v-model="actionFilter" @change="loadLogs" class="border rounded-lg px-3 py-2 text-sm">
+      <select v-model="actionFilter" @change="loadLogs" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200">
         <option value="">Todas las acciones</option>
         <option value="peer.connect">peer.connect</option>
         <option value="peer.disconnect">peer.disconnect</option>
@@ -78,13 +78,13 @@ function actionColor(action: string): string {
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
     </div>
 
-    <div v-else-if="logs.length === 0" class="text-center py-12 text-gray-400">
+    <div v-else-if="logs.length === 0" class="text-center py-12 text-gray-400 dark:text-gray-500">
       No hay registros.
     </div>
 
-    <div v-else class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div v-else class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
       <table class="w-full text-sm">
-        <thead class="bg-gray-50 text-left text-xs text-gray-500 uppercase tracking-wider">
+        <thead class="bg-gray-50 dark:bg-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           <tr>
             <th class="px-6 py-3">Fecha</th>
             <th class="px-6 py-3">Acción</th>
@@ -93,8 +93,8 @@ function actionColor(action: string): string {
             <th class="px-6 py-3 hidden lg:table-cell">Detalles</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-50">
-          <tr v-for="log in logs" :key="log.id" class="hover:bg-gray-50">
+        <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
+          <tr v-for="log in logs" :key="log.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
             <td class="px-6 py-4 text-gray-500 whitespace-nowrap text-xs">
               {{ new Date(log.created_at).toLocaleString() }}
             </td>
@@ -106,8 +106,8 @@ function actionColor(action: string): string {
             <td class="px-6 py-4 hidden md:table-cell text-xs text-gray-500">
               {{ log.user_id ? log.user_id.slice(0, 8) + '…' : 'sistema' }}
             </td>
-            <td class="px-6 py-4 font-mono text-gray-500 hidden md:table-cell text-xs">{{ log.ip_address }}</td>
-            <td class="px-6 py-4 text-xs text-gray-400 hidden lg:table-cell font-mono max-w-xs truncate">
+            <td class="px-6 py-4 font-mono text-gray-500 dark:text-gray-400 hidden md:table-cell text-xs">{{ log.ip_address }}</td>
+            <td class="px-6 py-4 text-xs text-gray-400 dark:text-gray-500 hidden lg:table-cell font-mono max-w-xs truncate">
               {{ JSON.stringify(log.metadata) }}
             </td>
           </tr>

@@ -87,7 +87,7 @@ async function deleteServer(id: string) {
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Admin — Servidores</h1>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Admin — Servidores</h1>
       <button
         @click="showForm ? cancelForm() : (showForm = true)"
         class="bg-midori-600 hover:bg-midori-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
@@ -96,21 +96,21 @@ async function deleteServer(id: string) {
       </button>
     </div>
 
-    <div v-if="showForm" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-      <h2 class="text-lg font-semibold mb-4">{{ editingId ? 'Editar' : 'Nuevo' }} servidor</h2>
+    <div v-if="showForm" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-6">
+      <h2 class="text-lg font-semibold mb-4 dark:text-gray-100">{{ editingId ? 'Editar' : 'Nuevo' }} servidor</h2>
       <form @submit.prevent="saveServer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <input v-model="form.name" placeholder="Nombre" required class="border rounded-lg px-3 py-2 text-sm" />
-        <input v-model="form.host" placeholder="Host" required class="border rounded-lg px-3 py-2 text-sm" />
-        <input v-model.number="form.port" type="number" placeholder="Puerto API" class="border rounded-lg px-3 py-2 text-sm" />
-        <input v-model.number="form.wg_port" type="number" placeholder="Puerto WG" class="border rounded-lg px-3 py-2 text-sm" />
-        <input v-model="form.public_key" placeholder="Clave pública WG" required class="border rounded-lg px-3 py-2 text-sm font-mono" />
-        <input v-model="form.core_token" placeholder="Core Token" :required="!editingId" class="border rounded-lg px-3 py-2 text-sm" />
-        <input v-model="form.location" placeholder="Ubicación" class="border rounded-lg px-3 py-2 text-sm" />
-        <input v-model="form.country_code" placeholder="País (US, DE...)" class="border rounded-lg px-3 py-2 text-sm" />
-        <input v-model.number="form.max_peers" type="number" placeholder="Max peers" class="border rounded-lg px-3 py-2 text-sm" />
+        <input v-model="form.name" placeholder="Nombre" required class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model="form.host" placeholder="Host" required class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model.number="form.port" type="number" placeholder="Puerto API" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model.number="form.wg_port" type="number" placeholder="Puerto WG" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model="form.public_key" placeholder="Clave pública WG" required class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm font-mono bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model="form.core_token" placeholder="Core Token" :required="!editingId" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model="form.location" placeholder="Ubicación" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model="form.country_code" placeholder="País (US, DE...)" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model.number="form.max_peers" type="number" placeholder="Max peers" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
         <label class="flex items-center space-x-2">
           <input v-model="form.is_active" type="checkbox" class="rounded border-gray-300" />
-          <span class="text-sm text-gray-700">Activo</span>
+          <span class="text-sm text-gray-700 dark:text-gray-300">Activo</span>
         </label>
         <div class="md:col-span-2">
           <button type="submit" class="bg-midori-600 hover:bg-midori-700 text-white font-medium px-6 py-2 rounded-lg">
@@ -124,9 +124,9 @@ async function deleteServer(id: string) {
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
     </div>
 
-    <div v-else class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div v-else class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
       <table class="w-full text-sm">
-        <thead class="bg-gray-50 text-left text-xs text-gray-500 uppercase tracking-wider">
+        <thead class="bg-gray-50 dark:bg-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           <tr>
             <th class="px-6 py-3">Nombre</th>
             <th class="px-6 py-3">Host</th>
@@ -136,11 +136,11 @@ async function deleteServer(id: string) {
             <th class="px-6 py-3">Acciones</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-50">
-          <tr v-for="s in servers" :key="s.id" class="hover:bg-gray-50">
-            <td class="px-6 py-4 font-medium text-gray-900">{{ s.name }}</td>
-            <td class="px-6 py-4 font-mono text-xs text-gray-600">{{ s.host }}:{{ s.port }}</td>
-            <td class="px-6 py-4 hidden md:table-cell text-gray-500">{{ s.location }} {{ s.country_code ? `(${s.country_code})` : '' }}</td>
+        <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
+          <tr v-for="s in servers" :key="s.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+            <td class="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">{{ s.name }}</td>
+            <td class="px-6 py-4 font-mono text-xs text-gray-600 dark:text-gray-400">{{ s.host }}:{{ s.port }}</td>
+            <td class="px-6 py-4 hidden md:table-cell text-gray-500 dark:text-gray-400">{{ s.location }} {{ s.country_code ? `(${s.country_code})` : '' }}</td>
             <td class="px-6 py-4">{{ s.current_peers }}/{{ s.max_peers }}</td>
             <td class="px-6 py-4">
               <span :class="s.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'" class="text-xs font-medium px-2 py-1 rounded-full">

@@ -53,19 +53,19 @@ function formatBytes(bytes: number): string {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Admin — Peers</h1>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Admin — Peers</h1>
 
     <div v-if="loading" class="flex justify-center py-12">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
     </div>
 
-    <div v-else-if="peers.length === 0" class="text-center py-12 text-gray-400">
+    <div v-else-if="peers.length === 0" class="text-center py-12 text-gray-400 dark:text-gray-500">
       No hay peers en el sistema.
     </div>
 
-    <div v-else class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div v-else class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
       <table class="w-full text-sm">
-        <thead class="bg-gray-50 text-left text-xs text-gray-500 uppercase tracking-wider">
+        <thead class="bg-gray-50 dark:bg-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           <tr>
             <th class="px-6 py-3">Dispositivo</th>
             <th class="px-6 py-3">IP</th>
@@ -75,10 +75,10 @@ function formatBytes(bytes: number): string {
             <th class="px-6 py-3"></th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-50">
-          <tr v-for="p in peers" :key="p.id" class="hover:bg-gray-50">
+        <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
+          <tr v-for="p in peers" :key="p.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
             <td class="px-6 py-4 text-gray-900">{{ p.device_name || '—' }}</td>
-            <td class="px-6 py-4 font-mono text-xs text-gray-600">{{ p.assigned_ip }}</td>
+            <td class="px-6 py-4 font-mono text-xs text-gray-600 dark:text-gray-400">{{ p.assigned_ip }}</td>
             <td class="px-6 py-4 hidden md:table-cell text-xs text-gray-500">{{ p.user_id.slice(0, 8) }}…</td>
             <td class="px-6 py-4 hidden md:table-cell text-xs text-gray-500">
               ↑{{ formatBytes(p.bytes_sent) }} ↓{{ formatBytes(p.bytes_received) }}

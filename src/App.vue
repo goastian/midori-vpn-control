@@ -15,7 +15,7 @@ const isFullPage = computed(() => route.meta?.fullPage === true)
   <RouterView v-if="isFullPage" />
 
   <!-- App shell for authenticated / standard routes -->
-  <div v-else class="min-h-screen bg-gray-50">
+    <div v-else class="min-h-screen bg-gray-50 dark:bg-gray-900">
     <NavBar v-if="auth.isAuthenticated" />
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <RouterView />

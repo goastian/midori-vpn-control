@@ -5,3 +5,7 @@
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
+
+.dark body {
+  color-scheme: dark;
+}
