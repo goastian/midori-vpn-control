@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { api } from '../lib/api'
 
 interface Server {
@@ -102,6 +102,12 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
+let clipboardTimer: ReturnType<typeof setTimeout> | null = null
+
+onUnmounted(() => {
+  if (clipboardTimer) clearTimeout(clipboardTimer)
+})
+
 function copyConfig() {
   if (!lastConfig.value) return
   const c = lastConfig.value
@@ -114,7 +120,11 @@ PublicKey = ${c.server_public_key}
 Endpoint = ${c.server_endpoint}
 AllowedIPs = ${c.allowed_ips}`
   navigator.clipboard.writeText(text)
-  alert('Configuración copiada al portapapeles')
+  alert('Configuración copiada al portapapeles (se limpiará en 60s)')
+  if (clipboardTimer) clearTimeout(clipboardTimer)
+  clipboardTimer = setTimeout(() => {
+    navigator.clipboard.writeText('').catch(() => {})
+  }, 60_000)
 }
 </script>
 
