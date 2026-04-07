@@ -4,7 +4,33 @@ import { generateCodeVerifier, generateCodeChallenge } from '../lib/pkce'
 import { exchangeCode, api } from '../lib/api'
 import { UserSchema, type User } from '../lib/schemas'
 
-const ISSUER = import.meta.env.VITE_AUTHENTIK_ISSUER
+function normalizeIssuer(value: string | undefined): string {
+  return (value || '').replace(/\/+$/, '')
+}
+
+function parseIssuerUrls(value: string | undefined) {
+  const appUrl = normalizeIssuer(value)
+
+  try {
+    const url = new URL(appUrl)
+    const origin = url.origin
+    return {
+      appUrl,
+      expectedTokenIssuer: `${origin}/`,
+      authorizationUrl: `${origin}/application/o/authorize/`,
+      endSessionUrl: `${appUrl}/end-session/`,
+    }
+  } catch {
+    return {
+      appUrl,
+      expectedTokenIssuer: appUrl,
+      authorizationUrl: `${appUrl}/authorize/`,
+      endSessionUrl: `${appUrl}/end-session/`,
+    }
+  }
+}
+
+const issuerUrls = parseIssuerUrls(import.meta.env.VITE_AUTHENTIK_ISSUER)
 const CLIENT_ID = import.meta.env.VITE_AUTHENTIK_CLIENT_ID
 const REDIRECT_URI = import.meta.env.VITE_AUTHENTIK_REDIRECT_URI
 
@@ -37,10 +63,10 @@ function isTokenExpired(token: string, skewSeconds = 60): boolean {
 }
 
 function isTokenIssuerValid(token: string): boolean {
-  if (!ISSUER) return true
+  if (!issuerUrls.expectedTokenIssuer) return true
   const payload = decodeJWTPayload(token)
   if (!payload?.iss) return false
-  return payload.iss === ISSUER
+  return payload.iss.replace(/\/+$/, '') === issuerUrls.expectedTokenIssuer.replace(/\/+$/, '')
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -74,7 +100,7 @@ export const useAuthStore = defineStore('auth', () => {
       state,
     })
 
-    window.location.href = `${ISSUER}/authorize/?${params.toString()}`
+    window.location.href = `${issuerUrls.authorizationUrl}?${params.toString()}`
   }
 
   async function handleCallback(code: string) {
@@ -129,7 +155,7 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
 
-    const logoutUrl = `${ISSUER}/end-session/?post_logout_redirect_uri=${encodeURIComponent(window.location.origin + '/')}`
+    const logoutUrl = `${issuerUrls.endSessionUrl}?post_logout_redirect_uri=${encodeURIComponent(window.location.origin + '/')}`
     window.location.href = logoutUrl
   }
 
