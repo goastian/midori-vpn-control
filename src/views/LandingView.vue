@@ -146,10 +146,10 @@ function scrollTo(id: string) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-x-hidden">
+  <div class="min-h-screen bg-gray-900 text-gray-100 overflow-x-hidden">
 
     <!-- ═══════════════════════ NAVBAR ═══════════════════════ -->
-    <nav class="fixed top-0 inset-x-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-100 dark:border-gray-800">
+    <nav class="fixed top-0 inset-x-0 z-50 bg-gray-900/80 backdrop-blur-lg border-b border-gray-800">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between h-16">
           <!-- Logo -->
@@ -164,17 +164,17 @@ function scrollTo(id: string) {
 
           <!-- Desktop links -->
           <div class="hidden md:flex items-center gap-8">
-            <button @click="scrollTo('features')" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Features</button>
-            <button @click="scrollTo('pricing')" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Pricing</button>
-            <button @click="scrollTo('trust')" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Security</button>
-            <router-link to="/login" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Log In</router-link>
+            <button @click="scrollTo('features')" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">Features</button>
+            <button @click="scrollTo('pricing')" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">Pricing</button>
+            <button @click="scrollTo('trust')" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">Security</button>
+            <router-link to="/login" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">Log In</router-link>
             <router-link to="/login" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-midori-500 rounded-lg hover:bg-midori-600 transition-colors shadow-sm">
               Get Started
             </router-link>
           </div>
 
           <!-- Mobile menu button -->
-          <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden p-2 rounded-lg hover:bg-gray-100">
+          <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden p-2 rounded-lg hover:bg-gray-800 text-gray-300">
             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path v-if="!mobileMenuOpen" stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
               <path v-else stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -192,11 +192,11 @@ function scrollTo(id: string) {
         leave-from-class="opacity-100 translate-y-0"
         leave-to-class="opacity-0 -translate-y-2"
       >
-        <div v-if="mobileMenuOpen" class="md:hidden bg-white border-b border-gray-100 px-4 pb-4 space-y-2">
-          <button @click="scrollTo('features')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50">Features</button>
-          <button @click="scrollTo('pricing')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50">Pricing</button>
-          <button @click="scrollTo('trust')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50">Security</button>
-          <router-link to="/login" class="block px-3 py-2 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50">Log In</router-link>
+        <div v-if="mobileMenuOpen" class="md:hidden bg-gray-900 border-b border-gray-800 px-4 pb-4 space-y-2">
+          <button @click="scrollTo('features')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">Features</button>
+          <button @click="scrollTo('pricing')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">Pricing</button>
+          <button @click="scrollTo('trust')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">Security</button>
+          <router-link to="/login" class="block px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">Log In</router-link>
           <router-link to="/login" class="block text-center px-4 py-2 text-sm font-semibold text-white bg-midori-500 rounded-lg">Get Started</router-link>
         </div>
       </Transition>
@@ -205,15 +205,15 @@ function scrollTo(id: string) {
     <!-- ═══════════════════════ HERO ═══════════════════════ -->
     <section class="relative pt-32 pb-20 sm:pt-40 sm:pb-28 overflow-hidden">
       <!-- Background gradient -->
-      <div class="absolute inset-0 bg-gradient-to-b from-midori-50/60 via-white to-white -z-10"></div>
-      <div class="absolute top-20 -right-32 w-96 h-96 bg-midori-200/30 rounded-full blur-3xl -z-10"></div>
-      <div class="absolute top-40 -left-32 w-80 h-80 bg-midori-100/40 rounded-full blur-3xl -z-10"></div>
+      <div class="absolute inset-0 bg-gradient-to-b from-midori-950/30 via-gray-900 to-gray-900 -z-10"></div>
+      <div class="absolute top-20 -right-32 w-96 h-96 bg-midori-700/20 rounded-full blur-3xl -z-10"></div>
+      <div class="absolute top-40 -left-32 w-80 h-80 bg-midori-800/15 rounded-full blur-3xl -z-10"></div>
 
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <!-- Left: Copy -->
           <div>
-            <div class="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold text-midori-700 bg-midori-100 rounded-full mb-6">
+            <div class="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold text-midori-400 bg-midori-900/40 rounded-full mb-6">
               <span class="w-1.5 h-1.5 rounded-full bg-midori-500 animate-pulse"></span>
               Now with WireGuard protocol
             </div>
@@ -224,7 +224,7 @@ function scrollTo(id: string) {
               VPN
             </h1>
 
-            <p class="mt-6 text-lg sm:text-xl text-gray-500 max-w-lg leading-relaxed">
+            <p class="mt-6 text-lg sm:text-xl text-gray-400 max-w-lg leading-relaxed">
               Open-source VPN built on WireGuard. Real-time analytics, global servers, and zero-log guarantee — all in one dashboard.
             </p>
 
@@ -233,7 +233,7 @@ function scrollTo(id: string) {
                 Start for free
                 <svg class="ml-2 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
               </router-link>
-              <button @click="scrollTo('features')" class="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all">
+              <button @click="scrollTo('features')" class="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-gray-300 bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-700 transition-all">
                 See features
               </button>
             </div>
@@ -241,27 +241,27 @@ function scrollTo(id: string) {
             <!-- Stats row -->
             <div class="mt-12 grid grid-cols-3 gap-6">
               <div>
-                <p class="text-2xl sm:text-3xl font-bold text-gray-900">{{ formatNumber(usersCount) }}</p>
-                <p class="text-sm text-gray-500 mt-1">Active users</p>
+                <p class="text-2xl sm:text-3xl font-bold text-white">{{ formatNumber(usersCount) }}</p>
+                <p class="text-sm text-gray-400 mt-1">Active users</p>
               </div>
               <div>
-                <p class="text-2xl sm:text-3xl font-bold text-gray-900">{{ serversCount }}+</p>
-                <p class="text-sm text-gray-500 mt-1">Servers</p>
+                <p class="text-2xl sm:text-3xl font-bold text-white">{{ serversCount }}+</p>
+                <p class="text-sm text-gray-400 mt-1">Servers</p>
               </div>
               <div>
-                <p class="text-2xl sm:text-3xl font-bold text-gray-900">{{ uptimeCount }}.<span class="text-midori-500">9</span>%</p>
-                <p class="text-sm text-gray-500 mt-1">Uptime</p>
+                <p class="text-2xl sm:text-3xl font-bold text-white">{{ uptimeCount }}.<span class="text-midori-500">9</span>%</p>
+                <p class="text-sm text-gray-400 mt-1">Uptime</p>
               </div>
             </div>
           </div>
 
           <!-- Right: Dashboard mockup -->
           <div class="relative">
-            <div class="bg-white rounded-2xl shadow-2xl shadow-gray-200/60 border border-gray-100 p-6 space-y-5">
+            <div class="bg-white rounded-2xl shadow-2xl shadow-black/30 border border-gray-700/30 p-6 space-y-5">
               <!-- Mock header -->
               <div class="flex items-center justify-between">
                 <div>
-                  <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">Network Traffic</p>
+                  <p class="text-sm font-semibold text-gray-900">Network Traffic</p>
                   <p class="text-xs text-gray-400 mt-0.5">Last 24 hours — real-time</p>
                 </div>
                 <div class="flex items-center gap-1.5 px-2.5 py-1 bg-midori-50 rounded-lg">
@@ -302,14 +302,14 @@ function scrollTo(id: string) {
             </div>
 
             <!-- Floating card -->
-            <div class="absolute -bottom-4 -left-4 bg-white rounded-xl shadow-lg border border-gray-100 p-3 flex items-center gap-3">
+            <div class="absolute -bottom-4 -left-4 bg-white rounded-xl shadow-lg border border-gray-700/30 p-3 flex items-center gap-3">
               <div class="w-9 h-9 rounded-lg bg-midori-100 flex items-center justify-center flex-shrink-0">
                 <svg class="w-5 h-5 text-midori-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
               </div>
               <div>
-                <p class="text-xs font-semibold text-gray-900 dark:text-gray-100">Encrypted</p>
+                <p class="text-xs font-semibold text-gray-900">Encrypted</p>
                 <p class="text-[10px] text-gray-400">WireGuard / AES-256</p>
               </div>
             </div>
@@ -319,23 +319,23 @@ function scrollTo(id: string) {
     </section>
 
     <!-- ═══════════════════════ FEATURES ═══════════════════════ -->
-    <section id="features" class="py-20 sm:py-28 bg-gray-50/50">
+    <section id="features" class="py-20 sm:py-28 bg-gray-800/50">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="text-center max-w-2xl mx-auto mb-16">
           <p class="text-sm font-semibold text-midori-600 uppercase tracking-wide">Features</p>
           <h2 class="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight">Everything you need for secure networking</h2>
-          <p class="mt-4 text-lg text-gray-500 dark:text-gray-400">Built for speed, privacy, and developer experience. Every feature is designed to just work.</p>
+          <p class="mt-4 text-lg text-gray-400">Built for speed, privacy, and developer experience. Every feature is designed to just work.</p>
         </div>
 
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
           <div
             v-for="f in features"
             :key="f.title"
-            class="group bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-lg hover:shadow-gray-100/80 hover:border-midori-100 transition-all duration-300"
+            class="group bg-gray-800 rounded-2xl border border-gray-700 p-6 hover:shadow-lg hover:shadow-black/30 hover:border-midori-700 transition-all duration-300"
           >
             <!-- Icon -->
             <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4 transition-colors duration-300"
-              :class="'bg-midori-50 text-midori-600 group-hover:bg-midori-500 group-hover:text-white'"
+              :class="'bg-midori-900/40 text-midori-400 group-hover:bg-midori-500 group-hover:text-white'"
             >
               <!-- Shield -->
               <svg v-if="f.icon === 'shield'" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -363,7 +363,7 @@ function scrollTo(id: string) {
               </svg>
             </div>
 
-            <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">{{ f.title }}</h3>
+            <h3 class="text-base font-semibold text-white">{{ f.title }}</h3>
             <p class="mt-2 text-sm text-gray-500 leading-relaxed">{{ f.desc }}</p>
           </div>
         </div>
@@ -376,18 +376,18 @@ function scrollTo(id: string) {
         <div class="text-center max-w-2xl mx-auto mb-12">
           <p class="text-sm font-semibold text-midori-600 uppercase tracking-wide">Pricing</p>
           <h2 class="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight">Simple, transparent pricing</h2>
-          <p class="mt-4 text-lg text-gray-500 dark:text-gray-400">Start free. Upgrade when you need more. No hidden fees, ever.</p>
+          <p class="mt-4 text-lg text-gray-400">Start free. Upgrade when you need more. No hidden fees, ever.</p>
 
           <!-- Annual/Monthly toggle -->
-          <div class="mt-8 inline-flex items-center gap-3 bg-gray-100 rounded-full p-1">
+          <div class="mt-8 inline-flex items-center gap-3 bg-gray-800 rounded-full p-1">
             <button
               @click="annual = false"
-              :class="!annual ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'"
+              :class="!annual ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400'"
               class="px-4 py-1.5 rounded-full text-sm font-medium transition-all"
             >Monthly</button>
             <button
               @click="annual = true"
-              :class="annual ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'"
+              :class="annual ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400'"
               class="px-4 py-1.5 rounded-full text-sm font-medium transition-all"
             >
               Annual
@@ -402,8 +402,8 @@ function scrollTo(id: string) {
             :key="plan.name"
             class="relative rounded-2xl border p-6 lg:p-8 flex flex-col transition-all duration-300"
             :class="plan.highlighted
-              ? 'border-midori-500 bg-white shadow-xl shadow-midori-100/50 scale-[1.02]'
-              : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'"
+              ? 'border-midori-500 bg-gray-800 shadow-xl shadow-midori-900/30 scale-[1.02]'
+              : 'border-gray-700 bg-gray-800 hover:border-gray-600 hover:shadow-lg hover:shadow-black/20'"
           >
             <!-- Popular badge -->
             <div v-if="plan.highlighted" class="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -413,12 +413,12 @@ function scrollTo(id: string) {
             </div>
 
             <div>
-              <h3 class="text-lg font-bold text-gray-900">{{ plan.name }}</h3>
-              <p class="text-sm text-gray-500 mt-1">{{ plan.desc }}</p>
+              <h3 class="text-lg font-bold text-white">{{ plan.name }}</h3>
+              <p class="text-sm text-gray-400 mt-1">{{ plan.desc }}</p>
             </div>
 
             <div class="mt-6 flex items-baseline gap-1">
-              <span class="text-4xl font-extrabold text-gray-900">
+              <span class="text-4xl font-extrabold text-white">
                 ${{ annual ? plan.annualPrice : plan.monthlyPrice }}
               </span>
               <span v-if="plan.monthlyPrice > 0" class="text-sm text-gray-400">/mo</span>
@@ -426,7 +426,7 @@ function scrollTo(id: string) {
             </div>
 
             <ul class="mt-6 space-y-3 flex-1">
-              <li v-for="feat in plan.features" :key="feat" class="flex items-start gap-2.5 text-sm text-gray-600">
+              <li v-for="feat in plan.features" :key="feat" class="flex items-start gap-2.5 text-sm text-gray-300">
                 <svg class="w-4 h-4 text-midori-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
@@ -439,7 +439,7 @@ function scrollTo(id: string) {
               class="mt-8 block text-center px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200"
               :class="plan.highlighted
                 ? 'bg-midori-500 text-white hover:bg-midori-600 shadow-lg shadow-midori-500/25'
-                : 'bg-gray-100 text-gray-900 hover:bg-gray-200'"
+                : 'bg-gray-700 text-white hover:bg-gray-600'"
             >
               {{ plan.cta }}
             </router-link>
@@ -449,56 +449,56 @@ function scrollTo(id: string) {
     </section>
 
     <!-- ═══════════════════════ TRUST / SECURITY ═══════════════════════ -->
-    <section id="trust" class="py-20 sm:py-28 bg-gray-50/50">
+    <section id="trust" class="py-20 sm:py-28 bg-gray-800/50">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="text-center max-w-2xl mx-auto mb-16">
           <p class="text-sm font-semibold text-midori-600 uppercase tracking-wide">Trust &amp; Security</p>
           <h2 class="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight">Built on transparency</h2>
-          <p class="mt-4 text-lg text-gray-500 dark:text-gray-400">Open-source. Audited. No compromises on privacy.</p>
+          <p class="mt-4 text-lg text-gray-400">Open-source. Audited. No compromises on privacy.</p>
         </div>
 
         <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <!-- Badge 1 -->
-          <div class="bg-white rounded-2xl border border-gray-100 p-6 text-center hover:shadow-md transition-shadow">
-            <div class="w-12 h-12 mx-auto rounded-xl bg-midori-50 flex items-center justify-center mb-4">
+          <div class="bg-gray-800 rounded-2xl border border-gray-700 p-6 text-center hover:shadow-lg hover:shadow-black/20 transition-shadow">
+            <div class="w-12 h-12 mx-auto rounded-xl bg-midori-900/40 flex items-center justify-center mb-4">
               <svg class="w-6 h-6 text-midori-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
               </svg>
             </div>
-            <h3 class="text-sm font-bold text-gray-900">Open Source</h3>
+            <h3 class="text-sm font-bold text-white">Open Source</h3>
             <p class="text-xs text-gray-500 mt-1.5 leading-relaxed">Full source code available on GitHub. Audit anytime.</p>
           </div>
 
           <!-- Badge 2 -->
-          <div class="bg-white rounded-2xl border border-gray-100 p-6 text-center hover:shadow-md transition-shadow">
-            <div class="w-12 h-12 mx-auto rounded-xl bg-midori-50 flex items-center justify-center mb-4">
+          <div class="bg-gray-800 rounded-2xl border border-gray-700 p-6 text-center hover:shadow-lg hover:shadow-black/20 transition-shadow">
+            <div class="w-12 h-12 mx-auto rounded-xl bg-midori-900/40 flex items-center justify-center mb-4">
               <svg class="w-6 h-6 text-midori-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
             </div>
-            <h3 class="text-sm font-bold text-gray-900">Zero-Log</h3>
+            <h3 class="text-sm font-bold text-white">Zero-Log</h3>
             <p class="text-xs text-gray-500 mt-1.5 leading-relaxed">We never log browsing activity or connection metadata.</p>
           </div>
 
           <!-- Badge 3 -->
-          <div class="bg-white rounded-2xl border border-gray-100 p-6 text-center hover:shadow-md transition-shadow">
-            <div class="w-12 h-12 mx-auto rounded-xl bg-midori-50 flex items-center justify-center mb-4">
+          <div class="bg-gray-800 rounded-2xl border border-gray-700 p-6 text-center hover:shadow-lg hover:shadow-black/20 transition-shadow">
+            <div class="w-12 h-12 mx-auto rounded-xl bg-midori-900/40 flex items-center justify-center mb-4">
               <svg class="w-6 h-6 text-midori-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
             </div>
-            <h3 class="text-sm font-bold text-gray-900">WireGuard</h3>
+            <h3 class="text-sm font-bold text-white">WireGuard</h3>
             <p class="text-xs text-gray-500 mt-1.5 leading-relaxed">State-of-the-art cryptography with minimal attack surface.</p>
           </div>
 
           <!-- Badge 4 -->
-          <div class="bg-white rounded-2xl border border-gray-100 p-6 text-center hover:shadow-md transition-shadow">
-            <div class="w-12 h-12 mx-auto rounded-xl bg-midori-50 flex items-center justify-center mb-4">
+          <div class="bg-gray-800 rounded-2xl border border-gray-700 p-6 text-center hover:shadow-lg hover:shadow-black/20 transition-shadow">
+            <div class="w-12 h-12 mx-auto rounded-xl bg-midori-900/40 flex items-center justify-center mb-4">
               <svg class="w-6 h-6 text-midori-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h3 class="text-sm font-bold text-gray-900">GDPR Ready</h3>
+            <h3 class="text-sm font-bold text-white">GDPR Ready</h3>
             <p class="text-xs text-gray-500 mt-1.5 leading-relaxed">Compliant data handling. EU servers available.</p>
           </div>
         </div>
@@ -507,11 +507,11 @@ function scrollTo(id: string) {
         <div class="mt-16 text-center">
           <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-6">Powered by</p>
           <div class="flex items-center justify-center gap-8 sm:gap-12 flex-wrap opacity-50 grayscale">
-            <span class="text-lg font-bold text-gray-600">WireGuard</span>
-            <span class="text-lg font-bold text-gray-600">Authentik</span>
-            <span class="text-lg font-bold text-gray-600">PostgreSQL</span>
-            <span class="text-lg font-bold text-gray-600">Go</span>
-            <span class="text-lg font-bold text-gray-600">Vue.js</span>
+            <span class="text-lg font-bold text-gray-400">WireGuard</span>
+            <span class="text-lg font-bold text-gray-400">Authentik</span>
+            <span class="text-lg font-bold text-gray-400">PostgreSQL</span>
+            <span class="text-lg font-bold text-gray-400">Go</span>
+            <span class="text-lg font-bold text-gray-400">Vue.js</span>
           </div>
         </div>
       </div>
@@ -523,7 +523,7 @@ function scrollTo(id: string) {
         <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight">
           Ready to take control of your privacy?
         </h2>
-        <p class="mt-4 text-lg text-gray-500 max-w-xl mx-auto">
+        <p class="mt-4 text-lg text-gray-400 max-w-xl mx-auto">
           Join thousands of users who trust MidoriVPN for fast, secure, and transparent networking.
         </p>
         <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -531,7 +531,7 @@ function scrollTo(id: string) {
             Get started — it's free
             <svg class="ml-2 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
           </router-link>
-          <a href="https://github.com/goastian/midori-vpn-core" target="_blank" rel="noopener noreferrer" class="inline-flex items-center px-6 py-3.5 text-base font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all">
+          <a href="https://github.com/goastian/midori-vpn-core" target="_blank" rel="noopener noreferrer" class="inline-flex items-center px-6 py-3.5 text-base font-semibold text-gray-300 bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-700 transition-all">
             <svg class="mr-2 w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
             View on GitHub
           </a>
@@ -540,7 +540,7 @@ function scrollTo(id: string) {
     </section>
 
     <!-- ═══════════════════════ FOOTER ═══════════════════════ -->
-    <footer class="border-t border-gray-100 bg-white">
+    <footer class="border-t border-gray-800 bg-gray-950">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
           <!-- Brand -->
@@ -558,44 +558,44 @@ function scrollTo(id: string) {
 
           <!-- Product -->
           <div>
-            <h4 class="text-xs font-semibold text-gray-900 uppercase tracking-wider mb-4">Product</h4>
+            <h4 class="text-xs font-semibold text-gray-100 uppercase tracking-wider mb-4">Product</h4>
             <ul class="space-y-2.5">
-              <li><button @click="scrollTo('features')" class="text-sm text-gray-500 hover:text-gray-900 transition-colors">Features</button></li>
-              <li><button @click="scrollTo('pricing')" class="text-sm text-gray-500 hover:text-gray-900 transition-colors">Pricing</button></li>
-              <li><a href="#" class="text-sm text-gray-500 hover:text-gray-900 transition-colors">Download</a></li>
-              <li><a href="#" class="text-sm text-gray-500 hover:text-gray-900 transition-colors">Changelog</a></li>
+              <li><button @click="scrollTo('features')" class="text-sm text-gray-400 hover:text-white transition-colors">Features</button></li>
+              <li><button @click="scrollTo('pricing')" class="text-sm text-gray-400 hover:text-white transition-colors">Pricing</button></li>
+              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">Download</a></li>
+              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">Changelog</a></li>
             </ul>
           </div>
 
           <!-- Company -->
           <div>
-            <h4 class="text-xs font-semibold text-gray-900 uppercase tracking-wider mb-4">Company</h4>
+            <h4 class="text-xs font-semibold text-gray-100 uppercase tracking-wider mb-4">Company</h4>
             <ul class="space-y-2.5">
-              <li><a href="https://astian.org" target="_blank" rel="noopener noreferrer" class="text-sm text-gray-500 hover:text-gray-900 transition-colors">About Astian</a></li>
-              <li><a href="#" class="text-sm text-gray-500 hover:text-gray-900 transition-colors">Blog</a></li>
-              <li><a href="#" class="text-sm text-gray-500 hover:text-gray-900 transition-colors">Careers</a></li>
-              <li><a href="#" class="text-sm text-gray-500 hover:text-gray-900 transition-colors">Contact</a></li>
+              <li><a href="https://astian.org" target="_blank" rel="noopener noreferrer" class="text-sm text-gray-400 hover:text-white transition-colors">About Astian</a></li>
+              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">Blog</a></li>
+              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">Careers</a></li>
+              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">Contact</a></li>
             </ul>
           </div>
 
           <!-- Legal -->
           <div>
-            <h4 class="text-xs font-semibold text-gray-900 uppercase tracking-wider mb-4">Legal</h4>
+            <h4 class="text-xs font-semibold text-gray-100 uppercase tracking-wider mb-4">Legal</h4>
             <ul class="space-y-2.5">
-              <li><a href="#" class="text-sm text-gray-500 hover:text-gray-900 transition-colors">Privacy Policy</a></li>
-              <li><a href="#" class="text-sm text-gray-500 hover:text-gray-900 transition-colors">Terms of Service</a></li>
-              <li><a href="#" class="text-sm text-gray-500 hover:text-gray-900 transition-colors">GDPR</a></li>
+              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">Privacy Policy</a></li>
+              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">Terms of Service</a></li>
+              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">GDPR</a></li>
             </ul>
           </div>
         </div>
 
-        <div class="mt-12 pt-8 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="mt-12 pt-8 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p class="text-xs text-gray-400">&copy; {{ new Date().getFullYear() }} Astian Foundation. All rights reserved.</p>
           <div class="flex items-center gap-4">
-            <a href="https://github.com/goastian" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-gray-600 transition-colors">
+            <a href="https://github.com/goastian" target="_blank" rel="noopener noreferrer" class="text-gray-500 hover:text-gray-300 transition-colors">
               <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
             </a>
-            <a href="#" class="text-gray-400 hover:text-gray-600 transition-colors">
+            <a href="#" class="text-gray-500 hover:text-gray-300 transition-colors">
               <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
             </a>
           </div>
