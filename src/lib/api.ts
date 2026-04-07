@@ -25,7 +25,7 @@ async function tryRefreshToken(): Promise<string> {
     throw new Error('No refresh token available')
   }
 
-  const res = await fetch(`${API_URL}/auth/refresh`, {
+  const res = await fetch(`${API_URL}/api/v1/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refresh_token: refreshToken }),
@@ -126,7 +126,7 @@ export const api = {
 import { TokenResponseSchema } from './schemas'
 
 export async function exchangeCode(code: string, redirectUri: string, codeVerifier: string) {
-  const res = await fetch(`${API_URL}/auth/callback`, {
+  const res = await fetch(`${API_URL}/api/v1/auth/callback`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code, redirect_uri: redirectUri, code_verifier: codeVerifier }),

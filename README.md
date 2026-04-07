@@ -68,7 +68,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`. Vite’s proxy forwards `/api/*`, `/auth/*`, and `/health` to the backend at `:8080`.
+Open `http://localhost:5173`. Vite’s proxy forwards `/api/*` and `/health` to the backend at `:8080`.
 
 ## Production Build
 
@@ -85,7 +85,7 @@ Static files are generated in `control/dist/`. They can be served with Nginx, Ca
 | Variable                      | Example                                               | Description                               |
 | ----------------------------- | ----------------------------------------------------- | ----------------------------------------- |
 | `VITE_API_URL`                | `http://localhost:8080`                               | Backend API URL                           |
-| `VITE_AUTHENTIK_ISSUER`       | `https://accounts.astian.org/application/o/midorivpn` | Authentik OIDC issuer                     |
+| `VITE_AUTHENTIK_ISSUER`       | `https://accounts.astian.org/application/o/midori-vpn` | Authentik OAuth2 app URL                  |
 | `VITE_AUTHENTIK_CLIENT_ID`    | `60mBgw8BHTvK...`                                     | OAuth2 application Client ID in Authentik |
 | `VITE_AUTHENTIK_REDIRECT_URI` | `http://localhost:5173/auth/callback`                 | Post-login redirect URI                   |
 
@@ -99,7 +99,7 @@ Static files are generated in `control/dist/`. They can be served with Nginx, Ca
 │          │ ──────────────────────→  │                  │
 └─────┬────┘                          └──────────────────┘
       │
-      │ 3. POST /auth/callback
+      │ 3. POST /api/v1/auth/callback
       │    { code, redirect_uri, code_verifier }
       ▼
 ┌──────────┐     4. Token exchange     ┌──────────────────┐
@@ -124,7 +124,7 @@ Static files are generated in `control/dist/`. They can be served with Nginx, Ca
 
 3. **`AuthCallback.vue`** — Reads the `code` from the URL, retrieves the `code_verifier` from `sessionStorage`, and sends both to the backend.
 
-4. **Backend** (`POST /auth/callback`) — Exchanges the code + verifier with Authentik and returns the tokens to the frontend.
+4. **Backend** (`POST /api/v1/auth/callback`) — Exchanges the code + verifier with Authentik and returns the tokens to the frontend.
 
 5. **Frontend** — Stores `access_token` in `localStorage`, loads the user profile, and redirects to the Dashboard.
 
@@ -145,8 +145,8 @@ All protected endpoints automatically send `Authorization: Bearer <token>` via `
 
 | Method   | Endpoint                      | Purpose                  |
 | -------- | ----------------------------- | ------------------------ |
-| `GET`    | `/auth/config`                | OIDC configuration       |
-| `POST`   | `/auth/callback`              | Exchange code → tokens   |
+| `GET`    | `/api/v1/auth/config`         | OIDC configuration       |
+| `POST`   | `/api/v1/auth/callback`       | Exchange code → tokens   |
 | `GET`    | `/api/v1/control/me`          | Current user profile     |
 | `GET`    | `/api/v1/control/servers`     | List active VPN servers  |
 | `POST`   | `/api/v1/control/servers`     | Create server (admin)    |
