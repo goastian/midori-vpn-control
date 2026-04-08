@@ -57,15 +57,22 @@ function decodeJWTPayload(token: string): JWTPayload | null {
 }
 
 function isTokenExpired(token: string, skewSeconds = 60): boolean {
+  // Check stored expires_at first (works for both opaque and JWT tokens)
+  const expiresAt = localStorage.getItem('token_expires_at')
+  if (expiresAt) {
+    return Date.now() / 1000 > Number(expiresAt) - skewSeconds
+  }
+  // Fallback to JWT decode
   const payload = decodeJWTPayload(token)
-  if (!payload?.exp) return true
+  if (!payload?.exp) return false // opaque token — rely on 401 refresh
   return Date.now() / 1000 > payload.exp - skewSeconds
 }
 
 function isTokenIssuerValid(token: string): boolean {
   if (!issuerUrls.expectedTokenIssuer) return true
   const payload = decodeJWTPayload(token)
-  if (!payload?.iss) return false
+  // Opaque tokens (non-JWT) or JWTs without iss — trust the backend
+  if (!payload?.iss) return true
   return payload.iss.replace(/\/+$/, '') === issuerUrls.expectedTokenIssuer.replace(/\/+$/, '')
 }
 
@@ -124,18 +131,30 @@ export const useAuthStore = defineStore('auth', () => {
       const tokens = await exchangeCode(code, REDIRECT_URI, verifier)
       console.log('[AUTH] Token exchange SUCCESS')
 
-      // Validate token before storing
-      const payload = decodeJWTPayload(tokens.access_token)
-      console.log('[AUTH] Token issuer from JWT:', payload?.iss)
+      // Validate issuer from id_token (JWT) — access_token may be opaque
+      const accessPayload = decodeJWTPayload(tokens.access_token)
+      const idPayload = tokens.id_token ? decodeJWTPayload(tokens.id_token) : null
+      console.log('[AUTH] Access token issuer:', accessPayload?.iss ?? '(opaque token)')
+      console.log('[AUTH] ID token issuer:', idPayload?.iss ?? '(no id_token)')
       console.log('[AUTH] Expected issuer:', issuerUrls.expectedTokenIssuer)
 
-      if (!isTokenIssuerValid(tokens.access_token)) {
-        console.error('[AUTH] Token issuer mismatch!', payload?.iss, '!==', issuerUrls.expectedTokenIssuer)
-        throw new Error('Token issuer mismatch')
+      // Validate issuer: prefer id_token (guaranteed JWT per OIDC), fall back to access_token
+      const issuerPayload = idPayload ?? accessPayload
+      if (issuerPayload?.iss) {
+        const tokenIss = issuerPayload.iss.replace(/\/+$/, '')
+        const expectedIss = issuerUrls.expectedTokenIssuer.replace(/\/+$/, '')
+        if (tokenIss !== expectedIss) {
+          console.error('[AUTH] Token issuer mismatch!', issuerPayload.iss, '!==', issuerUrls.expectedTokenIssuer)
+          throw new Error('Token issuer mismatch')
+        }
       }
-      if (isTokenExpired(tokens.access_token)) {
-        console.error('[AUTH] Received expired token!', 'exp:', payload?.exp, 'now:', Date.now() / 1000)
-        throw new Error('Received expired token')
+      console.log('[AUTH] Issuer validation OK')
+
+      // Store expires_at from expires_in for reliable expiry checks (works with opaque tokens)
+      if (tokens.expires_in) {
+        const expiresAt = Math.floor(Date.now() / 1000) + tokens.expires_in
+        localStorage.setItem('token_expires_at', String(expiresAt))
+        console.log('[AUTH] Token expires_at stored:', expiresAt, '(in', tokens.expires_in, 'seconds)')
       }
 
       console.log('[AUTH] Token validated, storing...')
@@ -175,6 +194,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
+    localStorage.removeItem('token_expires_at')
 
     const logoutUrl = `${issuerUrls.endSessionUrl}?post_logout_redirect_uri=${encodeURIComponent(window.location.origin + '/')}`
     window.location.href = logoutUrl
