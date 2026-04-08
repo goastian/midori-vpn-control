@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '../../lib/api'
+import { useLocale } from '../../lib/i18n'
 import type { AuditLog } from '../../lib/schemas'
 
 const logs = ref<AuditLog[]>([])
 const loading = ref(true)
 const actionFilter = ref('')
+const { t, formatDateTime } = useLocale()
 
 onMounted(() => loadLogs())
 
@@ -22,20 +24,8 @@ async function loadLogs() {
 }
 
 function actionLabel(action: string): string {
-  const map: Record<string, string> = {
-    'peer.connect': 'Conexión VPN',
-    'peer.disconnect': 'Desconexión VPN',
-    'peer.cleanup': 'Limpieza automática',
-    'admin.server.create': 'Servidor creado',
-    'admin.server.update': 'Servidor actualizado',
-    'admin.server.delete': 'Servidor eliminado',
-    'admin.user.create': 'Usuario creado',
-    'admin.user.update': 'Usuario actualizado',
-    'admin.user.delete': 'Usuario eliminado',
-    'admin.user.ban': 'Usuario baneado',
-    'admin.peer.disconnect': 'Desconexión forzada',
-  }
-  return map[action] || action
+  const label = t(`auditView.actions.${action}`)
+  return label === `auditView.actions.${action}` ? action : label
 }
 
 function actionColor(action: string): string {
@@ -49,11 +39,11 @@ function actionColor(action: string): string {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Admin — Audit Logs</h1>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">{{ t('adminAudit.title') }}</h1>
 
     <div class="flex items-center gap-3 mb-6">
       <select v-model="actionFilter" @change="loadLogs" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200">
-        <option value="">Todas las acciones</option>
+        <option value="">{{ t('common.allActions') }}</option>
         <option value="peer.connect">peer.connect</option>
         <option value="peer.disconnect">peer.disconnect</option>
         <option value="peer.cleanup">peer.cleanup</option>
@@ -71,24 +61,24 @@ function actionColor(action: string): string {
     </div>
 
     <div v-else-if="logs.length === 0" class="text-center py-12 text-gray-400 dark:text-gray-500">
-      No hay registros.
+      {{ t('adminAudit.empty') }}
     </div>
 
     <div v-else class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
       <table class="w-full text-sm">
         <thead class="bg-gray-50 dark:bg-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           <tr>
-            <th class="px-6 py-3">Fecha</th>
-            <th class="px-6 py-3">Acción</th>
-            <th class="px-6 py-3 hidden md:table-cell">Usuario</th>
-            <th class="px-6 py-3 hidden md:table-cell">IP</th>
-            <th class="px-6 py-3 hidden lg:table-cell">Detalles</th>
+            <th class="px-6 py-3">{{ t('common.date') }}</th>
+            <th class="px-6 py-3">{{ t('auditView.action') }}</th>
+            <th class="px-6 py-3 hidden md:table-cell">{{ t('common.user') }}</th>
+            <th class="px-6 py-3 hidden md:table-cell">{{ t('auditView.ip') }}</th>
+            <th class="px-6 py-3 hidden lg:table-cell">{{ t('common.details') }}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
           <tr v-for="log in logs" :key="log.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
             <td class="px-6 py-4 text-gray-500 whitespace-nowrap text-xs">
-              {{ new Date(log.created_at).toLocaleString() }}
+              {{ formatDateTime(log.created_at) }}
             </td>
             <td class="px-6 py-4">
               <span :class="actionColor(log.action)" class="text-xs font-medium px-2 py-1 rounded-full">
@@ -96,7 +86,7 @@ function actionColor(action: string): string {
               </span>
             </td>
             <td class="px-6 py-4 hidden md:table-cell text-xs text-gray-500">
-              {{ log.user_id ? log.user_id.slice(0, 8) + '…' : 'sistema' }}
+              {{ log.user_id ? log.user_id.slice(0, 8) + '…' : t('common.system') }}
             </td>
             <td class="px-6 py-4 font-mono text-gray-500 dark:text-gray-400 hidden md:table-cell text-xs">{{ log.ip_address }}</td>
             <td class="px-6 py-4 text-xs text-gray-400 dark:text-gray-500 hidden lg:table-cell font-mono max-w-xs truncate">

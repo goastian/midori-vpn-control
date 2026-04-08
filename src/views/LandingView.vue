@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
+import LanguageSelector from '../components/LanguageSelector.vue'
+import { useLocale } from '../lib/i18n'
 
 // Animated counter for hero stats
 function useAnimatedCounter(target: number, duration = 2000) {
@@ -28,6 +30,7 @@ const usersCount = useAnimatedCounter(12480)
 const serversCount = useAnimatedCounter(48)
 const uptimeCount = useAnimatedCounter(99)
 const dataPoints = useAnimatedCounter(1200000, 2500)
+const { t } = useLocale()
 
 // Simulated live chart data
 const chartBars = ref<number[]>([])
@@ -49,89 +52,96 @@ const mobileMenuOpen = ref(false)
 // Pricing toggle
 const annual = ref(true)
 
-const plans = [
+const plans = computed(() => [
   {
-    name: 'Free',
-    desc: 'Share bandwidth, browse free',
+    name: t('landing.plans.free.name'),
+    desc: t('landing.plans.free.desc'),
     monthlyPrice: 0,
     annualPrice: 0,
     features: [
-      '1 device connection',
-      'Bandwidth sharing node',
-      '3 server locations',
-      'Community support',
-      'Basic analytics',
+      t('landing.plans.free.features.a'),
+      t('landing.plans.free.features.b'),
+      t('landing.plans.free.features.c'),
+      t('landing.plans.free.features.d'),
+      t('landing.plans.free.features.e'),
     ],
-    cta: 'Get Started',
+    cta: t('landing.plans.free.cta'),
     highlighted: false,
   },
   {
-    name: 'Pro',
-    desc: 'For individuals who need more',
+    name: t('landing.plans.pro.name'),
+    desc: t('landing.plans.pro.desc'),
     monthlyPrice: 5.99,
     annualPrice: 3.99,
     features: [
-      '5 device connections',
-      '24 server locations',
-      'WireGuard + OpenVPN',
-      'Real-time analytics',
-      'Priority support',
-      'No bandwidth sharing',
+      t('landing.plans.pro.features.a'),
+      t('landing.plans.pro.features.b'),
+      t('landing.plans.pro.features.c'),
+      t('landing.plans.pro.features.d'),
+      t('landing.plans.pro.features.e'),
+      t('landing.plans.pro.features.f'),
     ],
-    cta: 'Start Free Trial',
+    cta: t('landing.plans.pro.cta'),
     highlighted: true,
   },
   {
-    name: 'Business',
-    desc: 'For teams and organizations',
+    name: t('landing.plans.business.name'),
+    desc: t('landing.plans.business.desc'),
     monthlyPrice: 12.99,
     annualPrice: 9.99,
     features: [
-      'Unlimited devices',
-      '48+ server locations',
-      'All protocols',
-      'Admin dashboard',
-      'Dedicated support',
-      'Custom DNS',
-      'SSO integration',
+      t('landing.plans.business.features.a'),
+      t('landing.plans.business.features.b'),
+      t('landing.plans.business.features.c'),
+      t('landing.plans.business.features.d'),
+      t('landing.plans.business.features.e'),
+      t('landing.plans.business.features.f'),
+      t('landing.plans.business.features.g'),
     ],
-    cta: 'Contact Sales',
+    cta: t('landing.plans.business.cta'),
     highlighted: false,
   },
-]
+])
 
-const features = [
+const features = computed(() => [
   {
-    title: 'WireGuard Protocol',
-    desc: 'State-of-the-art cryptography with blazing fast speeds. Up to 3x faster than traditional VPN protocols.',
+    title: t('landing.featureCards.wireguard.title'),
+    desc: t('landing.featureCards.wireguard.desc'),
     icon: 'shield',
   },
   {
-    title: 'Real-Time Analytics',
-    desc: 'Monitor bandwidth, latency, and connection health with live WebSocket-powered dashboards.',
+    title: t('landing.featureCards.analytics.title'),
+    desc: t('landing.featureCards.analytics.desc'),
     icon: 'chart',
   },
   {
-    title: 'Global Server Network',
-    desc: 'Connect to 48+ servers worldwide. Automatic selection by lowest latency for optimal performance.',
+    title: t('landing.featureCards.global.title'),
+    desc: t('landing.featureCards.global.desc'),
     icon: 'globe',
   },
   {
-    title: 'Multi-Device Support',
-    desc: 'Protect all your devices with a single account. Export configs as QR codes for instant mobile setup.',
+    title: t('landing.featureCards.devices.title'),
+    desc: t('landing.featureCards.devices.desc'),
     icon: 'devices',
   },
   {
-    title: 'Zero-Log Policy',
-    desc: 'We never store your browsing data. Open-source codebase for complete transparency and trust.',
+    title: t('landing.featureCards.noLogs.title'),
+    desc: t('landing.featureCards.noLogs.desc'),
     icon: 'lock',
   },
   {
-    title: 'Mesh Networking',
-    desc: 'Peer-to-peer connections with NAT traversal. Decentralized architecture for ultimate resilience.',
+    title: t('landing.featureCards.mesh.title'),
+    desc: t('landing.featureCards.mesh.desc'),
     icon: 'mesh',
   },
-]
+])
+
+const trustCards = computed(() => [
+  { key: 'openSource', title: t('landing.trustCards.openSource.title'), desc: t('landing.trustCards.openSource.desc') },
+  { key: 'zeroLog', title: t('landing.trustCards.zeroLog.title'), desc: t('landing.trustCards.zeroLog.desc') },
+  { key: 'wireguard', title: t('landing.trustCards.wireguard.title'), desc: t('landing.trustCards.wireguard.desc') },
+  { key: 'gdpr', title: t('landing.trustCards.gdpr.title'), desc: t('landing.trustCards.gdpr.desc') },
+])
 
 function formatNumber(n: number): string {
   if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
@@ -159,17 +169,18 @@ function scrollTo(id: string) {
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
             </div>
-            <span class="text-xl font-bold tracking-tight">Midori<span class="text-midori-500">VPN</span></span>
+            <span class="text-xl font-bold tracking-tight">{{ t('common.appName') }}</span>
           </div>
 
           <!-- Desktop links -->
           <div class="hidden md:flex items-center gap-8">
-            <button @click="scrollTo('features')" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">Features</button>
-            <button @click="scrollTo('pricing')" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">Pricing</button>
-            <button @click="scrollTo('trust')" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">Security</button>
-            <router-link to="/login" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">Log In</router-link>
+            <button @click="scrollTo('features')" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">{{ t('landing.featuresNav') }}</button>
+            <button @click="scrollTo('pricing')" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">{{ t('landing.pricingNav') }}</button>
+            <button @click="scrollTo('trust')" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">{{ t('landing.securityNav') }}</button>
+            <LanguageSelector tone="dark" />
+            <router-link to="/login" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">{{ t('landing.login') }}</router-link>
             <router-link to="/login" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-midori-500 rounded-lg hover:bg-midori-600 transition-colors shadow-sm">
-              Get Started
+              {{ t('landing.getStarted') }}
             </router-link>
           </div>
 
@@ -193,11 +204,12 @@ function scrollTo(id: string) {
         leave-to-class="opacity-0 -translate-y-2"
       >
         <div v-if="mobileMenuOpen" class="md:hidden bg-gray-900 border-b border-gray-800 px-4 pb-4 space-y-2">
-          <button @click="scrollTo('features')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">Features</button>
-          <button @click="scrollTo('pricing')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">Pricing</button>
-          <button @click="scrollTo('trust')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">Security</button>
-          <router-link to="/login" class="block px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">Log In</router-link>
-          <router-link to="/login" class="block text-center px-4 py-2 text-sm font-semibold text-white bg-midori-500 rounded-lg">Get Started</router-link>
+          <LanguageSelector tone="dark" />
+          <button @click="scrollTo('features')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">{{ t('landing.featuresNav') }}</button>
+          <button @click="scrollTo('pricing')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">{{ t('landing.pricingNav') }}</button>
+          <button @click="scrollTo('trust')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">{{ t('landing.securityNav') }}</button>
+          <router-link to="/login" class="block px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">{{ t('landing.login') }}</router-link>
+          <router-link to="/login" class="block text-center px-4 py-2 text-sm font-semibold text-white bg-midori-500 rounded-lg">{{ t('landing.getStarted') }}</router-link>
         </div>
       </Transition>
     </nav>
@@ -215,26 +227,26 @@ function scrollTo(id: string) {
           <div>
             <div class="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold text-midori-400 bg-midori-900/40 rounded-full mb-6">
               <span class="w-1.5 h-1.5 rounded-full bg-midori-500 animate-pulse"></span>
-              Now with WireGuard protocol
+              {{ t('landing.heroBadge') }}
             </div>
 
             <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.1]">
-              Secure, fast &amp;
-              <span class="text-midori-500">transparent</span>
-              VPN
+              {{ t('landing.heroTitleB') }}
+              <span class="text-midori-500">{{ t('landing.heroTitleAccent') }}</span>
+              {{ t('landing.heroTitleA') }}
             </h1>
 
             <p class="mt-6 text-lg sm:text-xl text-gray-400 max-w-lg leading-relaxed">
-              Open-source VPN built on WireGuard. Real-time analytics, global servers, and zero-log guarantee — all in one dashboard.
+              {{ t('landing.heroDescription') }}
             </p>
 
             <div class="mt-8 flex flex-col sm:flex-row gap-3">
               <router-link to="/login" class="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-white bg-midori-500 rounded-xl hover:bg-midori-600 transition-all shadow-lg shadow-midori-500/25 hover:shadow-midori-500/40">
-                Start for free
+                {{ t('landing.heroPrimary') }}
                 <svg class="ml-2 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
               </router-link>
               <button @click="scrollTo('features')" class="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-gray-300 bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-700 transition-all">
-                See features
+                {{ t('landing.heroSecondary') }}
               </button>
             </div>
 
@@ -242,15 +254,15 @@ function scrollTo(id: string) {
             <div class="mt-12 grid grid-cols-3 gap-6">
               <div>
                 <p class="text-2xl sm:text-3xl font-bold text-white">{{ formatNumber(usersCount) }}</p>
-                <p class="text-sm text-gray-400 mt-1">Active users</p>
+                <p class="text-sm text-gray-400 mt-1">{{ t('landing.activeUsers') }}</p>
               </div>
               <div>
                 <p class="text-2xl sm:text-3xl font-bold text-white">{{ serversCount }}+</p>
-                <p class="text-sm text-gray-400 mt-1">Servers</p>
+                <p class="text-sm text-gray-400 mt-1">{{ t('landing.servers') }}</p>
               </div>
               <div>
                 <p class="text-2xl sm:text-3xl font-bold text-white">{{ uptimeCount }}.<span class="text-midori-500">9</span>%</p>
-                <p class="text-sm text-gray-400 mt-1">Uptime</p>
+                <p class="text-sm text-gray-400 mt-1">{{ t('landing.uptime') }}</p>
               </div>
             </div>
           </div>
@@ -261,12 +273,12 @@ function scrollTo(id: string) {
               <!-- Mock header -->
               <div class="flex items-center justify-between">
                 <div>
-                  <p class="text-sm font-semibold text-gray-900">Network Traffic</p>
-                  <p class="text-xs text-gray-400 mt-0.5">Last 24 hours — real-time</p>
+                  <p class="text-sm font-semibold text-gray-900">{{ t('landing.networkTraffic') }}</p>
+                  <p class="text-xs text-gray-400 mt-0.5">{{ t('landing.last24h') }}</p>
                 </div>
                 <div class="flex items-center gap-1.5 px-2.5 py-1 bg-midori-50 rounded-lg">
                   <span class="w-1.5 h-1.5 rounded-full bg-midori-500 animate-pulse"></span>
-                  <span class="text-xs font-semibold text-midori-700">Live</span>
+                  <span class="text-xs font-semibold text-midori-700">{{ t('landing.live') }}</span>
                 </div>
               </div>
 
@@ -284,17 +296,17 @@ function scrollTo(id: string) {
               <!-- Mock stats cards -->
               <div class="grid grid-cols-3 gap-3">
                 <div class="bg-gray-50 rounded-xl p-3">
-                  <p class="text-xs text-gray-400 font-medium">Bandwidth</p>
+                  <p class="text-xs text-gray-400 font-medium">{{ t('landing.bandwidth') }}</p>
                   <p class="text-lg font-bold text-gray-900 mt-1">{{ formatNumber(dataPoints) }}</p>
                   <p class="text-xs text-midori-600 font-medium mt-0.5">+12.3%</p>
                 </div>
                 <div class="bg-gray-50 rounded-xl p-3">
-                  <p class="text-xs text-gray-400 font-medium">Latency</p>
+                  <p class="text-xs text-gray-400 font-medium">{{ t('landing.latency') }}</p>
                   <p class="text-lg font-bold text-gray-900 mt-1">14ms</p>
                   <p class="text-xs text-midori-600 font-medium mt-0.5">-8.1%</p>
                 </div>
                 <div class="bg-gray-50 rounded-xl p-3">
-                  <p class="text-xs text-gray-400 font-medium">Peers</p>
+                  <p class="text-xs text-gray-400 font-medium">{{ t('common.peers') }}</p>
                   <p class="text-lg font-bold text-gray-900 mt-1">2,481</p>
                   <p class="text-xs text-midori-600 font-medium mt-0.5">+5.7%</p>
                 </div>
@@ -309,7 +321,7 @@ function scrollTo(id: string) {
                 </svg>
               </div>
               <div>
-                <p class="text-xs font-semibold text-gray-900">Encrypted</p>
+                <p class="text-xs font-semibold text-gray-900">{{ t('landing.encrypted') }}</p>
                 <p class="text-[10px] text-gray-400">WireGuard / AES-256</p>
               </div>
             </div>
@@ -322,9 +334,9 @@ function scrollTo(id: string) {
     <section id="features" class="py-20 sm:py-28 bg-gray-800/50">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="text-center max-w-2xl mx-auto mb-16">
-          <p class="text-sm font-semibold text-midori-600 uppercase tracking-wide">Features</p>
-          <h2 class="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight">Everything you need for secure networking</h2>
-          <p class="mt-4 text-lg text-gray-400">Built for speed, privacy, and developer experience. Every feature is designed to just work.</p>
+          <p class="text-sm font-semibold text-midori-600 uppercase tracking-wide">{{ t('landing.featuresNav') }}</p>
+          <h2 class="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight">{{ t('landing.featuresTitle') }}</h2>
+          <p class="mt-4 text-lg text-gray-400">{{ t('landing.featuresSubtitle') }}</p>
         </div>
 
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
@@ -374,9 +386,9 @@ function scrollTo(id: string) {
     <section id="pricing" class="py-20 sm:py-28">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="text-center max-w-2xl mx-auto mb-12">
-          <p class="text-sm font-semibold text-midori-600 uppercase tracking-wide">Pricing</p>
-          <h2 class="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight">Simple, transparent pricing</h2>
-          <p class="mt-4 text-lg text-gray-400">Start free. Upgrade when you need more. No hidden fees, ever.</p>
+          <p class="text-sm font-semibold text-midori-600 uppercase tracking-wide">{{ t('landing.pricingNav') }}</p>
+          <h2 class="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight">{{ t('landing.pricingTitle') }}</h2>
+          <p class="mt-4 text-lg text-gray-400">{{ t('landing.pricingSubtitle') }}</p>
 
           <!-- Annual/Monthly toggle -->
           <div class="mt-8 inline-flex items-center gap-3 bg-gray-800 rounded-full p-1">
@@ -384,13 +396,13 @@ function scrollTo(id: string) {
               @click="annual = false"
               :class="!annual ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400'"
               class="px-4 py-1.5 rounded-full text-sm font-medium transition-all"
-            >Monthly</button>
+            >{{ t('landing.monthly') }}</button>
             <button
               @click="annual = true"
               :class="annual ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400'"
               class="px-4 py-1.5 rounded-full text-sm font-medium transition-all"
             >
-              Annual
+              {{ t('landing.annual') }}
               <span class="ml-1 text-xs font-semibold text-midori-600">-33%</span>
             </button>
           </div>
@@ -408,7 +420,7 @@ function scrollTo(id: string) {
             <!-- Popular badge -->
             <div v-if="plan.highlighted" class="absolute -top-3 left-1/2 -translate-x-1/2">
               <span class="inline-flex items-center px-3 py-1 text-xs font-bold text-white bg-midori-500 rounded-full shadow-sm">
-                Most Popular
+                {{ t('landing.mostPopular') }}
               </span>
             </div>
 
@@ -421,8 +433,8 @@ function scrollTo(id: string) {
               <span class="text-4xl font-extrabold text-white">
                 ${{ annual ? plan.annualPrice : plan.monthlyPrice }}
               </span>
-              <span v-if="plan.monthlyPrice > 0" class="text-sm text-gray-400">/mo</span>
-              <span v-else class="text-sm text-gray-400">forever</span>
+              <span v-if="plan.monthlyPrice > 0" class="text-sm text-gray-400">{{ t('landing.perMonth') }}</span>
+              <span v-else class="text-sm text-gray-400">{{ t('landing.forever') }}</span>
             </div>
 
             <ul class="mt-6 space-y-3 flex-1">
@@ -452,60 +464,35 @@ function scrollTo(id: string) {
     <section id="trust" class="py-20 sm:py-28 bg-gray-800/50">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="text-center max-w-2xl mx-auto mb-16">
-          <p class="text-sm font-semibold text-midori-600 uppercase tracking-wide">Trust &amp; Security</p>
-          <h2 class="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight">Built on transparency</h2>
-          <p class="mt-4 text-lg text-gray-400">Open-source. Audited. No compromises on privacy.</p>
+          <p class="text-sm font-semibold text-midori-600 uppercase tracking-wide">{{ t('landing.securityNav') }}</p>
+          <h2 class="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight">{{ t('landing.trustTitle') }}</h2>
+          <p class="mt-4 text-lg text-gray-400">{{ t('landing.trustSubtitle') }}</p>
         </div>
 
         <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <!-- Badge 1 -->
-          <div class="bg-gray-800 rounded-2xl border border-gray-700 p-6 text-center hover:shadow-lg hover:shadow-black/20 transition-shadow">
+          <div v-for="card in trustCards" :key="card.key" class="bg-gray-800 rounded-2xl border border-gray-700 p-6 text-center hover:shadow-lg hover:shadow-black/20 transition-shadow">
             <div class="w-12 h-12 mx-auto rounded-xl bg-midori-900/40 flex items-center justify-center mb-4">
-              <svg class="w-6 h-6 text-midori-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <svg v-if="card.key === 'openSource'" class="w-6 h-6 text-midori-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
               </svg>
-            </div>
-            <h3 class="text-sm font-bold text-white">Open Source</h3>
-            <p class="text-xs text-gray-500 mt-1.5 leading-relaxed">Full source code available on GitHub. Audit anytime.</p>
-          </div>
-
-          <!-- Badge 2 -->
-          <div class="bg-gray-800 rounded-2xl border border-gray-700 p-6 text-center hover:shadow-lg hover:shadow-black/20 transition-shadow">
-            <div class="w-12 h-12 mx-auto rounded-xl bg-midori-900/40 flex items-center justify-center mb-4">
-              <svg class="w-6 h-6 text-midori-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <svg v-else-if="card.key === 'zeroLog'" class="w-6 h-6 text-midori-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
-            </div>
-            <h3 class="text-sm font-bold text-white">Zero-Log</h3>
-            <p class="text-xs text-gray-500 mt-1.5 leading-relaxed">We never log browsing activity or connection metadata.</p>
-          </div>
-
-          <!-- Badge 3 -->
-          <div class="bg-gray-800 rounded-2xl border border-gray-700 p-6 text-center hover:shadow-lg hover:shadow-black/20 transition-shadow">
-            <div class="w-12 h-12 mx-auto rounded-xl bg-midori-900/40 flex items-center justify-center mb-4">
-              <svg class="w-6 h-6 text-midori-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <svg v-else-if="card.key === 'wireguard'" class="w-6 h-6 text-midori-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
-            </div>
-            <h3 class="text-sm font-bold text-white">WireGuard</h3>
-            <p class="text-xs text-gray-500 mt-1.5 leading-relaxed">State-of-the-art cryptography with minimal attack surface.</p>
-          </div>
-
-          <!-- Badge 4 -->
-          <div class="bg-gray-800 rounded-2xl border border-gray-700 p-6 text-center hover:shadow-lg hover:shadow-black/20 transition-shadow">
-            <div class="w-12 h-12 mx-auto rounded-xl bg-midori-900/40 flex items-center justify-center mb-4">
-              <svg class="w-6 h-6 text-midori-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <svg v-else class="w-6 h-6 text-midori-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h3 class="text-sm font-bold text-white">GDPR Ready</h3>
-            <p class="text-xs text-gray-500 mt-1.5 leading-relaxed">Compliant data handling. EU servers available.</p>
+            <h3 class="text-sm font-bold text-white">{{ card.title }}</h3>
+            <p class="text-xs text-gray-500 mt-1.5 leading-relaxed">{{ card.desc }}</p>
           </div>
         </div>
 
         <!-- Logos row -->
         <div class="mt-16 text-center">
-          <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-6">Powered by</p>
+          <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-6">{{ t('landing.poweredBy') }}</p>
           <div class="flex items-center justify-center gap-8 sm:gap-12 flex-wrap opacity-50 grayscale">
             <span class="text-lg font-bold text-gray-400">WireGuard</span>
             <span class="text-lg font-bold text-gray-400">Authentik</span>
@@ -521,19 +508,19 @@ function scrollTo(id: string) {
     <section class="py-20 sm:py-28">
       <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight">
-          Ready to take control of your privacy?
+          {{ t('landing.ctaTitle') }}
         </h2>
         <p class="mt-4 text-lg text-gray-400 max-w-xl mx-auto">
-          Join thousands of users who trust MidoriVPN for fast, secure, and transparent networking.
+          {{ t('landing.ctaSubtitle') }}
         </p>
         <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
           <router-link to="/login" class="inline-flex items-center px-8 py-3.5 text-base font-semibold text-white bg-midori-500 rounded-xl hover:bg-midori-600 transition-all shadow-lg shadow-midori-500/25 hover:shadow-midori-500/40">
-            Get started — it's free
+            {{ t('landing.ctaPrimary') }}
             <svg class="ml-2 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
           </router-link>
           <a href="https://github.com/goastian/midori-vpn-core" target="_blank" rel="noopener noreferrer" class="inline-flex items-center px-6 py-3.5 text-base font-semibold text-gray-300 bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-700 transition-all">
             <svg class="mr-2 w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
-            View on GitHub
+            {{ t('landing.ctaSecondary') }}
           </a>
         </div>
       </div>
@@ -553,44 +540,44 @@ function scrollTo(id: string) {
               </div>
               <span class="text-lg font-bold">Midori<span class="text-midori-500">VPN</span></span>
             </div>
-            <p class="text-sm text-gray-500 leading-relaxed">Open-source VPN built for speed, privacy and transparency.</p>
+            <p class="text-sm text-gray-500 leading-relaxed">{{ t('landing.footerDescription') }}</p>
           </div>
 
           <!-- Product -->
           <div>
-            <h4 class="text-xs font-semibold text-gray-100 uppercase tracking-wider mb-4">Product</h4>
+            <h4 class="text-xs font-semibold text-gray-100 uppercase tracking-wider mb-4">{{ t('landing.footerProduct') }}</h4>
             <ul class="space-y-2.5">
-              <li><button @click="scrollTo('features')" class="text-sm text-gray-400 hover:text-white transition-colors">Features</button></li>
-              <li><button @click="scrollTo('pricing')" class="text-sm text-gray-400 hover:text-white transition-colors">Pricing</button></li>
-              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">Download</a></li>
-              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">Changelog</a></li>
+              <li><button @click="scrollTo('features')" class="text-sm text-gray-400 hover:text-white transition-colors">{{ t('landing.featuresNav') }}</button></li>
+              <li><button @click="scrollTo('pricing')" class="text-sm text-gray-400 hover:text-white transition-colors">{{ t('landing.pricingNav') }}</button></li>
+              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">{{ t('landing.footerDownload') }}</a></li>
+              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">{{ t('landing.footerChangelog') }}</a></li>
             </ul>
           </div>
 
           <!-- Company -->
           <div>
-            <h4 class="text-xs font-semibold text-gray-100 uppercase tracking-wider mb-4">Company</h4>
+            <h4 class="text-xs font-semibold text-gray-100 uppercase tracking-wider mb-4">{{ t('landing.footerCompany') }}</h4>
             <ul class="space-y-2.5">
-              <li><a href="https://astian.org" target="_blank" rel="noopener noreferrer" class="text-sm text-gray-400 hover:text-white transition-colors">About Astian</a></li>
-              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">Blog</a></li>
-              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">Careers</a></li>
-              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">Contact</a></li>
+              <li><a href="https://astian.org" target="_blank" rel="noopener noreferrer" class="text-sm text-gray-400 hover:text-white transition-colors">{{ t('landing.footerAbout') }}</a></li>
+              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">{{ t('landing.footerBlog') }}</a></li>
+              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">{{ t('landing.footerCareers') }}</a></li>
+              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">{{ t('landing.footerContact') }}</a></li>
             </ul>
           </div>
 
           <!-- Legal -->
           <div>
-            <h4 class="text-xs font-semibold text-gray-100 uppercase tracking-wider mb-4">Legal</h4>
+            <h4 class="text-xs font-semibold text-gray-100 uppercase tracking-wider mb-4">{{ t('landing.footerLegal') }}</h4>
             <ul class="space-y-2.5">
-              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">Privacy Policy</a></li>
-              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">Terms of Service</a></li>
+              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">{{ t('landing.footerPrivacy') }}</a></li>
+              <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">{{ t('landing.footerTerms') }}</a></li>
               <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">GDPR</a></li>
             </ul>
           </div>
         </div>
 
         <div class="mt-12 pt-8 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p class="text-xs text-gray-400">&copy; {{ new Date().getFullYear() }} Astian Foundation. All rights reserved.</p>
+          <p class="text-xs text-gray-400">&copy; {{ new Date().getFullYear() }} Astian Foundation. {{ t('landing.footerRights') }}</p>
           <div class="flex items-center gap-4">
             <a href="https://github.com/goastian" target="_blank" rel="noopener noreferrer" class="text-gray-500 hover:text-gray-300 transition-colors">
               <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>

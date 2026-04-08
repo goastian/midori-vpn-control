@@ -2,8 +2,11 @@ import { computed, ref } from 'vue'
 
 export type LocaleCode = 'pt' | 'es' | 'de' | 'en' | 'tr' | 'fr' | 'ru' | 'uk' | 'ca' | 'gl'
 
-type TranslationValue = string | Record<string, TranslationValue>
-type TranslationTree = Record<string, TranslationValue>
+interface TranslationTree {
+  [key: string]: string | TranslationTree
+}
+
+type TranslationValue = string | TranslationTree
 type InterpolationParams = Record<string, string | number>
 
 type SupportedLocale = {
@@ -41,7 +44,7 @@ function detectInitialLocale(): LocaleCode {
   const savedLocale = window.localStorage.getItem(STORAGE_KEY)
   if (savedLocale) return normalizeLocale(savedLocale)
 
-  return normalizeLocale(window.navigator.language)
+  return 'es'
 }
 
 const messages: Record<LocaleCode, TranslationTree> = {

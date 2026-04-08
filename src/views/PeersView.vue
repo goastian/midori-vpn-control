@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { api } from '../lib/api'
+import { useLocale } from '../lib/i18n'
 import type { Server, Connection, ConnectionConfig } from '../lib/schemas'
 
 const servers = ref<Server[]>([])
@@ -8,6 +9,7 @@ const connections = ref<Connection[]>([])
 const loading = ref(true)
 const connecting = ref(false)
 const lastConfig = ref<ConnectionConfig | null>(null)
+const { t } = useLocale()
 
 const form = ref({
   server_id: '',
@@ -51,7 +53,7 @@ async function connect() {
 }
 
 async function disconnect(id: string) {
-  if (!confirm('¿Desconectar este dispositivo?')) return
+  if (!confirm(t('connectionsView.disconnectConfirm'))) return
   try {
     await api.delete(`/api/v1/control/connections/${id}`)
     await loadData()
@@ -90,7 +92,7 @@ PublicKey = ${c.server_public_key}
 Endpoint = ${c.server_endpoint}
 AllowedIPs = ${c.allowed_ips}`
   navigator.clipboard.writeText(text)
-  alert('Configuración copiada al portapapeles (se limpiará en 60s)')
+  alert(t('connectionsView.copied'))
   if (clipboardTimer) clearTimeout(clipboardTimer)
   clipboardTimer = setTimeout(() => {
     navigator.clipboard.writeText('').catch(() => {})
@@ -100,32 +102,32 @@ AllowedIPs = ${c.allowed_ips}`
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Mis Conexiones VPN</h1>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">{{ t('connectionsView.title') }}</h1>
 
     <!-- Connect form -->
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-6">
-      <h2 class="text-lg font-semibold mb-4 dark:text-gray-100">Nueva conexión</h2>
+      <h2 class="text-lg font-semibold mb-4 dark:text-gray-100">{{ t('connectionsView.newConnection') }}</h2>
       <form @submit.prevent="connect" class="space-y-3">
         <div class="flex flex-col sm:flex-row gap-3">
           <select
             v-model="form.server_id"
             class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm flex-1 bg-white dark:bg-gray-700 dark:text-gray-200"
           >
-            <option value="">Auto (menos cargado)</option>
+            <option value="">{{ t('connectionsView.autoServer') }}</option>
             <option v-for="s in servers" :key="s.id" :value="s.id">
               {{ s.name }} ({{ s.location }}) — {{ s.current_peers }}/{{ s.max_peers }}
             </option>
           </select>
           <input
             v-model="form.device_name"
-            placeholder="Nombre del dispositivo (opcional)"
+            :placeholder="t('connectionsView.deviceNamePlaceholder')"
             class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm flex-1 bg-white dark:bg-gray-700 dark:text-gray-200"
           />
         </div>
         <div class="flex flex-col sm:flex-row gap-3">
           <input
             v-model="form.public_key"
-            placeholder="Tu clave pública WireGuard"
+            :placeholder="t('connectionsView.publicKeyPlaceholder')"
             required
             class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm flex-1 font-mono bg-white dark:bg-gray-700 dark:text-gray-200"
           />
@@ -134,7 +136,7 @@ AllowedIPs = ${c.allowed_ips}`
             :disabled="connecting"
             class="bg-midori-600 hover:bg-midori-700 text-white font-medium px-6 py-2 rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap"
           >
-            {{ connecting ? 'Conectando...' : 'Conectar' }}
+            {{ connecting ? t('common.connecting') : t('common.connect') }}
           </button>
         </div>
       </form>
@@ -143,9 +145,9 @@ AllowedIPs = ${c.allowed_ips}`
     <!-- WireGuard config result -->
     <div v-if="lastConfig" class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-6 mb-6">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="font-semibold text-green-800 dark:text-green-400">Configuración WireGuard</h3>
+        <h3 class="font-semibold text-green-800 dark:text-green-400">{{ t('connectionsView.configTitle') }}</h3>
         <button @click="copyConfig" class="text-sm text-green-700 hover:text-green-900 font-medium">
-          Copiar
+          {{ t('common.copy') }}
         </button>
       </div>
       <pre class="text-xs bg-white dark:bg-gray-800 rounded-lg p-4 font-mono text-gray-700 dark:text-gray-300 overflow-x-auto">[Interface]
@@ -156,7 +158,7 @@ DNS = {{ lastConfig.dns }}
 PublicKey = {{ lastConfig.server_public_key }}
 Endpoint = {{ lastConfig.server_endpoint }}
 AllowedIPs = {{ lastConfig.allowed_ips }}</pre>
-      <button @click="lastConfig = null" class="mt-3 text-xs text-gray-500 hover:text-gray-700">Cerrar</button>
+      <button @click="lastConfig = null" class="mt-3 text-xs text-gray-500 hover:text-gray-700">{{ t('connectionsView.closeConfig') }}</button>
     </div>
 
     <div v-if="loading" class="flex justify-center py-12">
@@ -164,24 +166,24 @@ AllowedIPs = {{ lastConfig.allowed_ips }}</pre>
     </div>
 
     <div v-else-if="connections.length === 0" class="text-center py-12 text-gray-400 dark:text-gray-500">
-      No tienes conexiones activas.
+      {{ t('connectionsView.empty') }}
     </div>
 
     <div v-else class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
       <table class="w-full text-sm">
         <thead class="bg-gray-50 dark:bg-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           <tr>
-            <th class="px-6 py-3">Dispositivo</th>
-            <th class="px-6 py-3">Servidor</th>
-            <th class="px-6 py-3">IP</th>
-            <th class="px-6 py-3 hidden md:table-cell">Tráfico</th>
-            <th class="px-6 py-3">Estado</th>
+            <th class="px-6 py-3">{{ t('common.device') }}</th>
+            <th class="px-6 py-3">{{ t('common.server') }}</th>
+            <th class="px-6 py-3">{{ t('common.ip') }}</th>
+            <th class="px-6 py-3 hidden md:table-cell">{{ t('connectionsView.trafficHeader') }}</th>
+            <th class="px-6 py-3">{{ t('common.status') }}</th>
             <th class="px-6 py-3"></th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
           <tr v-for="conn in connections" :key="conn.id" class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-            <td class="px-6 py-4 text-gray-900">{{ conn.device_name || 'Sin nombre' }}</td>
+            <td class="px-6 py-4 text-gray-900">{{ conn.device_name || t('common.unnamed') }}</td>
             <td class="px-6 py-4 font-medium text-gray-700">{{ serverName(conn.server_id) }}</td>
             <td class="px-6 py-4 font-mono text-gray-600 text-xs">{{ conn.assigned_ip }}</td>
             <td class="px-6 py-4 text-gray-500 hidden md:table-cell text-xs">
@@ -192,7 +194,7 @@ AllowedIPs = {{ lastConfig.allowed_ips }}</pre>
                 :class="conn.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
                 class="text-xs font-medium px-2 py-1 rounded-full"
               >
-                {{ conn.is_active ? 'Activo' : 'Inactivo' }}
+                {{ conn.is_active ? t('common.active') : t('common.inactive') }}
               </span>
             </td>
             <td class="px-6 py-4 text-right">
@@ -201,7 +203,7 @@ AllowedIPs = {{ lastConfig.allowed_ips }}</pre>
                 @click="disconnect(conn.id)"
                 class="text-xs text-red-500 hover:text-red-700 transition-colors"
               >
-                Desconectar
+                {{ t('common.disconnect') }}
               </button>
             </td>
           </tr>

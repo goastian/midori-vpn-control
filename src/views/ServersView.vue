@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '../lib/api'
+import { useLocale } from '../lib/i18n'
 import type { Server } from '../lib/schemas'
 
 const servers = ref<Server[]>([])
 const loading = ref(true)
+const { t } = useLocale()
 
 onMounted(async () => {
   await loadServers()
@@ -35,14 +37,14 @@ function loadColor(pct: number): string {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Servidores VPN</h1>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">{{ t('serversView.title') }}</h1>
 
     <div v-if="loading" class="flex justify-center py-12">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
     </div>
 
     <div v-else-if="servers.length === 0" class="text-center py-12 text-gray-400 dark:text-gray-500">
-      No hay servidores disponibles.
+      {{ t('serversView.empty') }}
     </div>
 
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -53,7 +55,7 @@ function loadColor(pct: number): string {
             :class="server.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'"
             class="text-xs font-medium px-2 py-1 rounded-full"
           >
-            {{ server.is_active ? 'Activo' : 'Inactivo' }}
+            {{ server.is_active ? t('common.active') : t('common.inactive') }}
           </span>
         </div>
         <div class="space-y-2 text-sm text-gray-500">
@@ -61,7 +63,7 @@ function loadColor(pct: number): string {
           <p class="font-mono text-xs">{{ server.host }}:{{ server.wg_port }}</p>
           <div>
             <div class="flex justify-between text-xs mb-1">
-              <span>Carga</span>
+              <span>{{ t('serversView.load') }}</span>
               <span>{{ server.current_peers }}/{{ server.max_peers }}</span>
             </div>
             <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">

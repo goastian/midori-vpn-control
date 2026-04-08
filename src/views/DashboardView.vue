@@ -2,9 +2,11 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { api } from '../lib/api'
+import { useLocale } from '../lib/i18n'
 import type { AdminStats, Connection } from '../lib/schemas'
 
 const auth = useAuthStore()
+const { t, formatDateTime, formatWeekdayShort } = useLocale()
 
 const connections = ref<Connection[]>([])
 const adminStats = ref<AdminStats | null>(null)
@@ -29,21 +31,21 @@ const activePercent = computed(() => {
 const dashboardCards = computed(() => {
   const cards = [
     {
-      title: 'Conexiones activas',
+      title: t('dashboard.cards.activeConnections'),
       value: String(connectionTotals.value.active),
-      subtitle: `${connectionTotals.value.total} total`,
+      subtitle: t('common.totalConnections', { count: connectionTotals.value.total }),
       tone: 'emerald',
     },
     {
-      title: 'Uso de red',
+      title: t('dashboard.cards.networkUsage'),
       value: formatBytes(totalTransferredBytes.value),
-      subtitle: `${formatBytes(totalSentBytes.value)} subida / ${formatBytes(totalReceivedBytes.value)} bajada`,
+      subtitle: `↑${formatBytes(totalSentBytes.value)} / ↓${formatBytes(totalReceivedBytes.value)}`,
       tone: 'cyan',
     },
     {
-      title: 'Estado actual',
+      title: t('dashboard.cards.currentStatus'),
       value: `${activePercent.value}%`,
-      subtitle: 'peers conectados',
+      subtitle: t('common.peersConnected'),
       tone: 'violet',
     },
   ]
@@ -51,21 +53,21 @@ const dashboardCards = computed(() => {
   if (auth.isAdmin && adminStats.value) {
     cards.unshift(
       {
-        title: 'Usuarios',
+        title: t('common.users'),
         value: String(adminStats.value.total_users),
-        subtitle: 'cuentas registradas',
+        subtitle: t('common.registeredAccounts'),
         tone: 'midori',
       },
       {
-        title: 'Servidores',
+        title: t('common.servers'),
         value: String(adminStats.value.active_servers),
-        subtitle: `${adminStats.value.total_servers} disponibles`,
+        subtitle: t('common.available', { count: adminStats.value.total_servers }),
         tone: 'amber',
       },
       {
-        title: 'Peers',
+        title: t('common.peers'),
         value: String(adminStats.value.active_peers),
-        subtitle: `${adminStats.value.total_peers} provisionados`,
+        subtitle: t('common.provisioned', { count: adminStats.value.total_peers }),
         tone: 'rose',
       },
     )
@@ -90,7 +92,7 @@ const trafficByDay = computed(() => {
     date.setHours(0, 0, 0, 0)
     return {
       key: date.toISOString().slice(0, 10),
-      label: date.toLocaleDateString('es-ES', { weekday: 'short' }).replace('.', ''),
+      label: formatWeekdayShort(date),
       value: 0,
     }
   })
@@ -125,7 +127,7 @@ const deviceUsage = computed(() => {
   const deviceMap = new Map<string, { device: string; total: number; active: number }>()
 
   for (const conn of connections.value) {
-    const name = (conn.device_name || 'Dispositivo sin nombre').trim()
+    const name = (conn.device_name || t('common.noNamedDevice')).trim() || t('common.noNamedDevice')
     const current = deviceMap.get(name) || { device: name, total: 0, active: 0 }
     current.total += conn.bytes_sent + conn.bytes_received
     if (conn.is_active) current.active += 1
@@ -193,12 +195,12 @@ onUnmounted(() => {
       <div class="absolute -bottom-10 left-1/3 h-32 w-32 rounded-full bg-cyan-400/10 blur-2xl"></div>
       <div class="relative z-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Midori Control Center</p>
-          <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Panel de rendimiento</h1>
-          <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">Seguimiento de conexiones, trafico y salud operativa en tiempo real.</p>
+          <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{{ t('dashboard.eyebrow') }}</p>
+          <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{{ t('dashboard.title') }}</h1>
+          <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ t('dashboard.subtitle') }}</p>
         </div>
         <div class="rounded-2xl border border-slate-200 bg-white/70 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/70">
-          <p class="text-xs text-slate-500">Sesion activa</p>
+          <p class="text-xs text-slate-500">{{ t('common.sessionActive') }}</p>
           <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ auth.user?.email }}</p>
         </div>
       </div>
@@ -233,11 +235,11 @@ onUnmounted(() => {
         <article class="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 xl:col-span-2">
           <div class="mb-4 flex items-center justify-between">
             <div>
-              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Trafico de red semanal</h2>
-              <p class="text-sm text-slate-500 dark:text-slate-400">Acumulado por fecha de provisionamiento de conexiones.</p>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ t('dashboard.weeklyTraffic') }}</h2>
+              <p class="text-sm text-slate-500 dark:text-slate-400">{{ t('dashboard.weeklyTrafficSubtitle') }}</p>
             </div>
             <div class="text-right">
-              <p class="text-xs uppercase tracking-widest text-slate-400">Total</p>
+              <p class="text-xs uppercase tracking-widest text-slate-400">{{ t('common.total') }}</p>
               <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ formatBytes(totalTransferredBytes) }}</p>
             </div>
           </div>
@@ -261,8 +263,8 @@ onUnmounted(() => {
         </article>
 
         <article class="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
-          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Salud de conexiones</h2>
-          <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Distribucion de estado activo e inactivo.</p>
+          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ t('dashboard.connectionHealth') }}</h2>
+          <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ t('dashboard.connectionHealthSubtitle') }}</p>
 
           <div class="mt-6 flex items-center justify-center">
             <div class="relative">
@@ -282,18 +284,18 @@ onUnmounted(() => {
               </svg>
               <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
                 <p class="text-3xl font-semibold text-slate-900 dark:text-slate-100">{{ activePercent }}%</p>
-                <p class="text-xs uppercase tracking-[0.2em] text-slate-400">activos</p>
+                <p class="text-xs uppercase tracking-[0.2em] text-slate-400">{{ t('dashboard.activeLabel') }}</p>
               </div>
             </div>
           </div>
 
           <div class="mt-2 space-y-2 text-sm">
             <div class="flex items-center justify-between rounded-xl bg-slate-100/90 px-3 py-2 dark:bg-slate-800/80">
-              <span class="text-slate-500 dark:text-slate-300">Activas</span>
+              <span class="text-slate-500 dark:text-slate-300">{{ t('dashboard.activeLabel') }}</span>
               <span class="font-semibold text-slate-800 dark:text-slate-100">{{ connectionTotals.active }}</span>
             </div>
             <div class="flex items-center justify-between rounded-xl bg-slate-100/90 px-3 py-2 dark:bg-slate-800/80">
-              <span class="text-slate-500 dark:text-slate-300">Inactivas</span>
+              <span class="text-slate-500 dark:text-slate-300">{{ t('dashboard.inactiveLabel') }}</span>
               <span class="font-semibold text-slate-800 dark:text-slate-100">{{ connectionTotals.inactive }}</span>
             </div>
           </div>
@@ -303,8 +305,8 @@ onUnmounted(() => {
       <section class="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <article class="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
           <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Rendimiento por dispositivo</h2>
-            <span class="text-xs uppercase tracking-[0.2em] text-slate-400">Top 5</span>
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ t('dashboard.performanceByDevice') }}</h2>
+            <span class="text-xs uppercase tracking-[0.2em] text-slate-400">{{ t('common.topFive') }}</span>
           </div>
 
           <div v-if="deviceUsage.length" class="space-y-3">
@@ -319,19 +321,19 @@ onUnmounted(() => {
                   :style="{ width: `${Math.max((device.total / mostUsedDeviceBytes) * 100, 10)}%` }"
                 ></div>
               </div>
-              <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">{{ device.active }} conexion(es) activa(s)</p>
+              <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">{{ t('dashboard.connectionsActiveSuffix', { count: device.active }) }}</p>
             </div>
           </div>
 
           <p v-else class="rounded-xl bg-slate-100 px-4 py-8 text-center text-sm text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-            Aun no hay datos de trafico por dispositivo.
+            {{ t('dashboard.noDeviceTraffic') }}
           </p>
         </article>
 
         <article class="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
           <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Actividad reciente</h2>
-            <span class="text-xs uppercase tracking-[0.2em] text-slate-400">en vivo</span>
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ t('dashboard.recentActivity') }}</h2>
+            <span class="text-xs uppercase tracking-[0.2em] text-slate-400">{{ t('common.live') }}</span>
           </div>
 
           <div v-if="connections.length > 0" class="space-y-3">
@@ -346,11 +348,11 @@ onUnmounted(() => {
                   class="rounded-full px-2 py-1 text-[11px] font-semibold"
                   :class="conn.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'"
                 >
-                  {{ conn.is_active ? 'Activo' : 'Inactivo' }}
+                  {{ conn.is_active ? t('common.active') : t('common.inactive') }}
                 </span>
               </div>
               <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                {{ conn.device_name || 'Sin nombre' }} · {{ new Date(conn.created_at).toLocaleString() }}
+                {{ conn.device_name || t('common.unnamed') }} · {{ formatDateTime(conn.created_at) }}
               </p>
               <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 ↑{{ formatBytes(conn.bytes_sent) }} · ↓{{ formatBytes(conn.bytes_received) }}
@@ -359,7 +361,7 @@ onUnmounted(() => {
           </div>
 
           <p v-else class="rounded-xl bg-slate-100 px-4 py-8 text-center text-sm text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-            No existen conexiones recientes para mostrar.
+            {{ t('dashboard.noRecentConnections') }}
           </p>
         </article>
       </section>
@@ -367,24 +369,24 @@ onUnmounted(() => {
       <section v-if="auth.isAdmin && adminStats" class="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Metricas de plataforma</h2>
-            <p class="text-sm text-slate-500 dark:text-slate-400">Resumen general de infraestructura administrada.</p>
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ t('dashboard.platformMetrics') }}</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400">{{ t('dashboard.platformMetricsSubtitle') }}</p>
           </div>
           <div class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
             <div class="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-800">
-              <p class="text-xs text-slate-500">Usuarios</p>
+              <p class="text-xs text-slate-500">{{ t('common.users') }}</p>
               <p class="font-semibold text-slate-800 dark:text-slate-100">{{ adminStats.total_users }}</p>
             </div>
             <div class="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-800">
-              <p class="text-xs text-slate-500">Servidores</p>
+              <p class="text-xs text-slate-500">{{ t('common.servers') }}</p>
               <p class="font-semibold text-slate-800 dark:text-slate-100">{{ adminStats.active_servers }}/{{ adminStats.total_servers }}</p>
             </div>
             <div class="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-800">
-              <p class="text-xs text-slate-500">Peers</p>
+              <p class="text-xs text-slate-500">{{ t('common.peers') }}</p>
               <p class="font-semibold text-slate-800 dark:text-slate-100">{{ adminStats.active_peers }}/{{ adminStats.total_peers }}</p>
             </div>
             <div class="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-800">
-              <p class="text-xs text-slate-500">Trafico global</p>
+              <p class="text-xs text-slate-500">{{ t('dashboard.globalTraffic') }}</p>
               <p class="font-semibold text-slate-800 dark:text-slate-100">
                 ↑{{ formatBytes(adminStats.total_bytes_sent) }}
                 ↓{{ formatBytes(adminStats.total_bytes_received) }}

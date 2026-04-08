@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '../lib/api'
+import { useLocale } from '../lib/i18n'
 import type { AuditLog } from '../lib/schemas'
 
 const logs = ref<AuditLog[]>([])
 const loading = ref(true)
+const { t, formatDateTime } = useLocale()
 
 onMounted(async () => {
   try {
@@ -17,15 +19,8 @@ onMounted(async () => {
 })
 
 function actionLabel(action: string): string {
-  const map: Record<string, string> = {
-    'peer.connect': 'Conexión VPN',
-    'peer.disconnect': 'Desconexión VPN',
-    'peer.cleanup': 'Limpieza automática',
-    'server.create': 'Servidor creado',
-    'server.update': 'Servidor actualizado',
-    'server.delete': 'Servidor eliminado',
-  }
-  return map[action] || action
+  const label = t(`auditView.actions.${action}`)
+  return label === `auditView.actions.${action}` ? action : label
 }
 
 function actionColor(action: string): string {
@@ -51,30 +46,30 @@ function safeMetadata(metadata: Record<string, any>): string {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Registro de Auditoría</h1>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">{{ t('auditView.title') }}</h1>
 
     <div v-if="loading" class="flex justify-center py-12">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
     </div>
 
     <div v-else-if="logs.length === 0" class="text-center py-12 text-gray-400 dark:text-gray-500">
-      No hay registros de auditoría.
+      {{ t('auditView.empty') }}
     </div>
 
     <div v-else class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
       <table class="w-full text-sm">
         <thead class="bg-gray-50 dark:bg-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           <tr>
-            <th class="px-6 py-3">Fecha</th>
-            <th class="px-6 py-3">Acción</th>
-            <th class="px-6 py-3 hidden md:table-cell">IP</th>
-            <th class="px-6 py-3 hidden lg:table-cell">Detalles</th>
+            <th class="px-6 py-3">{{ t('common.date') }}</th>
+            <th class="px-6 py-3">{{ t('auditView.action') }}</th>
+            <th class="px-6 py-3 hidden md:table-cell">{{ t('auditView.ip') }}</th>
+            <th class="px-6 py-3 hidden lg:table-cell">{{ t('common.details') }}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
           <tr v-for="log in logs" :key="log.id" class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
             <td class="px-6 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">
-              {{ new Date(log.created_at).toLocaleString() }}
+              {{ formatDateTime(log.created_at) }}
             </td>
             <td class="px-6 py-4">
               <span :class="actionColor(log.action)" class="text-xs font-medium px-2 py-1 rounded-full">

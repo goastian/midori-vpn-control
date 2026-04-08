@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '../../lib/api'
+import { useLocale } from '../../lib/i18n'
 import type { AdminPeer } from '../../lib/schemas'
 
 const peers = ref<AdminPeer[]>([])
 const loading = ref(true)
+const { t } = useLocale()
 
 onMounted(() => loadPeers())
 
@@ -20,7 +22,7 @@ async function loadPeers() {
 }
 
 async function forceDisconnect(id: string) {
-  if (!confirm('¿Forzar desconexión de este peer?')) return
+  if (!confirm(t('adminPeers.forceDisconnectConfirm'))) return
   try {
     await api.delete(`/api/v1/admin/peers/${id}`)
     await loadPeers()
@@ -40,25 +42,25 @@ function formatBytes(bytes: number): string {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Admin — Peers</h1>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">{{ t('adminPeers.title') }}</h1>
 
     <div v-if="loading" class="flex justify-center py-12">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
     </div>
 
     <div v-else-if="peers.length === 0" class="text-center py-12 text-gray-400 dark:text-gray-500">
-      No hay peers en el sistema.
+      {{ t('adminPeers.empty') }}
     </div>
 
     <div v-else class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
       <table class="w-full text-sm">
         <thead class="bg-gray-50 dark:bg-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           <tr>
-            <th class="px-6 py-3">Dispositivo</th>
-            <th class="px-6 py-3">IP</th>
-            <th class="px-6 py-3 hidden md:table-cell">Usuario</th>
-            <th class="px-6 py-3 hidden md:table-cell">Tráfico</th>
-            <th class="px-6 py-3">Estado</th>
+            <th class="px-6 py-3">{{ t('common.device') }}</th>
+            <th class="px-6 py-3">{{ t('common.ip') }}</th>
+            <th class="px-6 py-3 hidden md:table-cell">{{ t('common.user') }}</th>
+            <th class="px-6 py-3 hidden md:table-cell">{{ t('common.traffic') }}</th>
+            <th class="px-6 py-3">{{ t('common.status') }}</th>
             <th class="px-6 py-3"></th>
           </tr>
         </thead>
@@ -75,7 +77,7 @@ function formatBytes(bytes: number): string {
                 :class="p.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
                 class="text-xs font-medium px-2 py-1 rounded-full"
               >
-                {{ p.is_active ? 'Activo' : 'Inactivo' }}
+                {{ p.is_active ? t('common.active') : t('common.inactive') }}
               </span>
             </td>
             <td class="px-6 py-4 text-right">
@@ -84,7 +86,7 @@ function formatBytes(bytes: number): string {
                 @click="forceDisconnect(p.id)"
                 class="text-xs text-red-500 hover:text-red-700"
               >
-                Desconectar
+                {{ t('common.disconnect') }}
               </button>
             </td>
           </tr>

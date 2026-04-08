@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '../../lib/api'
+import { useLocale } from '../../lib/i18n'
 import type { Server } from '../../lib/schemas'
 
 const servers = ref<Server[]>([])
 const loading = ref(true)
 const showForm = ref(false)
 const editingId = ref<string | null>(null)
+const { t } = useLocale()
 
 const emptyForm = {
   name: '', host: '', port: 8080, wg_port: 51820,
@@ -60,7 +62,7 @@ async function saveServer() {
 }
 
 async function deleteServer(id: string) {
-  if (!confirm('¿Eliminar este servidor permanentemente?')) return
+  if (!confirm(t('adminServers.deleteConfirm'))) return
   try {
     await api.delete(`/api/v1/admin/servers/${id}`)
     await loadServers()
@@ -73,34 +75,34 @@ async function deleteServer(id: string) {
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Admin — Servidores</h1>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('adminServers.title') }}</h1>
       <button
         @click="showForm ? cancelForm() : (showForm = true)"
         class="bg-midori-600 hover:bg-midori-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
       >
-        {{ showForm ? 'Cancelar' : 'Agregar servidor' }}
+        {{ showForm ? t('common.cancel') : t('adminServers.addServer') }}
       </button>
     </div>
 
     <div v-if="showForm" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-6">
-      <h2 class="text-lg font-semibold mb-4 dark:text-gray-100">{{ editingId ? 'Editar' : 'Nuevo' }} servidor</h2>
+      <h2 class="text-lg font-semibold mb-4 dark:text-gray-100">{{ editingId ? t('adminServers.editServer') : t('adminServers.newServer') }}</h2>
       <form @submit.prevent="saveServer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <input v-model="form.name" placeholder="Nombre" required class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model="form.name" :placeholder="t('common.name')" required class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
         <input v-model="form.host" placeholder="Host" required class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <input v-model.number="form.port" type="number" placeholder="Puerto API" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <input v-model.number="form.wg_port" type="number" placeholder="Puerto WG" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <input v-model="form.public_key" placeholder="Clave pública WG" required class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm font-mono bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model.number="form.port" type="number" :placeholder="t('adminServers.apiPort')" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model.number="form.wg_port" type="number" :placeholder="t('adminServers.wgPort')" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model="form.public_key" :placeholder="t('adminServers.wgPublicKey')" required class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm font-mono bg-white dark:bg-gray-700 dark:text-gray-200" />
         <input v-model="form.core_token" placeholder="Core Token" :required="!editingId" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <input v-model="form.location" placeholder="Ubicación" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <input v-model="form.country_code" placeholder="País (US, DE...)" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <input v-model.number="form.max_peers" type="number" placeholder="Max peers" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model="form.location" :placeholder="t('adminServers.location')" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model="form.country_code" :placeholder="t('adminServers.country')" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model.number="form.max_peers" type="number" :placeholder="t('adminServers.maxPeers')" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
         <label class="flex items-center space-x-2">
           <input v-model="form.is_active" type="checkbox" class="rounded border-gray-300" />
-          <span class="text-sm text-gray-700 dark:text-gray-300">Activo</span>
+          <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('adminServers.activeToggle') }}</span>
         </label>
         <div class="md:col-span-2">
           <button type="submit" class="bg-midori-600 hover:bg-midori-700 text-white font-medium px-6 py-2 rounded-lg">
-            {{ editingId ? 'Guardar' : 'Crear' }}
+            {{ editingId ? t('adminServers.saveEdit') : t('adminServers.saveNew') }}
           </button>
         </div>
       </form>
@@ -114,12 +116,12 @@ async function deleteServer(id: string) {
       <table class="w-full text-sm">
         <thead class="bg-gray-50 dark:bg-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           <tr>
-            <th class="px-6 py-3">Nombre</th>
+            <th class="px-6 py-3">{{ t('common.name') }}</th>
             <th class="px-6 py-3">Host</th>
-            <th class="px-6 py-3 hidden md:table-cell">Ubicación</th>
-            <th class="px-6 py-3">Peers</th>
-            <th class="px-6 py-3">Estado</th>
-            <th class="px-6 py-3">Acciones</th>
+            <th class="px-6 py-3 hidden md:table-cell">{{ t('adminServers.location') }}</th>
+            <th class="px-6 py-3">{{ t('common.peers') }}</th>
+            <th class="px-6 py-3">{{ t('common.status') }}</th>
+            <th class="px-6 py-3">{{ t('common.actions') }}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
@@ -130,12 +132,12 @@ async function deleteServer(id: string) {
             <td class="px-6 py-4">{{ s.current_peers }}/{{ s.max_peers }}</td>
             <td class="px-6 py-4">
               <span :class="s.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'" class="text-xs font-medium px-2 py-1 rounded-full">
-                {{ s.is_active ? 'Activo' : 'Inactivo' }}
+                {{ s.is_active ? t('common.active') : t('common.inactive') }}
               </span>
             </td>
             <td class="px-6 py-4 space-x-2">
-              <button @click="startEdit(s)" class="text-xs text-midori-600 hover:text-midori-700">Editar</button>
-              <button @click="deleteServer(s.id)" class="text-xs text-red-500 hover:text-red-700">Eliminar</button>
+              <button @click="startEdit(s)" class="text-xs text-midori-600 hover:text-midori-700">{{ t('common.edit') }}</button>
+              <button @click="deleteServer(s.id)" class="text-xs text-red-500 hover:text-red-700">{{ t('common.delete') }}</button>
             </td>
           </tr>
         </tbody>

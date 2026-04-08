@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '../../lib/api'
+import { useLocale } from '../../lib/i18n'
 import type { User } from '../../lib/schemas'
 
 const users = ref<User[]>([])
 const loading = ref(true)
 const showCreate = ref(false)
+const { t } = useLocale()
 
 const form = ref({
   authentik_uid: '',
@@ -47,7 +49,7 @@ async function createUser() {
 }
 
 async function banUser(id: string) {
-  const reason = prompt('Razón del ban:')
+  const reason = prompt(t('adminUsers.banReasonPrompt'))
   if (reason === null) return
   try {
     await api.post(`/api/v1/admin/users/${id}/ban`, { reason })
@@ -58,7 +60,7 @@ async function banUser(id: string) {
 }
 
 async function deleteUser(id: string) {
-  if (!confirm('¿Eliminar este usuario permanentemente?')) return
+  if (!confirm(t('adminUsers.deleteConfirm'))) return
   try {
     await api.delete(`/api/v1/admin/users/${id}`)
     await loadUsers()
@@ -71,12 +73,12 @@ async function deleteUser(id: string) {
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Gestión de Usuarios</h1>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('adminUsers.title') }}</h1>
       <button
         @click="showCreate = !showCreate"
         class="bg-midori-600 hover:bg-midori-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
       >
-        {{ showCreate ? 'Cancelar' : 'Crear usuario' }}
+        {{ showCreate ? t('common.cancel') : t('adminUsers.createUser') }}
       </button>
     </div>
 
@@ -84,11 +86,11 @@ async function deleteUser(id: string) {
       <form @submit.prevent="createUser" class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <input v-model="form.authentik_uid" placeholder="Authentik UID" required class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
         <input v-model="form.email" placeholder="Email" required class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <input v-model="form.display_name" placeholder="Nombre" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <input v-model="groupInput" placeholder="Grupos (separados por coma)" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model="form.display_name" :placeholder="t('adminUsers.namePlaceholder')" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model="groupInput" :placeholder="t('adminUsers.groupsPlaceholder')" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
         <div class="md:col-span-2">
           <button type="submit" class="bg-midori-600 hover:bg-midori-700 text-white font-medium px-6 py-2 rounded-lg">
-            Crear
+            {{ t('adminUsers.createSubmit') }}
           </button>
         </div>
       </form>
@@ -102,11 +104,11 @@ async function deleteUser(id: string) {
       <table class="w-full text-sm">
         <thead class="bg-gray-50 dark:bg-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           <tr>
-            <th class="px-6 py-3">Email</th>
-            <th class="px-6 py-3">Nombre</th>
-            <th class="px-6 py-3 hidden md:table-cell">Grupos</th>
-            <th class="px-6 py-3">Estado</th>
-            <th class="px-6 py-3">Acciones</th>
+            <th class="px-6 py-3">{{ t('common.email') }}</th>
+            <th class="px-6 py-3">{{ t('common.name') }}</th>
+            <th class="px-6 py-3 hidden md:table-cell">{{ t('common.groups') }}</th>
+            <th class="px-6 py-3">{{ t('common.status') }}</th>
+            <th class="px-6 py-3">{{ t('common.actions') }}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
@@ -119,13 +121,13 @@ async function deleteUser(id: string) {
               </span>
             </td>
             <td class="px-6 py-4">
-              <span v-if="u.is_banned" class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">Baneado</span>
-              <span v-else class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">Activo</span>
+              <span v-if="u.is_banned" class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">{{ t('adminUsers.banned') }}</span>
+              <span v-else class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">{{ t('common.active') }}</span>
             </td>
             <td class="px-6 py-4 space-x-2">
-              <router-link :to="`/admin/users/${u.id}`" class="text-xs text-midori-600 hover:text-midori-700">Ver</router-link>
-              <button v-if="!u.is_banned" @click="banUser(u.id)" class="text-xs text-yellow-600 hover:text-yellow-700">Ban</button>
-              <button @click="deleteUser(u.id)" class="text-xs text-red-500 hover:text-red-700">Eliminar</button>
+              <router-link :to="`/admin/users/${u.id}`" class="text-xs text-midori-600 hover:text-midori-700">{{ t('common.view') }}</router-link>
+              <button v-if="!u.is_banned" @click="banUser(u.id)" class="text-xs text-yellow-600 hover:text-yellow-700">{{ t('adminUsers.ban') }}</button>
+              <button @click="deleteUser(u.id)" class="text-xs text-red-500 hover:text-red-700">{{ t('common.delete') }}</button>
             </td>
           </tr>
         </tbody>

@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useLocale } from '../lib/i18n'
 import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const errorMsg = ref('')
+const { t } = useLocale()
 
 onMounted(async () => {
   console.log('[AUTH-CALLBACK] Component mounted')
@@ -25,7 +27,7 @@ onMounted(async () => {
 
   if (!code) {
     console.error('[AUTH-CALLBACK] No authorization code in URL')
-    errorMsg.value = 'No se recibió código de autorización'
+    errorMsg.value = t('authCallback.missingCode')
     return
   }
 
@@ -38,7 +40,7 @@ onMounted(async () => {
   sessionStorage.removeItem('oauth_state')
   if (!savedState || savedState !== returnedState) {
     console.error('[AUTH-CALLBACK] State mismatch!', { saved: savedState, returned: returnedState })
-    errorMsg.value = 'Estado OAuth inválido — posible ataque CSRF. Intenta iniciar sesión de nuevo.'
+    errorMsg.value = t('authCallback.invalidState')
     return
   }
 
@@ -50,7 +52,7 @@ onMounted(async () => {
     router.replace({ name: 'dashboard' })
   } catch (e: any) {
     console.error('[AUTH-CALLBACK] handleCallback FAILED:', e.message, e)
-    errorMsg.value = e.message || 'Error durante la autenticación'
+    errorMsg.value = e.message || t('authCallback.authError')
   }
 })
 </script>
@@ -59,15 +61,15 @@ onMounted(async () => {
   <div class="min-h-screen flex items-center justify-center">
     <div class="text-center">
       <div v-if="errorMsg" class="bg-red-50 text-red-700 rounded-lg p-6 max-w-md">
-        <h2 class="text-lg font-semibold mb-2">Error de autenticación</h2>
+        <h2 class="text-lg font-semibold mb-2">{{ t('authCallback.title') }}</h2>
         <p class="text-sm">{{ errorMsg }}</p>
         <router-link to="/login" class="mt-4 inline-block text-midori-600 hover:underline text-sm">
-          Volver al login
+          {{ t('authCallback.backToLogin') }}
         </router-link>
       </div>
       <div v-else class="space-y-4">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-midori-600 mx-auto"></div>
-        <p class="text-gray-500">Autenticando...</p>
+        <p class="text-gray-500">{{ t('authCallback.authenticating') }}</p>
       </div>
     </div>
   </div>

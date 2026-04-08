@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '../../lib/api'
+import { useLocale } from '../../lib/i18n'
 import type { User, AdminPeer } from '../../lib/schemas'
 
 const route = useRoute()
@@ -10,6 +11,7 @@ const userId = route.params.id as string
 const user = ref<User | null>(null)
 const peers = ref<AdminPeer[]>([])
 const loading = ref(true)
+const { t, formatDate } = useLocale()
 
 onMounted(async () => {
   try {
@@ -37,7 +39,7 @@ function formatBytes(bytes: number): string {
 <template>
   <div>
     <router-link to="/admin/users" class="text-sm text-midori-600 hover:text-midori-700 mb-4 inline-block">
-      ← Volver a usuarios
+      ← {{ t('adminUserDetail.back') }}
     </router-link>
 
     <div v-if="loading" class="flex justify-center py-12">
@@ -49,16 +51,16 @@ function formatBytes(bytes: number): string {
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-          <h2 class="text-lg font-semibold mb-4 dark:text-gray-100">Información</h2>
+          <h2 class="text-lg font-semibold mb-4 dark:text-gray-100">{{ t('adminUserDetail.info') }}</h2>
           <dl class="space-y-2 text-sm">
-            <div class="flex justify-between"><dt class="text-gray-500">Nombre</dt><dd>{{ user.display_name || '—' }}</dd></div>
-            <div class="flex justify-between"><dt class="text-gray-500">Grupos</dt><dd>{{ user.groups?.join(', ') || '—' }}</dd></div>
-            <div class="flex justify-between"><dt class="text-gray-500">Registrado</dt><dd>{{ new Date(user.created_at).toLocaleDateString() }}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">{{ t('common.name') }}</dt><dd>{{ user.display_name || '—' }}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">{{ t('common.groups') }}</dt><dd>{{ user.groups?.join(', ') || '—' }}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">{{ t('adminUserDetail.registered') }}</dt><dd>{{ formatDate(user.created_at) }}</dd></div>
             <div class="flex justify-between">
-              <dt class="text-gray-500">Estado</dt>
+              <dt class="text-gray-500">{{ t('common.status') }}</dt>
               <dd>
-                <span v-if="user.is_banned" class="text-red-600 font-medium">Baneado: {{ user.ban_reason }}</span>
-                <span v-else class="text-green-600">Activo</span>
+                <span v-if="user.is_banned" class="text-red-600 font-medium">{{ t('adminUserDetail.bannedWithReason', { reason: user.ban_reason || '—' }) }}</span>
+                <span v-else class="text-green-600">{{ t('common.active') }}</span>
               </dd>
             </div>
           </dl>
@@ -68,16 +70,16 @@ function formatBytes(bytes: number): string {
 
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-100">
-          <h2 class="text-lg font-semibold">Peers activos ({{ peers.length }})</h2>
+          <h2 class="text-lg font-semibold">{{ t('adminUserDetail.activePeers', { count: peers.length }) }}</h2>
         </div>
-        <div v-if="peers.length === 0" class="px-6 py-8 text-center text-gray-400 text-sm">Sin peers</div>
+        <div v-if="peers.length === 0" class="px-6 py-8 text-center text-gray-400 text-sm">{{ t('adminUserDetail.noPeers') }}</div>
         <table v-else class="w-full text-sm">
           <thead class="bg-gray-50 dark:bg-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase">
             <tr>
-              <th class="px-6 py-3">Dispositivo</th>
-              <th class="px-6 py-3">IP</th>
-              <th class="px-6 py-3">Tráfico</th>
-              <th class="px-6 py-3">Estado</th>
+              <th class="px-6 py-3">{{ t('common.device') }}</th>
+              <th class="px-6 py-3">{{ t('common.ip') }}</th>
+              <th class="px-6 py-3">{{ t('common.traffic') }}</th>
+              <th class="px-6 py-3">{{ t('common.status') }}</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
@@ -87,7 +89,7 @@ function formatBytes(bytes: number): string {
               <td class="px-6 py-3 text-xs">↑{{ formatBytes(p.bytes_sent) }} ↓{{ formatBytes(p.bytes_received) }}</td>
               <td class="px-6 py-3">
                 <span :class="p.is_active ? 'text-green-600' : 'text-gray-400'" class="text-xs">
-                  {{ p.is_active ? 'Activo' : 'Inactivo' }}
+                  {{ p.is_active ? t('common.active') : t('common.inactive') }}
                 </span>
               </td>
             </tr>
