@@ -82,6 +82,11 @@ export const useAuthStore = defineStore('auth', () => {
   )
 
   async function startLogin() {
+    console.log('[AUTH] startLogin() called')
+    console.log('[AUTH] ISSUER config:', issuerUrls)
+    console.log('[AUTH] CLIENT_ID:', CLIENT_ID)
+    console.log('[AUTH] REDIRECT_URI:', REDIRECT_URI)
+
     const verifier = generateCodeVerifier()
     const challenge = await generateCodeChallenge(verifier)
 
@@ -100,27 +105,40 @@ export const useAuthStore = defineStore('auth', () => {
       state,
     })
 
-    window.location.href = `${issuerUrls.authorizationUrl}?${params.toString()}`
+    const loginUrl = `${issuerUrls.authorizationUrl}?${params.toString()}`
+    console.log('[AUTH] Redirecting to Authentik:', loginUrl)
+    window.location.href = loginUrl
   }
 
   async function handleCallback(code: string) {
+    console.log('[AUTH] handleCallback() called with code length:', code.length)
     loading.value = true
     error.value = ''
 
     try {
       const verifier = sessionStorage.getItem('pkce_verifier') || ''
       sessionStorage.removeItem('pkce_verifier')
+      console.log('[AUTH] PKCE verifier present:', !!verifier, 'length:', verifier.length)
+      console.log('[AUTH] REDIRECT_URI for exchange:', REDIRECT_URI)
 
       const tokens = await exchangeCode(code, REDIRECT_URI, verifier)
+      console.log('[AUTH] Token exchange SUCCESS')
 
       // Validate token before storing
+      const payload = decodeJWTPayload(tokens.access_token)
+      console.log('[AUTH] Token issuer from JWT:', payload?.iss)
+      console.log('[AUTH] Expected issuer:', issuerUrls.expectedTokenIssuer)
+
       if (!isTokenIssuerValid(tokens.access_token)) {
+        console.error('[AUTH] Token issuer mismatch!', payload?.iss, '!==', issuerUrls.expectedTokenIssuer)
         throw new Error('Token issuer mismatch')
       }
       if (isTokenExpired(tokens.access_token)) {
+        console.error('[AUTH] Received expired token!', 'exp:', payload?.exp, 'now:', Date.now() / 1000)
         throw new Error('Received expired token')
       }
 
+      console.log('[AUTH] Token validated, storing...')
       accessToken.value = tokens.access_token
       localStorage.setItem('access_token', tokens.access_token)
 
@@ -129,8 +147,11 @@ export const useAuthStore = defineStore('auth', () => {
         localStorage.setItem('refresh_token', tokens.refresh_token)
       }
 
+      console.log('[AUTH] Fetching user profile...')
       await fetchProfile()
+      console.log('[AUTH] Login flow COMPLETE, user:', user.value?.email)
     } catch (e: any) {
+      console.error('[AUTH] handleCallback FAILED:', e.message, e)
       error.value = e.message || 'Login failed'
       throw e
     } finally {

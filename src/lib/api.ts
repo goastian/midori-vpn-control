@@ -126,17 +126,28 @@ export const api = {
 import { TokenResponseSchema } from './schemas'
 
 export async function exchangeCode(code: string, redirectUri: string, codeVerifier: string) {
-  const res = await fetch(`${API_URL}/api/v1/auth/callback`, {
+  const url = `${API_URL}/api/v1/auth/callback`
+  console.log('[AUTH-API] exchangeCode() called')
+  console.log('[AUTH-API] POST', url)
+  console.log('[AUTH-API] redirect_uri:', redirectUri)
+  console.log('[AUTH-API] code length:', code.length)
+  console.log('[AUTH-API] code_verifier length:', codeVerifier.length)
+
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code, redirect_uri: redirectUri, code_verifier: codeVerifier }),
   })
 
+  console.log('[AUTH-API] Response status:', res.status, res.statusText)
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'token exchange failed' }))
+    console.error('[AUTH-API] Token exchange FAILED:', res.status, err)
     throw new Error(err.error || 'token exchange failed')
   }
 
   const json = await res.json()
+  console.log('[AUTH-API] Token exchange response OK, has data:', !!json.data)
   return TokenResponseSchema.parse(json.data)
 }
