@@ -85,7 +85,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => !!accessToken.value)
   const isAdmin = computed(() =>
-    user.value?.groups?.some((g) => g === 'vpn-admins' || g === 'admins') ?? false
+    user.value?.groups?.some((g) =>
+      g === 'vpn-admins' || g === 'admins' || g === 'authentik Admins'
+    ) ?? false
   )
 
   async function startLogin() {

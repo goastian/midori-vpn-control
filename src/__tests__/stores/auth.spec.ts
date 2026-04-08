@@ -123,4 +123,20 @@ describe('useAuthStore', () => {
     const store = useAuthStore()
     expect(store.isAdmin).toBe(false)
   })
+
+  it('isAdmin is true for authentik Admins group', async () => {
+    const { useAuthStore } = await import('@/stores/auth')
+    const store = useAuthStore()
+    store.user = {
+      id: '53451935-3e31-407b-939f-873924c8a66f',
+      authentik_uid: 'user-1',
+      email: 'alfonso.hernandez@astian.org',
+      display_name: 'ponchale',
+      groups: ['authentik Admins'],
+      is_banned: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    expect(store.isAdmin).toBe(true)
+  })
 })
