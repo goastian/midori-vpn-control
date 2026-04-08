@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { api } from '../lib/api'
 import type { AdminStats, Connection } from '../lib/schemas'
@@ -10,6 +10,134 @@ const connections = ref<Connection[]>([])
 const adminStats = ref<AdminStats | null>(null)
 const loading = ref(true)
 let ws: WebSocket | null = null
+
+const connectionTotals = computed(() => {
+  const active = connections.value.filter((c) => c.is_active).length
+  const inactive = Math.max(connections.value.length - active, 0)
+  return {
+    total: connections.value.length,
+    active,
+    inactive,
+  }
+})
+
+const activePercent = computed(() => {
+  if (!connectionTotals.value.total) return 0
+  return Math.round((connectionTotals.value.active / connectionTotals.value.total) * 100)
+})
+
+const dashboardCards = computed(() => {
+  const cards = [
+    {
+      title: 'Conexiones activas',
+      value: String(connectionTotals.value.active),
+      subtitle: `${connectionTotals.value.total} total`,
+      tone: 'emerald',
+    },
+    {
+      title: 'Uso de red',
+      value: formatBytes(totalTransferredBytes.value),
+      subtitle: `${formatBytes(totalSentBytes.value)} subida / ${formatBytes(totalReceivedBytes.value)} bajada`,
+      tone: 'cyan',
+    },
+    {
+      title: 'Estado actual',
+      value: `${activePercent.value}%`,
+      subtitle: 'peers conectados',
+      tone: 'violet',
+    },
+  ]
+
+  if (auth.isAdmin && adminStats.value) {
+    cards.unshift(
+      {
+        title: 'Usuarios',
+        value: String(adminStats.value.total_users),
+        subtitle: 'cuentas registradas',
+        tone: 'midori',
+      },
+      {
+        title: 'Servidores',
+        value: String(adminStats.value.active_servers),
+        subtitle: `${adminStats.value.total_servers} disponibles`,
+        tone: 'amber',
+      },
+      {
+        title: 'Peers',
+        value: String(adminStats.value.active_peers),
+        subtitle: `${adminStats.value.total_peers} provisionados`,
+        tone: 'rose',
+      },
+    )
+  }
+
+  return cards
+})
+
+const totalSentBytes = computed(() =>
+  connections.value.reduce((sum, conn) => sum + conn.bytes_sent, 0),
+)
+const totalReceivedBytes = computed(() =>
+  connections.value.reduce((sum, conn) => sum + conn.bytes_received, 0),
+)
+const totalTransferredBytes = computed(() => totalSentBytes.value + totalReceivedBytes.value)
+
+const trafficByDay = computed(() => {
+  const now = new Date()
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(now)
+    date.setDate(now.getDate() - (6 - i))
+    date.setHours(0, 0, 0, 0)
+    return {
+      key: date.toISOString().slice(0, 10),
+      label: date.toLocaleDateString('es-ES', { weekday: 'short' }).replace('.', ''),
+      value: 0,
+    }
+  })
+
+  const map = new Map(days.map((d) => [d.key, d]))
+
+  for (const conn of connections.value) {
+    const key = conn.created_at.slice(0, 10)
+    const bucket = map.get(key)
+    if (!bucket) continue
+    bucket.value += conn.bytes_sent + conn.bytes_received
+  }
+
+  return days
+})
+
+const maxTrafficDay = computed(() => Math.max(...trafficByDay.value.map((d) => d.value), 1))
+
+const trafficSparkline = computed(() => {
+  const values = trafficByDay.value.map((d) => d.value)
+  const max = Math.max(...values, 1)
+  return values
+    .map((value, index) => {
+      const x = (index / Math.max(values.length - 1, 1)) * 100
+      const y = 100 - (value / max) * 100
+      return `${x},${y}`
+    })
+    .join(' ')
+})
+
+const deviceUsage = computed(() => {
+  const deviceMap = new Map<string, { device: string; total: number; active: number }>()
+
+  for (const conn of connections.value) {
+    const name = (conn.device_name || 'Dispositivo sin nombre').trim()
+    const current = deviceMap.get(name) || { device: name, total: 0, active: 0 }
+    current.total += conn.bytes_sent + conn.bytes_received
+    if (conn.is_active) current.active += 1
+    deviceMap.set(name, current)
+  }
+
+  return Array.from(deviceMap.values())
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5)
+})
+
+const mostUsedDeviceBytes = computed(() => Math.max(...deviceUsage.value.map((d) => d.total), 1))
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
@@ -56,85 +184,215 @@ onMounted(async () => {
 onUnmounted(() => {
   ws?.close()
 })
-
-const activeConnections = () => connections.value.filter((c) => c.is_active).length
 </script>
 
 <template>
-  <div>
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Dashboard</h1>
+  <div class="space-y-6">
+    <section class="relative overflow-hidden rounded-3xl border border-slate-200 bg-white/75 p-6 shadow-xl shadow-slate-900/5 backdrop-blur dark:border-slate-700 dark:bg-slate-900/70">
+      <div class="absolute -right-14 -top-14 h-40 w-40 rounded-full bg-midori-400/20 blur-2xl"></div>
+      <div class="absolute -bottom-10 left-1/3 h-32 w-32 rounded-full bg-cyan-400/10 blur-2xl"></div>
+      <div class="relative z-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Midori Control Center</p>
+          <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Panel de rendimiento</h1>
+          <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">Seguimiento de conexiones, trafico y salud operativa en tiempo real.</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white/70 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/70">
+          <p class="text-xs text-slate-500">Sesion activa</p>
+          <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ auth.user?.email }}</p>
+        </div>
+      </div>
+    </section>
 
-    <div v-if="loading" class="flex justify-center py-12">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
+    <div v-if="loading" class="flex justify-center py-16">
+      <div class="h-9 w-9 animate-spin rounded-full border-b-2 border-midori-600"></div>
     </div>
 
     <template v-else>
-      <!-- Admin stats -->
-      <div v-if="auth.isAdmin && adminStats" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
-          <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Usuarios</p>
-          <p class="text-2xl font-bold text-midori-600">{{ adminStats.total_users }}</p>
-        </div>
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
-          <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Servidores</p>
-          <p class="text-2xl font-bold text-midori-600">{{ adminStats.active_servers }}<span class="text-sm text-gray-400">/{{ adminStats.total_servers }}</span></p>
-        </div>
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
-          <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Peers activos</p>
-          <p class="text-2xl font-bold text-midori-600">{{ adminStats.active_peers }}<span class="text-sm text-gray-400">/{{ adminStats.total_peers }}</span></p>
-        </div>
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
-          <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Tráfico total</p>
-          <p class="text-lg font-bold text-gray-700 dark:text-gray-300">
-            <span class="text-green-600">↑{{ formatBytes(adminStats.total_bytes_sent) }}</span>
-            <span class="text-blue-600 ml-1">↓{{ formatBytes(adminStats.total_bytes_received) }}</span>
-          </p>
-        </div>
-      </div>
+      <section class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+        <article
+          v-for="card in dashboardCards"
+          :key="card.title"
+          class="rounded-2xl border p-5 shadow-sm transition hover:-translate-y-0.5"
+          :class="{
+            'border-emerald-100 bg-emerald-50/80 dark:border-emerald-900/40 dark:bg-emerald-950/30': card.tone === 'emerald',
+            'border-cyan-100 bg-cyan-50/80 dark:border-cyan-900/40 dark:bg-cyan-950/30': card.tone === 'cyan',
+            'border-violet-100 bg-violet-50/80 dark:border-violet-900/40 dark:bg-violet-950/30': card.tone === 'violet',
+            'border-midori-100 bg-midori-50/80 dark:border-midori-900/40 dark:bg-midori-950/30': card.tone === 'midori',
+            'border-amber-100 bg-amber-50/80 dark:border-amber-900/40 dark:bg-amber-950/30': card.tone === 'amber',
+            'border-rose-100 bg-rose-50/80 dark:border-rose-900/40 dark:bg-rose-950/30': card.tone === 'rose',
+          }"
+        >
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{{ card.title }}</p>
+          <p class="mt-3 text-3xl font-semibold text-slate-900 dark:text-slate-100">{{ card.value }}</p>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ card.subtitle }}</p>
+        </article>
+      </section>
 
-      <!-- User info cards -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-          <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Mis conexiones</p>
-          <p class="text-3xl font-bold text-midori-600">{{ activeConnections() }}</p>
-        </div>
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-          <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Cuenta</p>
-          <p class="text-lg font-semibold text-gray-700 dark:text-gray-200 truncate">{{ auth.user?.email }}</p>
-          <p v-if="auth.user?.display_name" class="text-sm text-gray-400 dark:text-gray-500">{{ auth.user.display_name }}</p>
-          <p v-if="auth.isAdmin" class="text-xs text-midori-600 font-medium mt-1">Admin</p>
-        </div>
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-          <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Total conexiones</p>
-          <p class="text-3xl font-bold text-gray-700">{{ connections.length }}</p>
-        </div>
-      </div>
-
-      <!-- Recent connections -->
-      <div v-if="connections.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-        <div class="px-6 py-4 border-b border-gray-100">
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Conexiones recientes</h2>
-        </div>
-        <div class="divide-y divide-gray-50 dark:divide-gray-700">
-          <div v-for="conn in connections.slice(0, 5)" :key="conn.id" class="px-6 py-4 flex items-center justify-between">
+      <section class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <article class="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 xl:col-span-2">
+          <div class="mb-4 flex items-center justify-between">
             <div>
-              <p class="text-sm font-mono text-gray-700">{{ conn.assigned_ip }}</p>
-              <p class="text-xs text-gray-400">
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Trafico de red semanal</h2>
+              <p class="text-sm text-slate-500 dark:text-slate-400">Acumulado por fecha de provisionamiento de conexiones.</p>
+            </div>
+            <div class="text-right">
+              <p class="text-xs uppercase tracking-widest text-slate-400">Total</p>
+              <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ formatBytes(totalTransferredBytes) }}</p>
+            </div>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/70">
+            <svg viewBox="0 0 100 100" class="h-28 w-full">
+              <polyline points="0,100 100,100" fill="none" class="stroke-slate-300 dark:stroke-slate-700" stroke-width="1" />
+              <polyline :points="trafficSparkline" fill="none" class="stroke-midori-500" stroke-width="2.3" stroke-linecap="round" />
+            </svg>
+            <div class="mt-3 grid grid-cols-7 gap-2">
+              <div v-for="day in trafficByDay" :key="day.key" class="space-y-1 text-center">
+                <div class="mx-auto flex h-16 w-6 items-end rounded-full bg-slate-200/70 p-1 dark:bg-slate-700/70">
+                  <div
+                    class="w-full rounded-full bg-gradient-to-t from-midori-600 to-cyan-400"
+                    :style="{ height: `${Math.max((day.value / maxTrafficDay) * 100, day.value > 0 ? 14 : 3)}%` }"
+                  ></div>
+                </div>
+                <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{{ day.label }}</p>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Salud de conexiones</h2>
+          <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Distribucion de estado activo e inactivo.</p>
+
+          <div class="mt-6 flex items-center justify-center">
+            <div class="relative">
+              <svg viewBox="0 0 120 120" class="h-44 w-44 -rotate-90">
+                <circle cx="60" cy="60" r="48" stroke="currentColor" stroke-width="14" fill="none" class="text-slate-200 dark:text-slate-700" />
+                <circle
+                  cx="60"
+                  cy="60"
+                  r="48"
+                  stroke="currentColor"
+                  stroke-width="14"
+                  fill="none"
+                  class="text-midori-500"
+                  stroke-linecap="round"
+                  :stroke-dasharray="`${(activePercent / 100) * 301.6} 301.6`"
+                />
+              </svg>
+              <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+                <p class="text-3xl font-semibold text-slate-900 dark:text-slate-100">{{ activePercent }}%</p>
+                <p class="text-xs uppercase tracking-[0.2em] text-slate-400">activos</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-2 space-y-2 text-sm">
+            <div class="flex items-center justify-between rounded-xl bg-slate-100/90 px-3 py-2 dark:bg-slate-800/80">
+              <span class="text-slate-500 dark:text-slate-300">Activas</span>
+              <span class="font-semibold text-slate-800 dark:text-slate-100">{{ connectionTotals.active }}</span>
+            </div>
+            <div class="flex items-center justify-between rounded-xl bg-slate-100/90 px-3 py-2 dark:bg-slate-800/80">
+              <span class="text-slate-500 dark:text-slate-300">Inactivas</span>
+              <span class="font-semibold text-slate-800 dark:text-slate-100">{{ connectionTotals.inactive }}</span>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <article class="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+          <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Rendimiento por dispositivo</h2>
+            <span class="text-xs uppercase tracking-[0.2em] text-slate-400">Top 5</span>
+          </div>
+
+          <div v-if="deviceUsage.length" class="space-y-3">
+            <div v-for="device in deviceUsage" :key="device.device" class="rounded-xl border border-slate-200/80 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-800/80">
+              <div class="mb-2 flex items-center justify-between gap-4">
+                <p class="truncate text-sm font-medium text-slate-700 dark:text-slate-100">{{ device.device }}</p>
+                <span class="text-xs text-slate-500 dark:text-slate-400">{{ formatBytes(device.total) }}</span>
+              </div>
+              <div class="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                <div
+                  class="h-full rounded-full bg-gradient-to-r from-cyan-500 to-midori-500"
+                  :style="{ width: `${Math.max((device.total / mostUsedDeviceBytes) * 100, 10)}%` }"
+                ></div>
+              </div>
+              <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">{{ device.active }} conexion(es) activa(s)</p>
+            </div>
+          </div>
+
+          <p v-else class="rounded-xl bg-slate-100 px-4 py-8 text-center text-sm text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+            Aun no hay datos de trafico por dispositivo.
+          </p>
+        </article>
+
+        <article class="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+          <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Actividad reciente</h2>
+            <span class="text-xs uppercase tracking-[0.2em] text-slate-400">en vivo</span>
+          </div>
+
+          <div v-if="connections.length > 0" class="space-y-3">
+            <div
+              v-for="conn in connections.slice(0, 6)"
+              :key="conn.id"
+              class="rounded-xl border border-slate-200/80 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-800/80"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <p class="text-sm font-mono text-slate-700 dark:text-slate-200">{{ conn.assigned_ip }}</p>
+                <span
+                  class="rounded-full px-2 py-1 text-[11px] font-semibold"
+                  :class="conn.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'"
+                >
+                  {{ conn.is_active ? 'Activo' : 'Inactivo' }}
+                </span>
+              </div>
+              <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 {{ conn.device_name || 'Sin nombre' }} · {{ new Date(conn.created_at).toLocaleString() }}
               </p>
-              <p v-if="conn.bytes_sent > 0 || conn.bytes_received > 0" class="text-xs text-gray-400 mt-0.5">
-                ↑{{ formatBytes(conn.bytes_sent) }} ↓{{ formatBytes(conn.bytes_received) }}
+              <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                ↑{{ formatBytes(conn.bytes_sent) }} · ↓{{ formatBytes(conn.bytes_received) }}
               </p>
             </div>
-            <span
-              :class="conn.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
-              class="text-xs font-medium px-2 py-1 rounded-full"
-            >
-              {{ conn.is_active ? 'Activo' : 'Inactivo' }}
-            </span>
+          </div>
+
+          <p v-else class="rounded-xl bg-slate-100 px-4 py-8 text-center text-sm text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+            No existen conexiones recientes para mostrar.
+          </p>
+        </article>
+      </section>
+
+      <section v-if="auth.isAdmin && adminStats" class="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Metricas de plataforma</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400">Resumen general de infraestructura administrada.</p>
+          </div>
+          <div class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+            <div class="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-800">
+              <p class="text-xs text-slate-500">Usuarios</p>
+              <p class="font-semibold text-slate-800 dark:text-slate-100">{{ adminStats.total_users }}</p>
+            </div>
+            <div class="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-800">
+              <p class="text-xs text-slate-500">Servidores</p>
+              <p class="font-semibold text-slate-800 dark:text-slate-100">{{ adminStats.active_servers }}/{{ adminStats.total_servers }}</p>
+            </div>
+            <div class="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-800">
+              <p class="text-xs text-slate-500">Peers</p>
+              <p class="font-semibold text-slate-800 dark:text-slate-100">{{ adminStats.active_peers }}/{{ adminStats.total_peers }}</p>
+            </div>
+            <div class="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-800">
+              <p class="text-xs text-slate-500">Trafico global</p>
+              <p class="font-semibold text-slate-800 dark:text-slate-100">
+                ↑{{ formatBytes(adminStats.total_bytes_sent) }}
+                ↓{{ formatBytes(adminStats.total_bytes_received) }}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
     </template>
   </div>
 </template>
