@@ -130,12 +130,23 @@ export const useAuthStore = defineStore('auth', () => {
 
       const tokens = await exchangeCode(code, REDIRECT_URI, verifier)
       console.log('[AUTH] Token exchange SUCCESS')
+      console.log('[AUTH] Token response flags:', {
+        has_access_token: !!tokens.access_token,
+        has_refresh_token: !!tokens.refresh_token,
+        has_id_token: !!tokens.id_token,
+      })
 
       // Validate issuer from id_token (JWT) — access_token may be opaque
       const accessPayload = decodeJWTPayload(tokens.access_token)
       const idPayload = tokens.id_token ? decodeJWTPayload(tokens.id_token) : null
       console.log('[AUTH] Access token issuer:', accessPayload?.iss ?? '(opaque token)')
-      console.log('[AUTH] ID token issuer:', idPayload?.iss ?? '(no id_token)')
+      if (!tokens.id_token) {
+        console.log('[AUTH] ID token issuer: (no id_token)')
+      } else if (!idPayload?.iss) {
+        console.log('[AUTH] ID token issuer: (present but non-decodable)')
+      } else {
+        console.log('[AUTH] ID token issuer:', idPayload.iss)
+      }
       console.log('[AUTH] Expected issuer:', issuerUrls.expectedTokenIssuer)
 
       // Validate issuer: prefer id_token (guaranteed JWT per OIDC), fall back to access_token
@@ -157,14 +168,10 @@ export const useAuthStore = defineStore('auth', () => {
         console.log('[AUTH] Token expires_at stored:', expiresAt, '(in', tokens.expires_in, 'seconds)')
       }
 
-      // Authentik may return opaque access_token; backend expects a JWT for JWKS validation.
-      // Use id_token as bearer when available.
-      const bearerToken = tokens.id_token || tokens.access_token
-
       console.log('[AUTH] Token validated, storing...')
-      console.log('[AUTH] Bearer token source:', tokens.id_token ? 'id_token' : 'access_token')
-      accessToken.value = bearerToken
-      localStorage.setItem('access_token', bearerToken)
+      console.log('[AUTH] Bearer token source: access_token')
+      accessToken.value = tokens.access_token
+      localStorage.setItem('access_token', tokens.access_token)
 
       if (tokens.refresh_token) {
         refreshToken.value = tokens.refresh_token
