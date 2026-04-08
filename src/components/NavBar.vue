@@ -3,29 +3,40 @@ import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useDarkMode } from '../composables/useDarkMode'
+import LanguageSelector from './LanguageSelector.vue'
+import { useLocale } from '../lib/i18n'
 
 const auth = useAuthStore()
 const route = useRoute()
 const { isDark, toggle: toggleDark } = useDarkMode()
+const { t } = useLocale()
 const mobileOpen = ref(false)
 
-const userNav = [
-  { name: 'Dashboard', path: '/dashboard', icon: 'home' },
-  { name: 'Servidores', path: '/servers', icon: 'server' },
-  { name: 'Conexiones', path: '/connections', icon: 'link' },
-  { name: 'Auditoría', path: '/audit', icon: 'audit' },
-]
-
-const adminNav = [
-  { name: 'Usuarios', path: '/admin/users', icon: 'users' },
-  { name: 'Admin Servers', path: '/admin/servers', icon: 'shield' },
-  { name: 'Admin Peers', path: '/admin/peers', icon: 'pulse' },
-  { name: 'Admin Logs', path: '/admin/audit', icon: 'log' },
-]
-
 const navGroups = computed(() => {
-  const groups = [{ title: 'General', items: userNav }]
-  if (auth.isAdmin) groups.push({ title: 'Administracion', items: adminNav })
+  const groups = [
+    {
+      title: t('nav.general'),
+      items: [
+        { name: t('nav.dashboard'), path: '/dashboard', icon: 'home' },
+        { name: t('nav.servers'), path: '/servers', icon: 'server' },
+        { name: t('nav.connections'), path: '/connections', icon: 'link' },
+        { name: t('nav.audit'), path: '/audit', icon: 'audit' },
+      ],
+    },
+  ]
+
+  if (auth.isAdmin) {
+    groups.push({
+      title: t('nav.administration'),
+      items: [
+        { name: t('nav.adminUsers'), path: '/admin/users', icon: 'users' },
+        { name: t('nav.adminServers'), path: '/admin/servers', icon: 'shield' },
+        { name: t('nav.adminPeers'), path: '/admin/peers', icon: 'pulse' },
+        { name: t('nav.adminLogs'), path: '/admin/audit', icon: 'log' },
+      ],
+    })
+  }
+
   return groups
 })
 
@@ -70,7 +81,7 @@ function closeMobile() {
       <button
         class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"
         @click="mobileOpen = true"
-        aria-label="Abrir menu"
+        :aria-label="t('nav.openMenu')"
       >
         <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
           <path d="M3 5.5a.75.75 0 01.75-.75h12.5a.75.75 0 010 1.5H3.75A.75.75 0 013 5.5zm0 4.5a.75.75 0 01.75-.75h12.5a.75.75 0 010 1.5H3.75A.75.75 0 013 10zm.75 3.75a.75.75 0 000 1.5h8.5a.75.75 0 000-1.5h-8.5z" />
@@ -82,20 +93,23 @@ function closeMobile() {
   <aside class="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-slate-200/80 bg-white/90 p-4 backdrop-blur lg:flex lg:flex-col dark:border-slate-700 dark:bg-slate-900/90">
     <div class="flex items-center justify-between px-2 pb-5">
       <router-link to="/dashboard" class="text-2xl font-semibold tracking-tight text-midori-700 dark:text-midori-400">
-        MidoriVPN
+        {{ t('common.appName') }}
       </router-link>
-      <button
-        @click="toggleDark"
-        class="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-        :title="isDark ? 'Modo claro' : 'Modo oscuro'"
-      >
-        <svg v-if="isDark" class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd" />
-        </svg>
-        <svg v-else class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-          <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-        </svg>
-      </button>
+      <div class="flex items-center gap-2">
+        <LanguageSelector />
+        <button
+          @click="toggleDark"
+          class="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          :title="isDark ? t('theme.switchToLight') : t('theme.switchToDark')"
+        >
+          <svg v-if="isDark" class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd" />
+          </svg>
+          <svg v-else class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+          </svg>
+        </button>
+      </div>
     </div>
 
     <nav class="flex-1 space-y-6 overflow-y-auto pr-1">
@@ -123,12 +137,12 @@ function closeMobile() {
 
       <div class="rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
         <p class="truncate text-sm font-semibold text-slate-700 dark:text-slate-200">{{ auth.user?.email }}</p>
-        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ auth.isAdmin ? 'Perfil administrador' : 'Perfil usuario' }}</p>
+        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ auth.isAdmin ? t('common.roleAdmin') : t('common.roleUser') }}</p>
         <button
           @click="auth.logout()"
           class="mt-3 w-full rounded-xl border border-rose-200 px-3 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 dark:border-rose-700/60 dark:text-rose-300 dark:hover:bg-rose-900/30"
         >
-          Cerrar sesion
+          {{ t('common.signOut') }}
         </button>
       </div>
     </nav>
@@ -140,9 +154,9 @@ function closeMobile() {
       <aside class="absolute inset-y-0 left-0 w-72 border-r border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
         <div class="flex items-center justify-between px-2 pb-4">
           <router-link to="/dashboard" class="text-xl font-semibold text-midori-700 dark:text-midori-400" @click="closeMobile">
-            MidoriVPN
+            {{ t('common.appName') }}
           </router-link>
-          <button class="rounded-xl p-2 text-slate-500 dark:text-slate-300" @click="closeMobile" aria-label="Cerrar menu">
+          <button class="rounded-xl p-2 text-slate-500 dark:text-slate-300" @click="closeMobile" :aria-label="t('nav.closeMenu')">
             <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path d="M5.22 5.22a.75.75 0 011.06 0L10 8.94l3.72-3.72a.75.75 0 111.06 1.06L11.06 10l3.72 3.72a.75.75 0 11-1.06 1.06L10 11.06l-3.72 3.72a.75.75 0 11-1.06-1.06L8.94 10 5.22 6.28a.75.75 0 010-1.06z" />
             </svg>
@@ -150,12 +164,13 @@ function closeMobile() {
         </div>
 
         <div class="space-y-4">
+          <LanguageSelector />
           <button
             @click="toggleDark"
             class="flex w-full items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300"
           >
-            Tema
-            <span>{{ isDark ? 'Oscuro' : 'Claro' }}</span>
+            {{ t('theme.label') }}
+            <span>{{ isDark ? t('theme.dark') : t('theme.light') }}</span>
           </button>
 
           <section v-for="group in navGroups" :key="group.title">
@@ -181,7 +196,7 @@ function closeMobile() {
             @click="auth.logout()"
             class="w-full rounded-xl border border-rose-200 px-3 py-2 text-sm font-medium text-rose-600 dark:border-rose-700/60 dark:text-rose-300"
           >
-            Cerrar sesion
+            {{ t('common.signOut') }}
           </button>
         </div>
       </aside>
