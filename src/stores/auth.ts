@@ -106,7 +106,7 @@ export const useAuthStore = defineStore('auth', () => {
       response_type: 'code',
       client_id: CLIENT_ID,
       redirect_uri: REDIRECT_URI,
-      scope: 'openid email profile',
+      scope: 'openid email profile offline_access',
       code_challenge: challenge,
       code_challenge_method: 'S256',
       state,
@@ -157,9 +157,14 @@ export const useAuthStore = defineStore('auth', () => {
         console.log('[AUTH] Token expires_at stored:', expiresAt, '(in', tokens.expires_in, 'seconds)')
       }
 
+      // Authentik may return opaque access_token; backend expects a JWT for JWKS validation.
+      // Use id_token as bearer when available.
+      const bearerToken = tokens.id_token || tokens.access_token
+
       console.log('[AUTH] Token validated, storing...')
-      accessToken.value = tokens.access_token
-      localStorage.setItem('access_token', tokens.access_token)
+      console.log('[AUTH] Bearer token source:', tokens.id_token ? 'id_token' : 'access_token')
+      accessToken.value = bearerToken
+      localStorage.setItem('access_token', bearerToken)
 
       if (tokens.refresh_token) {
         refreshToken.value = tokens.refresh_token
