@@ -4,13 +4,20 @@ import { api } from '../lib/api'
 import { useLocale } from '../lib/i18n'
 import type { Server, Connection, ConnectionConfig } from '../lib/schemas'
 
+type Keypair = {
+  private_key: string
+  public_key: string
+}
+
 const API_URL = import.meta.env.VITE_API_URL || ''
 
 const servers = ref<Server[]>([])
 const connections = ref<Connection[]>([])
 const loading = ref(true)
 const connecting = ref(false)
+const generatingKeypair = ref(false)
 const lastConfig = ref<ConnectionConfig | null>(null)
+const generatedPrivateKey = ref('')
 const { t } = useLocale()
 
 const form = ref({
@@ -54,6 +61,19 @@ async function connect() {
   }
 }
 
+async function generateKeypair() {
+  generatingKeypair.value = true
+  try {
+    const kp = await api.post<Keypair>('/api/v1/control/keypair')
+    generatedPrivateKey.value = kp.private_key
+    form.value.public_key = kp.public_key
+  } catch (e: any) {
+    alert(e.message)
+  } finally {
+    generatingKeypair.value = false
+  }
+}
+
 async function disconnect(id: string) {
   if (!confirm(t('connectionsView.disconnectConfirm'))) return
   try {
@@ -84,21 +104,44 @@ onUnmounted(() => {
 
 function copyConfig() {
   if (!lastConfig.value) return
-  const c = lastConfig.value
-  const text = `[Interface]
-Address = ${c.peer_ip}/32
-DNS = ${c.dns}
-
-[Peer]
-PublicKey = ${c.server_public_key}
-Endpoint = ${c.server_endpoint}
-AllowedIPs = ${c.allowed_ips}`
+  const text = buildClientConfig(lastConfig.value)
   navigator.clipboard.writeText(text)
   alert(t('connectionsView.copied'))
   if (clipboardTimer) clearTimeout(clipboardTimer)
   clipboardTimer = setTimeout(() => {
     navigator.clipboard.writeText('').catch(() => {})
   }, 60_000)
+}
+
+function buildClientConfig(config: ConnectionConfig): string {
+  const privateKeyLine = generatedPrivateKey.value
+    ? `PrivateKey = ${generatedPrivateKey.value}`
+    : 'PrivateKey = <PEGA_AQUI_TU_PRIVATE_KEY>'
+
+  return `[Interface]
+${privateKeyLine}
+Address = ${config.peer_ip}/32
+DNS = ${config.dns}
+
+[Peer]
+PublicKey = ${config.server_public_key}
+Endpoint = ${config.server_endpoint}
+AllowedIPs = ${config.allowed_ips}
+PersistentKeepalive = 25`
+}
+
+function downloadGeneratedConfig() {
+  if (!lastConfig.value) return
+  const text = buildClientConfig(lastConfig.value)
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${form.value.device_name || 'midori-client'}.conf`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
 }
 
 function authHeader(): Record<string, string> {
@@ -164,6 +207,9 @@ async function downloadQR(id: string, deviceName: string) {
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-6">
       <h2 class="text-lg font-semibold mb-4 dark:text-gray-100">{{ t('connectionsView.newConnection') }}</h2>
       <form @submit.prevent="connect" class="space-y-3">
+        <div class="text-xs text-gray-500 dark:text-gray-400">
+          Si no eliges servidor, se usa el menos cargado automáticamente. También puedes seleccionar uno manualmente.
+        </div>
         <div class="flex flex-col sm:flex-row gap-3">
           <select
             v-model="form.server_id"
@@ -180,6 +226,9 @@ async function downloadQR(id: string, deviceName: string) {
             class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm flex-1 bg-white dark:bg-gray-700 dark:text-gray-200"
           />
         </div>
+        <div v-if="servers.length === 0" class="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+          No hay servidores activos para elegir. Si eres admin, actívalos en Admin Servers.
+        </div>
         <div class="flex flex-col sm:flex-row gap-3">
           <input
             v-model="form.public_key"
@@ -187,6 +236,14 @@ async function downloadQR(id: string, deviceName: string) {
             required
             class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm flex-1 font-mono bg-white dark:bg-gray-700 dark:text-gray-200"
           />
+          <button
+            type="button"
+            :disabled="generatingKeypair"
+            @click="generateKeypair"
+            class="border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap"
+          >
+            {{ generatingKeypair ? 'Generando claves...' : 'Generar clave WG' }}
+          </button>
           <button
             type="submit"
             :disabled="connecting"
@@ -202,18 +259,19 @@ async function downloadQR(id: string, deviceName: string) {
     <div v-if="lastConfig" class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-6 mb-6">
       <div class="flex items-center justify-between mb-3">
         <h3 class="font-semibold text-green-800 dark:text-green-400">{{ t('connectionsView.configTitle') }}</h3>
-        <button @click="copyConfig" class="text-sm text-green-700 hover:text-green-900 font-medium">
-          {{ t('common.copy') }}
-        </button>
+        <div class="flex items-center gap-3">
+          <button @click="copyConfig" class="text-sm text-green-700 hover:text-green-900 font-medium">
+            {{ t('common.copy') }}
+          </button>
+          <button @click="downloadGeneratedConfig" class="text-sm text-green-700 hover:text-green-900 font-medium">
+            Descargar .conf
+          </button>
+        </div>
       </div>
-      <pre class="text-xs bg-white dark:bg-gray-800 rounded-lg p-4 font-mono text-gray-700 dark:text-gray-300 overflow-x-auto">[Interface]
-Address = {{ lastConfig.peer_ip }}/32
-DNS = {{ lastConfig.dns }}
-
-[Peer]
-PublicKey = {{ lastConfig.server_public_key }}
-Endpoint = {{ lastConfig.server_endpoint }}
-AllowedIPs = {{ lastConfig.allowed_ips }}</pre>
+      <div class="text-xs text-green-800 dark:text-green-300 mb-2">
+        Si generaste la clave aquí, el .conf ya incluye PrivateKey. Si no, reemplaza PrivateKey con tu clave privada.
+      </div>
+      <pre class="text-xs bg-white dark:bg-gray-800 rounded-lg p-4 font-mono text-gray-700 dark:text-gray-300 overflow-x-auto">{{ buildClientConfig(lastConfig) }}</pre>
       <button @click="lastConfig = null" class="mt-3 text-xs text-gray-500 hover:text-gray-700">{{ t('connectionsView.closeConfig') }}</button>
     </div>
 
