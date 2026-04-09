@@ -1,26 +1,55 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { api } from '../lib/api'
 import { useLocale } from '../lib/i18n'
 import type { Server } from '../lib/schemas'
 
+type ServerPingResult = {
+  server_id: string
+  latency_ms: number
+  available: boolean
+}
+
 const servers = ref<Server[]>([])
+const serverPing = ref<Record<string, ServerPingResult>>({})
 const loading = ref(true)
+let refreshTimer: ReturnType<typeof setInterval> | null = null
 const { t } = useLocale()
 
 onMounted(async () => {
   await loadServers()
+  refreshTimer = setInterval(() => {
+    loadServers({ silent: true })
+  }, 15000)
 })
 
-async function loadServers() {
-  loading.value = true
+onUnmounted(() => {
+  if (refreshTimer) {
+    clearInterval(refreshTimer)
+    refreshTimer = null
+  }
+})
+
+async function loadServers(options: { silent?: boolean } = {}) {
+  if (!options.silent) loading.value = true
   try {
-    servers.value = (await api.get<Server[]>('/api/v1/control/servers')) || []
+    const [serverList, pings] = await Promise.all([
+      api.get<Server[]>('/api/v1/control/servers'),
+      api.get<ServerPingResult[]>('/api/v1/control/servers/ping').then((data) => data || null).catch(() => null),
+    ])
+    servers.value = serverList || []
+    if (pings) {
+      serverPing.value = Object.fromEntries((pings || []).map((item) => [item.server_id, item]))
+    }
   } catch (e) {
     console.error('Failed to load servers', e)
   } finally {
-    loading.value = false
+    if (!options.silent) loading.value = false
   }
+}
+
+function isServerOnline(server: Server): boolean {
+  return serverPing.value[server.id]?.available === true
 }
 
 function loadPercent(server: Server): number {
@@ -52,10 +81,10 @@ function loadColor(pct: number): string {
         <div class="flex items-center justify-between mb-3">
           <h3 class="font-semibold text-gray-900 dark:text-gray-100">{{ server.name }}</h3>
           <span
-            :class="server.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'"
+            :class="isServerOnline(server) ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'"
             class="text-xs font-medium px-2 py-1 rounded-full"
           >
-            {{ server.is_active ? t('common.active') : t('common.inactive') }}
+            {{ isServerOnline(server) ? t('common.active') : t('common.inactive') }}
           </span>
         </div>
         <div class="space-y-2 text-sm text-gray-500">
