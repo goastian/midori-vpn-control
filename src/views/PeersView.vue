@@ -109,6 +109,11 @@ async function fetchProvisionedQR(peerId: string) {
   }
 }
 
+function closeConfigDialog() {
+  lastConfig.value = null
+  revokeLastQrUrl()
+}
+
 function revokeLastQrUrl() {
   if (lastQrUrl.value) {
     URL.revokeObjectURL(lastQrUrl.value)
@@ -370,7 +375,7 @@ async function downloadQR(id: string, deviceName: string) {
           </a>
         </div>
       </div>
-      <button @click="lastConfig = null; revokeLastQrUrl()" class="mt-3 text-xs text-gray-500 hover:text-gray-700">{{ t('connectionsView.closeConfig') }}</button>
+      <button @click="closeConfigDialog" class="mt-3 text-xs text-gray-500 hover:text-gray-700">{{ t('connectionsView.closeConfig') }}</button>
     </div>
 
     <div v-if="loading" class="flex justify-center py-12">
