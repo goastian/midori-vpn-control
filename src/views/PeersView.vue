@@ -4,6 +4,8 @@ import { api } from '../lib/api'
 import { useLocale } from '../lib/i18n'
 import type { Server, Connection, ConnectionConfig } from '../lib/schemas'
 
+const API_URL = import.meta.env.VITE_API_URL || ''
+
 const servers = ref<Server[]>([])
 const connections = ref<Connection[]>([])
 const loading = ref(true)
@@ -97,6 +99,60 @@ AllowedIPs = ${c.allowed_ips}`
   clipboardTimer = setTimeout(() => {
     navigator.clipboard.writeText('').catch(() => {})
   }, 60_000)
+}
+
+function authHeader(): Record<string, string> {
+  const token = localStorage.getItem('access_token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+async function downloadConfig(id: string, deviceName: string) {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/control/connections/${id}/config`, {
+      headers: authHeader(),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: `Request failed: ${res.status}` }))
+      throw new Error(err.error || `Request failed: ${res.status}`)
+    }
+
+    const text = await res.text()
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `wg-${deviceName || id.slice(0, 8)}.conf`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  } catch (e: any) {
+    alert(e.message)
+  }
+}
+
+async function downloadQR(id: string, deviceName: string) {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/control/connections/${id}/qr`, {
+      headers: authHeader(),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: `Request failed: ${res.status}` }))
+      throw new Error(err.error || `Request failed: ${res.status}`)
+    }
+
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `wg-${deviceName || id.slice(0, 8)}.png`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  } catch (e: any) {
+    alert(e.message)
+  }
 }
 </script>
 
@@ -198,13 +254,26 @@ AllowedIPs = {{ lastConfig.allowed_ips }}</pre>
               </span>
             </td>
             <td class="px-6 py-4 text-right">
-              <button
-                v-if="conn.is_active"
-                @click="disconnect(conn.id)"
-                class="text-xs text-red-500 hover:text-red-700 transition-colors"
-              >
-                {{ t('common.disconnect') }}
-              </button>
+              <div v-if="conn.is_active" class="flex items-center justify-end gap-3">
+                <button
+                  @click="downloadConfig(conn.id, conn.device_name)"
+                  class="text-xs text-midori-600 hover:text-midori-700 transition-colors"
+                >
+                  .conf
+                </button>
+                <button
+                  @click="downloadQR(conn.id, conn.device_name)"
+                  class="text-xs text-blue-500 hover:text-blue-700 transition-colors"
+                >
+                  QR
+                </button>
+                <button
+                  @click="disconnect(conn.id)"
+                  class="text-xs text-red-500 hover:text-red-700 transition-colors"
+                >
+                  {{ t('common.disconnect') }}
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>
