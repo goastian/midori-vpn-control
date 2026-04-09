@@ -9,16 +9,25 @@ type Keypair = {
   public_key: string
 }
 
+type ServerPingResult = {
+  server_id: string
+  latency_ms: number
+  available: boolean
+}
+
 const API_URL = import.meta.env.VITE_API_URL || ''
 
 const servers = ref<Server[]>([])
 const connections = ref<Connection[]>([])
+const serverPing = ref<Record<string, ServerPingResult>>({})
 const loading = ref(true)
 const connecting = ref(false)
 const generatingKeypair = ref(false)
 const lastConfig = ref<ConnectionConfig | null>(null)
 const generatedPrivateKey = ref('')
+const lastProvisionedDeviceName = ref('midori-client')
 const { t } = useLocale()
+const PRIVATE_KEYS_STORAGE_KEY = 'midori-private-keys-by-peer'
 
 const form = ref({
   server_id: '',
@@ -33,12 +42,14 @@ onMounted(async () => {
 async function loadData() {
   loading.value = true
   try {
-    const [s, c] = await Promise.all([
+    const [s, c, pings] = await Promise.all([
       api.get<Server[]>('/api/v1/control/servers'),
       api.get<Connection[]>('/api/v1/control/connections'),
+      api.get<ServerPingResult[]>('/api/v1/control/servers/ping').catch(() => []),
     ])
     servers.value = s || []
     connections.value = c || []
+    serverPing.value = Object.fromEntries((pings || []).map((item) => [item.server_id, item]))
   } catch (e) {
     console.error('Failed to load data', e)
   } finally {
@@ -46,12 +57,32 @@ async function loadData() {
   }
 }
 
+function availableServerCount(): number {
+  return servers.value.filter((s) => serverPing.value[s.id]?.available !== false).length
+}
+
+function selectedServerUnavailable(): boolean {
+  if (!form.value.server_id) return false
+  return serverPing.value[form.value.server_id]?.available === false
+}
+
+function canProvision(): boolean {
+  if (!form.value.public_key) return false
+  if (selectedServerUnavailable()) return false
+  return availableServerCount() > 0
+}
+
 async function connect() {
-  if (!form.value.public_key) return
+  if (!canProvision()) return
   connecting.value = true
   try {
+    const currentDeviceName = form.value.device_name || 'midori-client'
     const config = await api.post<ConnectionConfig>('/api/v1/control/connections', form.value)
     lastConfig.value = config
+    lastProvisionedDeviceName.value = currentDeviceName
+    if (generatedPrivateKey.value) {
+      savePrivateKeyForPeer(config.peer_id, generatedPrivateKey.value)
+    }
     form.value = { server_id: '', public_key: '', device_name: '' }
     await loadData()
   } catch (e: any) {
@@ -137,11 +168,33 @@ function downloadGeneratedConfig() {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `${form.value.device_name || 'midori-client'}.conf`
+  link.download = `${lastProvisionedDeviceName.value || 'midori-client'}.conf`
   document.body.appendChild(link)
   link.click()
   link.remove()
   URL.revokeObjectURL(url)
+}
+
+function readStoredPrivateKeys(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(PRIVATE_KEYS_STORAGE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    return typeof parsed === 'object' && parsed ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function savePrivateKeyForPeer(peerID: string, privateKey: string) {
+  const map = readStoredPrivateKeys()
+  map[peerID] = privateKey
+  localStorage.setItem(PRIVATE_KEYS_STORAGE_KEY, JSON.stringify(map))
+}
+
+function getPrivateKeyForPeer(peerID: string): string {
+  const map = readStoredPrivateKeys()
+  return map[peerID] || ''
 }
 
 function authHeader(): Record<string, string> {
@@ -159,7 +212,11 @@ async function downloadConfig(id: string, deviceName: string) {
       throw new Error(err.error || `Request failed: ${res.status}`)
     }
 
-    const text = await res.text()
+    let text = await res.text()
+    const privateKey = getPrivateKeyForPeer(id)
+    if (privateKey) {
+      text = text.replace('PrivateKey = <YOUR_PRIVATE_KEY>', `PrivateKey = ${privateKey}`)
+    }
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -208,7 +265,7 @@ async function downloadQR(id: string, deviceName: string) {
       <h2 class="text-lg font-semibold mb-4 dark:text-gray-100">{{ t('connectionsView.newConnection') }}</h2>
       <form @submit.prevent="connect" class="space-y-3">
         <div class="text-xs text-gray-500 dark:text-gray-400">
-          Si no eliges servidor, se usa el menos cargado automáticamente. También puedes seleccionar uno manualmente.
+          Este panel aprovisiona un perfil WireGuard para tu dispositivo. Si no eliges servidor, se usa el menos cargado automáticamente.
         </div>
         <div class="flex flex-col sm:flex-row gap-3">
           <select
@@ -218,6 +275,7 @@ async function downloadQR(id: string, deviceName: string) {
             <option value="">{{ t('connectionsView.autoServer') }}</option>
             <option v-for="s in servers" :key="s.id" :value="s.id">
               {{ s.name }} ({{ s.location }}) — {{ s.current_peers }}/{{ s.max_peers }}
+              {{ serverPing[s.id] ? (serverPing[s.id].available ? ` · ${serverPing[s.id].latency_ms}ms` : ' · no disponible') : '' }}
             </option>
           </select>
           <input
@@ -228,6 +286,12 @@ async function downloadQR(id: string, deviceName: string) {
         </div>
         <div v-if="servers.length === 0" class="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
           No hay servidores activos para elegir. Si eres admin, actívalos en Admin Servers.
+        </div>
+        <div v-else-if="availableServerCount() === 0" class="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+          Hay servidores registrados, pero ninguno está respondiendo al health check del core. Así se evita crear perfiles que luego fallen con 502.
+        </div>
+        <div v-if="selectedServerUnavailable()" class="text-xs text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
+          El servidor seleccionado no está disponible. Elige otro o usa modo auto.
         </div>
         <div class="flex flex-col sm:flex-row gap-3">
           <input
@@ -246,10 +310,10 @@ async function downloadQR(id: string, deviceName: string) {
           </button>
           <button
             type="submit"
-            :disabled="connecting"
+            :disabled="connecting || !canProvision()"
             class="bg-midori-600 hover:bg-midori-700 text-white font-medium px-6 py-2 rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap"
           >
-            {{ connecting ? t('common.connecting') : t('common.connect') }}
+            {{ connecting ? t('common.connecting') : 'Aprovisionar perfil' }}
           </button>
         </div>
       </form>
