@@ -24,6 +24,7 @@ const loading = ref(true)
 const connecting = ref(false)
 const generatingKeypair = ref(false)
 const lastConfig = ref<ConnectionConfig | null>(null)
+const lastQrUrl = ref('')
 const generatedPrivateKey = ref('')
 const lastProvisionedDeviceName = ref('midori-client')
 const { t } = useLocale()
@@ -84,11 +85,34 @@ async function connect() {
       savePrivateKeyForPeer(config.peer_id, generatedPrivateKey.value)
     }
     form.value = { server_id: '', public_key: '', device_name: '' }
+    // Fetch QR code for the newly provisioned peer
+    fetchProvisionedQR(config.peer_id)
     await loadData()
   } catch (e: any) {
     alert(e.message)
   } finally {
     connecting.value = false
+  }
+}
+
+async function fetchProvisionedQR(peerId: string) {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/control/connections/${peerId}/qr`, {
+      headers: authHeader(),
+    })
+    if (!res.ok) return
+    const blob = await res.blob()
+    revokeLastQrUrl()
+    lastQrUrl.value = URL.createObjectURL(blob)
+  } catch {
+    // QR fetch is best-effort; the user can still copy/download the config
+  }
+}
+
+function revokeLastQrUrl() {
+  if (lastQrUrl.value) {
+    URL.revokeObjectURL(lastQrUrl.value)
+    lastQrUrl.value = ''
   }
 }
 
@@ -131,6 +155,7 @@ let clipboardTimer: ReturnType<typeof setTimeout> | null = null
 
 onUnmounted(() => {
   if (clipboardTimer) clearTimeout(clipboardTimer)
+  revokeLastQrUrl()
 })
 
 function copyConfig() {
@@ -335,8 +360,17 @@ async function downloadQR(id: string, deviceName: string) {
       <div class="text-xs text-green-800 dark:text-green-300 mb-2">
         Si generaste la clave aquí, el .conf ya incluye PrivateKey. Si no, reemplaza PrivateKey con tu clave privada.
       </div>
-      <pre class="text-xs bg-white dark:bg-gray-800 rounded-lg p-4 font-mono text-gray-700 dark:text-gray-300 overflow-x-auto">{{ buildClientConfig(lastConfig) }}</pre>
-      <button @click="lastConfig = null" class="mt-3 text-xs text-gray-500 hover:text-gray-700">{{ t('connectionsView.closeConfig') }}</button>
+      <div class="flex flex-col md:flex-row gap-6">
+        <pre class="text-xs bg-white dark:bg-gray-800 rounded-lg p-4 font-mono text-gray-700 dark:text-gray-300 overflow-x-auto flex-1">{{ buildClientConfig(lastConfig) }}</pre>
+        <div v-if="lastQrUrl" class="flex flex-col items-center gap-2">
+          <p class="text-xs font-semibold text-green-800 dark:text-green-300">{{ t('connectionsView.scanQr') }}</p>
+          <img :src="lastQrUrl" :alt="t('connectionsView.qrAlt')" class="w-48 h-48 rounded-lg border border-green-200 dark:border-green-700 bg-white p-1" />
+          <a :href="lastQrUrl" :download="`${lastProvisionedDeviceName || 'midori-client'}-qr.png`" class="text-xs text-green-700 hover:text-green-900 dark:text-green-400 dark:hover:text-green-200 font-medium">
+            {{ t('connectionsView.downloadQr') }}
+          </a>
+        </div>
+      </div>
+      <button @click="lastConfig = null; revokeLastQrUrl()" class="mt-3 text-xs text-gray-500 hover:text-gray-700">{{ t('connectionsView.closeConfig') }}</button>
     </div>
 
     <div v-if="loading" class="flex justify-center py-12">
