@@ -73,6 +73,10 @@ const router = createRouter({
       component: () => import('../views/admin/AdminAuditView.vue'),
       meta: { admin: true },
     },
+    {
+      path: '/:pathMatch(.*)*',
+      redirect: '/',
+    },
   ],
 })
 

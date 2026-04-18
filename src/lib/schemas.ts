@@ -35,6 +35,7 @@ export const ServerSchema = z.object({
   id: z.string(),
   name: z.string(),
   host: z.string(),
+  endpoint: z.string().optional().default(''),
   port: z.number(),
   wg_port: z.number(),
   public_key: z.string(),

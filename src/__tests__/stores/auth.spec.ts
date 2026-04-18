@@ -21,14 +21,14 @@ function decodeJWTPayload(token: string): Record<string, unknown> | null {
 
 function isTokenExpired(token: string, skewSeconds = 60): boolean {
   const payload = decodeJWTPayload(token)
-  if (!payload?.exp) return true
+  if (!payload?.exp) return false // opaque token — rely on 401 refresh
   return Date.now() / 1000 > (payload.exp as number) - skewSeconds
 }
 
 function isTokenIssuerValid(token: string, expectedIssuer: string): boolean {
   if (!expectedIssuer) return true
   const payload = decodeJWTPayload(token)
-  if (!payload?.iss) return false
+  if (!payload?.iss) return true // opaque token — trust the backend
   return payload.iss === expectedIssuer
 }
 
@@ -76,9 +76,9 @@ describe('JWT helper functions', () => {
       expect(isTokenExpired(token, 60)).toBe(true)
     })
 
-    it('returns true when exp is missing', () => {
+    it('returns false when exp is missing (opaque token)', () => {
       const token = fakeJWT({ sub: 'user-1' })
-      expect(isTokenExpired(token)).toBe(true)
+      expect(isTokenExpired(token)).toBe(false)
     })
   })
 
@@ -98,9 +98,9 @@ describe('JWT helper functions', () => {
       expect(isTokenIssuerValid(token, '')).toBe(true)
     })
 
-    it('returns false when token has no iss claim', () => {
+    it('returns true when token has no iss claim (opaque token)', () => {
       const token = fakeJWT({ sub: 'user-1' })
-      expect(isTokenIssuerValid(token, 'https://auth.example.com')).toBe(false)
+      expect(isTokenIssuerValid(token, 'https://auth.example.com')).toBe(true)
     })
   })
 })

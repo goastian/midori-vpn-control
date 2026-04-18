@@ -19,7 +19,7 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null
 const { t } = useLocale()
 
 const emptyForm = {
-  name: '', host: '', port: 8080, wg_port: 51820,
+  name: '', host: '', endpoint: '', port: 8080, wg_port: 51820,
   public_key: '', core_token: '', location: '', country_code: '', max_peers: 250,
   is_active: true,
 }
@@ -64,7 +64,7 @@ function isServerOnline(server: Server): boolean {
 function startEdit(s: Server) {
   editingId.value = s.id
   form.value = {
-    name: s.name, host: s.host, port: s.port, wg_port: s.wg_port,
+    name: s.name, host: s.host, endpoint: s.endpoint ?? '', port: s.port, wg_port: s.wg_port,
     public_key: s.public_key, core_token: s.core_token || '',
     location: s.location, country_code: s.country_code, max_peers: s.max_peers,
     is_active: s.is_active,
@@ -119,7 +119,8 @@ async function deleteServer(id: string) {
       <h2 class="text-lg font-semibold mb-4 dark:text-gray-100">{{ editingId ? t('adminServers.editServer') : t('adminServers.newServer') }}</h2>
       <form @submit.prevent="saveServer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <input v-model="form.name" :placeholder="t('common.name')" required class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <input v-model="form.host" placeholder="Host" required class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model="form.host" placeholder="Host (core API)" required class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <input v-model="form.endpoint" :placeholder="t('adminServers.endpoint')" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
         <input v-model.number="form.port" type="number" :placeholder="t('adminServers.apiPort')" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
         <input v-model.number="form.wg_port" type="number" :placeholder="t('adminServers.wgPort')" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
         <input v-model="form.public_key" :placeholder="t('adminServers.wgPublicKey')" required class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm font-mono bg-white dark:bg-gray-700 dark:text-gray-200" />

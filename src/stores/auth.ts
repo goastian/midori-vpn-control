@@ -91,11 +91,6 @@ export const useAuthStore = defineStore('auth', () => {
   )
 
   async function startLogin() {
-    console.log('[AUTH] startLogin() called')
-    console.log('[AUTH] ISSUER config:', issuerUrls)
-    console.log('[AUTH] CLIENT_ID:', CLIENT_ID)
-    console.log('[AUTH] REDIRECT_URI:', REDIRECT_URI)
-
     const verifier = generateCodeVerifier()
     const challenge = await generateCodeChallenge(verifier)
 
@@ -115,63 +110,37 @@ export const useAuthStore = defineStore('auth', () => {
     })
 
     const loginUrl = `${issuerUrls.authorizationUrl}?${params.toString()}`
-    console.log('[AUTH] Redirecting to Authentik:', loginUrl)
     window.location.href = loginUrl
   }
 
   async function handleCallback(code: string) {
-    console.log('[AUTH] handleCallback() called with code length:', code.length)
     loading.value = true
     error.value = ''
 
     try {
       const verifier = sessionStorage.getItem('pkce_verifier') || ''
       sessionStorage.removeItem('pkce_verifier')
-      console.log('[AUTH] PKCE verifier present:', !!verifier, 'length:', verifier.length)
-      console.log('[AUTH] REDIRECT_URI for exchange:', REDIRECT_URI)
 
       const tokens = await exchangeCode(code, REDIRECT_URI, verifier)
-      console.log('[AUTH] Token exchange SUCCESS')
-      console.log('[AUTH] Token response flags:', {
-        has_access_token: !!tokens.access_token,
-        has_refresh_token: !!tokens.refresh_token,
-        has_id_token: !!tokens.id_token,
-      })
-
-      // Validate issuer from id_token (JWT) — access_token may be opaque
-      const accessPayload = decodeJWTPayload(tokens.access_token)
-      const idPayload = tokens.id_token ? decodeJWTPayload(tokens.id_token) : null
-      console.log('[AUTH] Access token issuer:', accessPayload?.iss ?? '(opaque token)')
-      if (!tokens.id_token) {
-        console.log('[AUTH] ID token issuer: (no id_token)')
-      } else if (!idPayload?.iss) {
-        console.log('[AUTH] ID token issuer: (present but non-decodable)')
-      } else {
-        console.log('[AUTH] ID token issuer:', idPayload.iss)
-      }
-      console.log('[AUTH] Expected issuer:', issuerUrls.expectedTokenIssuer)
 
       // Validate issuer: prefer id_token (guaranteed JWT per OIDC), fall back to access_token
+      const accessPayload = decodeJWTPayload(tokens.access_token)
+      const idPayload = tokens.id_token ? decodeJWTPayload(tokens.id_token) : null
       const issuerPayload = idPayload ?? accessPayload
       if (issuerPayload?.iss) {
         const tokenIss = issuerPayload.iss.replace(/\/+$/, '')
         const expectedIss = issuerUrls.expectedTokenIssuer.replace(/\/+$/, '')
         if (tokenIss !== expectedIss) {
-          console.error('[AUTH] Token issuer mismatch!', issuerPayload.iss, '!==', issuerUrls.expectedTokenIssuer)
           throw new Error('Token issuer mismatch')
         }
       }
-      console.log('[AUTH] Issuer validation OK')
 
       // Store expires_at from expires_in for reliable expiry checks (works with opaque tokens)
       if (tokens.expires_in) {
         const expiresAt = Math.floor(Date.now() / 1000) + tokens.expires_in
         localStorage.setItem('token_expires_at', String(expiresAt))
-        console.log('[AUTH] Token expires_at stored:', expiresAt, '(in', tokens.expires_in, 'seconds)')
       }
 
-      console.log('[AUTH] Token validated, storing...')
-      console.log('[AUTH] Bearer token source: access_token')
       accessToken.value = tokens.access_token
       localStorage.setItem('access_token', tokens.access_token)
 
@@ -180,11 +149,8 @@ export const useAuthStore = defineStore('auth', () => {
         localStorage.setItem('refresh_token', tokens.refresh_token)
       }
 
-      console.log('[AUTH] Fetching user profile...')
       await fetchProfile()
-      console.log('[AUTH] Login flow COMPLETE, user:', user.value?.email)
     } catch (e: any) {
-      console.error('[AUTH] handleCallback FAILED:', e.message, e)
       error.value = e.message || 'Login failed'
       throw e
     } finally {
