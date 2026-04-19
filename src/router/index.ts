@@ -23,6 +23,15 @@ const router = createRouter({
       meta: { public: true },
     },
     {
+      // Dedicated callback route for the browser extension.
+      // The extension intercepts this navigation and closes the tab.
+      // This route just shows a neutral loading screen as a fallback.
+      path: '/extension/callback',
+      name: 'extension-callback',
+      component: () => import('../views/ExtensionCallback.vue'),
+      meta: { public: true },
+    },
+    {
       path: '/dashboard',
       name: 'dashboard',
       component: () => import('../views/DashboardView.vue'),
