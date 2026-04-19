@@ -167,11 +167,13 @@ onMounted(async () => {
     loading.value = false
   }
 
-  // Connect WebSocket for real-time stats (JWT authenticated)
+  // Connect WebSocket for real-time stats (JWT authenticated via first message)
   try {
-    const token = encodeURIComponent(auth.accessToken)
-    const wsUrl = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws?token=${token}`
+    const wsUrl = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`
     ws = new WebSocket(wsUrl)
+    ws.onopen = () => {
+      ws?.send(JSON.stringify({ token: auth.accessToken }))
+    }
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data)
       if (msg.type === 'stats' && auth.isAdmin) {

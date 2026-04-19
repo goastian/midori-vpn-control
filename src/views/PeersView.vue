@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import QRCode from 'qrcode'
 import { api } from '../lib/api'
 import { useLocale } from '../lib/i18n'
 import type { Server, Connection, ConnectionConfig } from '../lib/schemas'
@@ -127,17 +128,13 @@ async function connect() {
   }
 }
 
-async function fetchProvisionQR(peerId: string) {
+async function fetchProvisionQR(_peerId: string) {
   provisionQRLoading.value = true
-  if (provisionQRUrl.value) URL.revokeObjectURL(provisionQRUrl.value)
   provisionQRUrl.value = ''
   try {
-    const res = await fetch(`${API_URL}/api/v1/control/connections/${peerId}/qr`, {
-      headers: authHeader(),
-    })
-    if (!res.ok) throw new Error('QR fetch failed')
-    const blob = await res.blob()
-    provisionQRUrl.value = URL.createObjectURL(blob)
+    if (!lastConfig.value) return
+    const text = buildClientConfig(lastConfig.value)
+    provisionQRUrl.value = await QRCode.toDataURL(text, { errorCorrectionLevel: 'L', scale: 4 })
   } catch {
     // QR is optional — don't block the flow
   } finally {
@@ -208,9 +205,12 @@ function buildClientConfig(config: ConnectionConfig): string {
     ? `PrivateKey = ${generatedPrivateKey.value}`
     : 'PrivateKey = <PEGA_AQUI_TU_PRIVATE_KEY>'
 
+  // peer_ip is a bare IP address; append /32 only if no mask is already present
+  const address = config.peer_ip.includes('/') ? config.peer_ip : `${config.peer_ip}/32`
+
   return `[Interface]
 ${privateKeyLine}
-Address = ${config.peer_ip}/32
+Address = ${address}
 DNS = ${config.dns}
 
 [Peer]
