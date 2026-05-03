@@ -19,6 +19,39 @@ function processRefreshQueue(error: Error | null, token: string | null) {
   refreshQueue = []
 }
 
+// In-memory access token — never persisted to localStorage.
+let _accessToken = ''
+let _onRefreshCallback: ((token: string) => void) | null = null
+
+export function setAccessToken(token: string): void {
+  _accessToken = token
+}
+
+export function clearAccessToken(): void {
+  _accessToken = ''
+}
+
+export function onAccessTokenRefreshed(cb: (token: string) => void): void {
+  _onRefreshCallback = cb
+}
+
+/**
+ * Attempt to obtain a new access token using the refresh_token stored in
+ * localStorage. Returns the new token on success, or null on failure.
+ * Intended for use during app initialisation (page load / store creation).
+ */
+export async function initFromStoredRefreshToken(): Promise<string | null> {
+  const saved = localStorage.getItem('refresh_token')
+  if (!saved) return null
+  try {
+    return await tryRefreshToken()
+  } catch {
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('token_expires_at')
+    return null
+  }
+}
+
 async function tryRefreshToken(): Promise<string> {
   const refreshToken = localStorage.getItem('refresh_token')
   if (!refreshToken) {
@@ -40,7 +73,10 @@ async function tryRefreshToken(): Promise<string> {
     throw new Error('Invalid refresh response')
   }
 
-  localStorage.setItem('access_token', json.data.access_token)
+  // Keep access token in memory only — never write to localStorage.
+  setAccessToken(json.data.access_token)
+  _onRefreshCallback?.(json.data.access_token)
+
   if (json.data.refresh_token) {
     localStorage.setItem('refresh_token', json.data.refresh_token)
   }
@@ -49,7 +85,7 @@ async function tryRefreshToken(): Promise<string> {
 }
 
 async function request<T>(path: string, options: RequestInit = {}, _isRetry = false): Promise<T> {
-  const token = localStorage.getItem('access_token')
+  const token = _accessToken
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -78,7 +114,7 @@ async function request<T>(path: string, options: RequestInit = {}, _isRetry = fa
       } catch (err) {
         isRefreshing = false
         processRefreshQueue(err as Error, null)
-        localStorage.removeItem('access_token')
+        clearAccessToken()
         localStorage.removeItem('refresh_token')
         window.location.href = '/login'
         throw new Error('Unauthorized')
@@ -95,7 +131,7 @@ async function request<T>(path: string, options: RequestInit = {}, _isRetry = fa
   }
 
   if (res.status === 401 && _isRetry) {
-    localStorage.removeItem('access_token')
+    clearAccessToken()
     localStorage.removeItem('refresh_token')
     window.location.href = '/login'
     throw new Error('Unauthorized')

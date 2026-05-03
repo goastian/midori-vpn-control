@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { generateCodeVerifier, generateCodeChallenge } from '../lib/pkce'
-import { exchangeCode, api } from '../lib/api'
+import { exchangeCode, api, setAccessToken, clearAccessToken, onAccessTokenRefreshed, initFromStoredRefreshToken } from '../lib/api'
 import { UserSchema, type User } from '../lib/schemas'
 
 function normalizeIssuer(value: string | undefined): string {
@@ -77,7 +77,8 @@ function isTokenIssuerValid(token: string): boolean {
 }
 
 export const useAuthStore = defineStore('auth', () => {
-  const accessToken = ref(localStorage.getItem('access_token') || '')
+  // access_token lives in memory only — never written to localStorage.
+  const accessToken = ref('')
   const refreshToken = ref(localStorage.getItem('refresh_token') || '')
   const user = ref<User | null>(null)
   const loading = ref(false)
@@ -142,7 +143,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
 
       accessToken.value = tokens.access_token
-      localStorage.setItem('access_token', tokens.access_token)
+      setAccessToken(tokens.access_token) // sync in-memory token for api module
 
       if (tokens.refresh_token) {
         refreshToken.value = tokens.refresh_token
@@ -172,7 +173,7 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken.value = ''
     refreshToken.value = ''
     user.value = null
-    localStorage.removeItem('access_token')
+    clearAccessToken() // clear in-memory token from api module
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('token_expires_at')
 
@@ -180,12 +181,33 @@ export const useAuthStore = defineStore('auth', () => {
     window.location.href = logoutUrl
   }
 
-  // Auto-fetch profile on init if token exists and is valid
-  if (accessToken.value) {
-    if (isTokenExpired(accessToken.value) || !isTokenIssuerValid(accessToken.value)) {
-      logout()
-    } else {
-      fetchProfile()
+  // Keep accessToken ref in sync when api.ts silently refreshes the token.
+  onAccessTokenRefreshed((token) => {
+    accessToken.value = token
+  })
+
+  // On page load: if a refresh_token is stored, obtain a fresh access_token in
+  // memory so the user doesn't have to log in again after a reload.
+  {
+    const savedRefresh = localStorage.getItem('refresh_token')
+    if (savedRefresh) {
+      refreshToken.value = savedRefresh
+      loading.value = true
+      initFromStoredRefreshToken()
+        .then((token) => {
+          if (token) {
+            // accessToken.value already updated via onAccessTokenRefreshed
+            fetchProfile()
+          } else {
+            refreshToken.value = ''
+          }
+        })
+        .catch(() => {
+          refreshToken.value = ''
+        })
+        .finally(() => {
+          loading.value = false
+        })
     }
   }
 
