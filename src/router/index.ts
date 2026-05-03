@@ -83,6 +83,12 @@ const router = createRouter({
       meta: { admin: true },
     },
     {
+      path: '/admin/mesh',
+      name: 'admin-mesh',
+      component: () => import('../views/admin/AdminMeshView.vue'),
+      meta: { admin: true },
+    },
+    {
       path: '/:pathMatch(.*)*',
       redirect: '/',
     },

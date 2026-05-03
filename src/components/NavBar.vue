@@ -32,6 +32,7 @@ const navGroups = computed(() => {
         { name: t('nav.adminUsers'), path: '/admin/users', icon: 'users' },
         { name: t('nav.adminServers'), path: '/admin/servers', icon: 'shield' },
         { name: t('nav.adminPeers'), path: '/admin/peers', icon: 'pulse' },
+        { name: t('nav.adminMesh'), path: '/admin/mesh', icon: 'mesh' },
         { name: t('nav.adminLogs'), path: '/admin/audit', icon: 'log' },
       ],
     })
@@ -62,6 +63,8 @@ function iconPath(icon: string) {
       return 'M2.5 10a1 1 0 011-1h2.2l1.4-3.5a1 1 0 011.87.05l1.6 4.8 1.1-2.2a1 1 0 01.9-.55h3.95a1 1 0 110 2h-3.33l-1.78 3.56a1 1 0 01-1.84-.1l-1.52-4.56-.8 2A1 1 0 015 11H3.5a1 1 0 01-1-1z'
     case 'log':
       return 'M5 2.5A1.5 1.5 0 003.5 4v12A1.5 1.5 0 005 17.5h10a1.5 1.5 0 001.5-1.5V4A1.5 1.5 0 0015 2.5H5zm2.25 4a.75.75 0 000 1.5h5.5a.75.75 0 100-1.5h-5.5zm0 3a.75.75 0 000 1.5h5.5a.75.75 0 100-1.5h-5.5zm0 3a.75.75 0 000 1.5H11a.75.75 0 100-1.5H7.25z'
+    case 'mesh':
+      return 'M5 3a2 2 0 100 4 2 2 0 000-4zm8 0a2 2 0 100 4 2 2 0 000-4zM3 10a2 2 0 114 0 2 2 0 01-4 0zm8 0a2 2 0 114 0 2 2 0 01-4 0zM5 14.5a2 2 0 100 4 2 2 0 000-4zm8 0a2 2 0 100 4 2 2 0 000-4zM7 5h6M7 12h6M5 8v4m10-4v4M7 16.5h6'
     default:
       return 'M10 2a8 8 0 100 16 8 8 0 000-16z'
   }

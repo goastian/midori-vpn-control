@@ -112,3 +112,28 @@ export const AdminPeerSchema = ConnectionSchema.extend({
 })
 
 export type AdminPeer = z.infer<typeof AdminPeerSchema>
+
+// ─── Admin Mesh ───────────────────────────────────────────
+
+export const AdminMeshMemberSchema = z.object({
+  mesh_ip: z.string(),
+  display_name: z.string(),
+  email: z.string(),
+  user_id: z.string(),
+  connected: z.boolean(),
+  joined_at: z.string(),
+})
+
+export type AdminMeshMember = z.infer<typeof AdminMeshMemberSchema>
+
+export const AdminMeshNetworkSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  subnet: z.string(),
+  is_active: z.boolean(),
+  member_count: z.number(),
+  created_at: z.string(),
+  members: z.array(AdminMeshMemberSchema),
+})
+
+export type AdminMeshNetwork = z.infer<typeof AdminMeshNetworkSchema>

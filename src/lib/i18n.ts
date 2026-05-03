@@ -124,6 +124,7 @@ const messages: Record<LocaleCode, TranslationTree> = {
       adminUsers: 'Usuarios',
       adminServers: 'Admin Servers',
       adminPeers: 'Admin Peers',
+      adminMesh: 'Mesh',
       adminLogs: 'Admin Logs',
       openMenu: 'Abrir menú',
       closeMenu: 'Cerrar menú',
@@ -407,6 +408,16 @@ const messages: Record<LocaleCode, TranslationTree> = {
       title: 'Admin - Audit Logs',
       empty: 'No hay registros.',
     },
+    adminMesh: {
+      title: 'Admin - Mesh Networks',
+      empty: 'No hay redes mesh en el sistema.',
+      refresh: 'Actualizar',
+      connected: 'Conectados',
+      noMembers: 'Sin miembros aún.',
+      colIp: 'IP Mesh',
+      statusConnected: 'Conectado',
+      statusOffline: 'Desconectado',
+    },
   },
   en: {
     language: { label: 'Language', switcherAria: 'Select language' },
@@ -414,7 +425,7 @@ const messages: Record<LocaleCode, TranslationTree> = {
       appName: 'MidoriVPN', loading: 'Loading...', save: 'Save', cancel: 'Cancel', create: 'Create', edit: 'Edit', delete: 'Delete', close: 'Close', copy: 'Copy', view: 'View', actions: 'Actions', active: 'Active', inactive: 'Inactive', status: 'Status', date: 'Date', details: 'Details', traffic: 'Traffic', device: 'Device', server: 'Server', user: 'User', users: 'Users', servers: 'Servers', peers: 'Peers', ip: 'IP', name: 'Name', email: 'Email', groups: 'Groups', back: 'Back', allActions: 'All actions', noResults: 'No results.', system: 'system', unnamed: 'Unnamed', yes: 'Yes', no: 'No', topFive: 'Top 5', live: 'live', total: 'Total', registeredAccounts: 'registered accounts', available: '{count} available', provisioned: '{count} provisioned', totalConnections: '{count} total', peersConnected: 'connected peers', sessionActive: 'Active session', roleAdmin: 'Admin profile', roleUser: 'User profile', signOut: 'Sign out', noNamedDevice: 'Unnamed device', noDataYet: 'No data yet.', connect: 'Connect', connecting: 'Connecting...', disconnect: 'Disconnect', search: 'Search'
     },
     theme: { light: 'Light', dark: 'Dark', switchToLight: 'Light mode', switchToDark: 'Dark mode', label: 'Theme' },
-    nav: { general: 'General', administration: 'Administration', dashboard: 'Dashboard', servers: 'Servers', connections: 'Connections', audit: 'Audit', adminUsers: 'Users', adminServers: 'Admin Servers', adminPeers: 'Admin Peers', adminLogs: 'Admin Logs', openMenu: 'Open menu', closeMenu: 'Close menu' },
+    nav: { general: 'General', administration: 'Administration', dashboard: 'Dashboard', servers: 'Servers', connections: 'Connections', audit: 'Audit', adminUsers: 'Users', adminServers: 'Admin Servers', adminPeers: 'Admin Peers', adminMesh: 'Mesh', adminLogs: 'Admin Logs', openMenu: 'Open menu', closeMenu: 'Close menu' },
     landing: {
       featuresNav: 'Features', pricingNav: 'Pricing', securityNav: 'Security', login: 'Log in', getStarted: 'Get started', heroBadge: 'Now with WireGuard protocol', heroTitleA: 'VPN', heroTitleB: 'Secure, fast and', heroTitleAccent: 'transparent', heroDescription: 'Open-source VPN built on WireGuard. Real-time analytics, global servers, and a zero-log guarantee in one dashboard.', heroPrimary: 'Start for free', heroSecondary: 'See features', activeUsers: 'Active users', servers: 'Servers', uptime: 'Uptime', networkTraffic: 'Network traffic', last24h: 'Last 24 hours, real time', live: 'Live', bandwidth: 'Bandwidth', latency: 'Latency', encrypted: 'Encrypted', featuresTitle: 'Everything you need for secure networking', featuresSubtitle: 'Built for speed, privacy, and developer experience. Every feature is designed to just work.', pricingTitle: 'Simple, transparent pricing', pricingSubtitle: 'Start free. Upgrade when you need more. No hidden fees.', monthly: 'Monthly', annual: 'Annual', forever: 'forever', perMonth: '/mo', mostPopular: 'Most popular', trustTitle: 'Built on transparency', trustSubtitle: 'Open source. Audited. No privacy compromises.', poweredBy: 'Powered by', ctaTitle: 'Ready to take control of your privacy?', ctaSubtitle: 'Join thousands of users who trust MidoriVPN for fast, secure, and transparent networking.', ctaPrimary: 'Get started for free', ctaSecondary: 'View on GitHub', footerDescription: 'Open-source VPN built for speed, privacy, and transparency.', footerProduct: 'Product', footerCompany: 'Company', footerLegal: 'Legal', footerDownload: 'Download', footerChangelog: 'Changelog', footerAbout: 'About Astian', footerBlog: 'Blog', footerCareers: 'Careers', footerContact: 'Contact', footerPrivacy: 'Privacy policy', footerTerms: 'Terms of service', footerRights: 'All rights reserved.',
       plans: { free: { name: 'Free', desc: 'Share bandwidth and browse for free', cta: 'Get started', features: { a: '1 connected device', b: 'Bandwidth sharing node', c: '3 server locations', d: 'Community support', e: 'Basic analytics' } }, pro: { name: 'Pro', desc: 'For individuals who need more', cta: 'Start free trial', features: { a: '5 connected devices', b: '24 server locations', c: 'WireGuard + OpenVPN', d: 'Real-time analytics', e: 'Priority support', f: 'No bandwidth sharing' } }, business: { name: 'Business', desc: 'For teams and organizations', cta: 'Contact sales', features: { a: 'Unlimited devices', b: '48+ server locations', c: 'All protocols', d: 'Admin dashboard', e: 'Dedicated support', f: 'Custom DNS', g: 'SSO integration' } } },
@@ -432,6 +443,7 @@ const messages: Record<LocaleCode, TranslationTree> = {
     adminServers: { title: 'Admin - Servers', addServer: 'Add server', newServer: 'New server', editServer: 'Edit server', apiPort: 'API port', wgPort: 'WG port', wgPublicKey: 'WG public key', coreToken: 'Core token', location: 'Location', country: 'Country (US, DE...)', maxPeers: 'Max peers', activeToggle: 'Active', saveNew: 'Create', saveEdit: 'Save', deleteConfirm: 'Delete this server permanently?', endpoint: 'Public WireGuard endpoint (empty = use Host)' },
     adminPeers: { title: 'Admin - Peers', empty: 'There are no peers in the system.', forceDisconnectConfirm: 'Force disconnection for this peer?' },
     adminAudit: { title: 'Admin - Audit Logs', empty: 'No records.' },
+    adminMesh: { title: 'Admin - Mesh Networks', empty: 'No mesh networks in the system.', refresh: 'Refresh', connected: 'Connected', noMembers: 'No members yet.', colIp: 'Mesh IP', statusConnected: 'Connected', statusOffline: 'Offline' },
   },
   pt: {},
   de: {},
