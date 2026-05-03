@@ -68,14 +68,6 @@ function isTokenExpired(token: string, skewSeconds = 60): boolean {
   return Date.now() / 1000 > payload.exp - skewSeconds
 }
 
-function isTokenIssuerValid(token: string): boolean {
-  if (!issuerUrls.expectedTokenIssuer) return true
-  const payload = decodeJWTPayload(token)
-  // Opaque tokens (non-JWT) or JWTs without iss — trust the backend
-  if (!payload?.iss) return true
-  return payload.iss.replace(/\/+$/, '') === issuerUrls.expectedTokenIssuer.replace(/\/+$/, '')
-}
-
 export const useAuthStore = defineStore('auth', () => {
   // access_token lives in memory only — never written to localStorage.
   const accessToken = ref('')

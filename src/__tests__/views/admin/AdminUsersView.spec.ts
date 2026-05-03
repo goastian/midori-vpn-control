@@ -125,7 +125,6 @@ describe('AdminUsersView', () => {
     await flushPromises()
 
     // Trigger delete on the first user
-    const deleteButtons = wrapper.findAll('button').filter((b) => b.text().toLowerCase().includes('elimin') || b.classes().some(() => true))
     // Find the delete button by checking if it calls delete
     const vm = wrapper.vm as any
     await vm.deleteUser('u1')

@@ -120,7 +120,7 @@ describe('AdminAuditView', () => {
     const { api } = await import('@/lib/api')
     vi.mocked(api.get).mockResolvedValue([])
 
-    const wrapper = shallowMount(AdminAuditView, {
+    shallowMount(AdminAuditView, {
       global: { plugins: [createPinia()] },
     })
 
