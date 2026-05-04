@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
 import type { AdminMeshNetwork } from '../../lib/schemas'
@@ -9,8 +9,18 @@ const loading = ref(true)
 const error = ref('')
 const expanded = ref<Set<string>>(new Set())
 const { t } = useLocale()
+let refreshTimer: number | undefined
 
-onMounted(() => load())
+onMounted(() => {
+  load()
+  refreshTimer = window.setInterval(() => {
+    load()
+  }, 15000)
+})
+
+onBeforeUnmount(() => {
+  if (refreshTimer) window.clearInterval(refreshTimer)
+})
 
 async function load() {
   loading.value = true

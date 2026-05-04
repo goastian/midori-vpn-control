@@ -133,6 +133,8 @@ export const AdminMeshNetworkSchema = z.object({
   subnet: z.string(),
   is_active: z.boolean(),
   member_count: z.number(),
+  country_code: z.string().optional(),
+  is_session: z.boolean().optional(),
   created_at: z.string(),
   members: z.array(AdminMeshMemberSchema),
 })
