@@ -203,6 +203,46 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // Periodic session validity check (every 5 minutes).
+  // If the access token has expired and the silent refresh fails, we force
+  // logout so the UI never shows a stale "logged in" state.
+  const SESSION_CHECK_INTERVAL_MS = 5 * 60 * 1000
+  let sessionCheckTimer: ReturnType<typeof setInterval> | null = null
+
+  function startSessionCheck() {
+    if (sessionCheckTimer) return
+    sessionCheckTimer = setInterval(async () => {
+      if (!accessToken.value) return
+      if (!isTokenExpired(accessToken.value)) return
+      // Token is expired — attempt a silent refresh via the stored refresh_token.
+      const savedRefresh = localStorage.getItem('refresh_token')
+      if (savedRefresh) {
+        try {
+          const token = await initFromStoredRefreshToken()
+          if (!token) {
+            logout()
+          }
+        } catch {
+          logout()
+        }
+      } else {
+        logout()
+      }
+    }, SESSION_CHECK_INTERVAL_MS)
+  }
+
+  function stopSessionCheck() {
+    if (sessionCheckTimer) {
+      clearInterval(sessionCheckTimer)
+      sessionCheckTimer = null
+    }
+  }
+
+  // Start checking as soon as the store is initialized (if already authenticated).
+  if (localStorage.getItem('refresh_token')) {
+    startSessionCheck()
+  }
+
   return {
     accessToken,
     refreshToken,
@@ -216,5 +256,7 @@ export const useAuthStore = defineStore('auth', () => {
     handleCallback,
     fetchProfile,
     logout,
+    startSessionCheck,
+    stopSessionCheck,
   }
 })

@@ -15,6 +15,7 @@ const serverPing = ref<Record<string, ServerPingResult>>({})
 const loading = ref(true)
 const showForm = ref(false)
 const editingId = ref<string | null>(null)
+const showToken = ref(false)
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 const { t } = useLocale()
 
@@ -24,6 +25,7 @@ const emptyForm = {
   is_active: true,
 }
 const form = ref({ ...emptyForm })
+const formErrors = ref<Record<string, string>>({})
 
 onMounted(async () => {
   await loadServers()
@@ -63,6 +65,7 @@ function isServerOnline(server: Server): boolean {
 
 function startEdit(s: Server) {
   editingId.value = s.id
+  showToken.value = false
   form.value = {
     name: s.name, host: s.host, endpoint: s.endpoint ?? '', port: s.port, wg_port: s.wg_port,
     public_key: s.public_key, core_token: s.core_token || '',
@@ -75,10 +78,28 @@ function startEdit(s: Server) {
 function cancelForm() {
   showForm.value = false
   editingId.value = null
+  showToken.value = false
   form.value = { ...emptyForm }
+  formErrors.value = {}
+}
+
+function validateForm(): boolean {
+  const errors: Record<string, string> = {}
+  if (!form.value.name.trim()) errors.name = 'Name is required'
+  if (!form.value.host.trim()) errors.host = 'Host is required'
+  if (form.value.port < 1 || form.value.port > 65535) errors.port = 'Port must be 1–65535'
+  if (form.value.wg_port < 1 || form.value.wg_port > 65535) errors.wg_port = 'WireGuard port must be 1–65535'
+  if (!form.value.public_key.trim()) errors.public_key = 'Public key is required'
+  if (!editingId.value && !form.value.core_token.trim()) errors.core_token = 'Core token is required for new servers'
+  if (form.value.max_peers < 1) errors.max_peers = 'Max peers must be at least 1'
+  if (form.value.country_code && !/^[A-Z]{2}$/.test(form.value.country_code))
+    errors.country_code = 'Country code must be 2 uppercase letters'
+  formErrors.value = errors
+  return Object.keys(errors).length === 0
 }
 
 async function saveServer() {
+  if (!validateForm()) return
   try {
     if (editingId.value) {
       await api.put(`/api/v1/admin/servers/${editingId.value}`, form.value)
@@ -88,23 +109,47 @@ async function saveServer() {
     cancelForm()
     await loadServers()
   } catch (e: any) {
-    alert(e.message)
+    formErrors.value.general = e.message ?? 'An unexpected error occurred'
   }
 }
 
-async function deleteServer(id: string) {
-  if (!confirm(t('adminServers.deleteConfirm'))) return
+const confirmDelete = ref<string | null>(null)
+
+function promptDeleteServer(id: string) {
+  confirmDelete.value = id
+}
+
+async function executeDeleteServer() {
+  if (!confirmDelete.value) return
+  const id = confirmDelete.value
+  confirmDelete.value = null
   try {
     await api.delete(`/api/v1/admin/servers/${id}`)
     await loadServers()
   } catch (e: any) {
-    alert(e.message)
+    formErrors.value.general = e.message ?? 'Failed to delete server'
   }
 }
 </script>
 
 <template>
   <div>
+    <!-- Delete confirmation modal -->
+    <div v-if="confirmDelete" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">{{ t('adminServers.deleteConfirm') }}</h3>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">This action cannot be undone.</p>
+        <div class="flex justify-end space-x-3">
+          <button @click="confirmDelete = null" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900">
+            {{ t('common.cancel') }}
+          </button>
+          <button @click="executeDeleteServer" class="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg">
+            {{ t('common.delete') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('adminServers.title') }}</h1>
       <button
@@ -117,17 +162,60 @@ async function deleteServer(id: string) {
 
     <div v-if="showForm" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-6">
       <h2 class="text-lg font-semibold mb-4 dark:text-gray-100">{{ editingId ? t('adminServers.editServer') : t('adminServers.newServer') }}</h2>
+      <div v-if="formErrors.general" class="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg text-sm text-red-700 dark:text-red-300">
+        {{ formErrors.general }}
+      </div>
       <form @submit.prevent="saveServer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <input v-model="form.name" :placeholder="t('common.name')" required class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <input v-model="form.host" placeholder="Host (core API)" required class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <div>
+          <input v-model="form.name" :placeholder="t('common.name')" required class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" :class="formErrors.name ? 'border-red-400' : ''" />
+          <p v-if="formErrors.name" class="text-xs text-red-500 mt-1">{{ formErrors.name }}</p>
+        </div>
+        <div>
+          <input v-model="form.host" placeholder="Host (core API)" required class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" :class="formErrors.host ? 'border-red-400' : ''" />
+          <p v-if="formErrors.host" class="text-xs text-red-500 mt-1">{{ formErrors.host }}</p>
+        </div>
         <input v-model="form.endpoint" :placeholder="t('adminServers.endpoint')" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <input v-model.number="form.port" type="number" :placeholder="t('adminServers.apiPort')" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <input v-model.number="form.wg_port" type="number" :placeholder="t('adminServers.wgPort')" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <input v-model="form.public_key" :placeholder="t('adminServers.wgPublicKey')" required class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm font-mono bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <input v-model="form.core_token" placeholder="Core Token" :required="!editingId" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <div>
+          <input v-model.number="form.port" type="number" min="1" max="65535" :placeholder="t('adminServers.apiPort')" class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" :class="formErrors.port ? 'border-red-400' : ''" />
+          <p v-if="formErrors.port" class="text-xs text-red-500 mt-1">{{ formErrors.port }}</p>
+        </div>
+        <div>
+          <input v-model.number="form.wg_port" type="number" min="1" max="65535" :placeholder="t('adminServers.wgPort')" class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" :class="formErrors.wg_port ? 'border-red-400' : ''" />
+          <p v-if="formErrors.wg_port" class="text-xs text-red-500 mt-1">{{ formErrors.wg_port }}</p>
+        </div>
+        <div>
+          <input v-model="form.public_key" :placeholder="t('adminServers.wgPublicKey')" required class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm font-mono bg-white dark:bg-gray-700 dark:text-gray-200" :class="formErrors.public_key ? 'border-red-400' : ''" />
+          <p v-if="formErrors.public_key" class="text-xs text-red-500 mt-1">{{ formErrors.public_key }}</p>
+        </div>
+        <!-- Core token — masked by default to prevent shoulder-surfing/screen recording exposure -->
+        <div>
+          <div class="relative">
+            <input
+              v-model="form.core_token"
+              :type="showToken ? 'text' : 'password'"
+              placeholder="Core Token"
+              :required="!editingId"
+              autocomplete="new-password"
+              class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 pr-20 text-sm bg-white dark:bg-gray-700 dark:text-gray-200"
+              :class="formErrors.core_token ? 'border-red-400' : ''"
+            />
+            <button
+              type="button"
+              @click="showToken = !showToken"
+              class="absolute inset-y-0 right-2 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-1"
+            >{{ showToken ? 'Hide' : 'Show' }}</button>
+          </div>
+          <p v-if="formErrors.core_token" class="text-xs text-red-500 mt-1">{{ formErrors.core_token }}</p>
+        </div>
         <input v-model="form.location" :placeholder="t('adminServers.location')" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <input v-model="form.country_code" :placeholder="t('adminServers.country')" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <input v-model.number="form.max_peers" type="number" :placeholder="t('adminServers.maxPeers')" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
+        <div>
+          <input v-model="form.country_code" :placeholder="t('adminServers.country')" maxlength="2" class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 uppercase" :class="formErrors.country_code ? 'border-red-400' : ''" />
+          <p v-if="formErrors.country_code" class="text-xs text-red-500 mt-1">{{ formErrors.country_code }}</p>
+        </div>
+        <div>
+          <input v-model.number="form.max_peers" type="number" min="1" :placeholder="t('adminServers.maxPeers')" class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" :class="formErrors.max_peers ? 'border-red-400' : ''" />
+          <p v-if="formErrors.max_peers" class="text-xs text-red-500 mt-1">{{ formErrors.max_peers }}</p>
+        </div>
         <label class="flex items-center space-x-2">
           <input v-model="form.is_active" type="checkbox" class="rounded border-gray-300" />
           <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('adminServers.activeToggle') }}</span>
@@ -169,7 +257,7 @@ async function deleteServer(id: string) {
             </td>
             <td class="px-6 py-4 space-x-2">
               <button @click="startEdit(s)" class="text-xs text-midori-600 hover:text-midori-700">{{ t('common.edit') }}</button>
-              <button @click="deleteServer(s.id)" class="text-xs text-red-500 hover:text-red-700">{{ t('common.delete') }}</button>
+              <button @click="promptDeleteServer(s.id)" class="text-xs text-red-500 hover:text-red-700">{{ t('common.delete') }}</button>
             </td>
           </tr>
         </tbody>
