@@ -120,6 +120,7 @@ export const AdminMeshMemberSchema = z.object({
   display_name: z.string(),
   email: z.string(),
   user_id: z.string(),
+  public_ip: z.string().optional(),
   connected: z.boolean(),
   joined_at: z.string(),
 })

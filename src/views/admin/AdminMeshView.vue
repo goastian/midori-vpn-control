@@ -112,7 +112,7 @@ function connectedCount(net: AdminMeshNetwork) {
               <thead class="bg-gray-50 dark:bg-gray-700/60 text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider text-left">
                 <tr>
                   <th class="px-5 py-2.5">{{ t('adminMesh.colIp') }}</th>
-                  <th class="px-5 py-2.5">{{ t('common.user') }}</th>
+                  <th class="px-5 py-2.5">{{ t('adminMesh.colPublicIp') }}</th>
                   <th class="px-5 py-2.5 hidden sm:table-cell">{{ t('common.email') }}</th>
                   <th class="px-5 py-2.5">{{ t('common.status') }}</th>
                 </tr>
@@ -134,9 +134,12 @@ function connectedCount(net: AdminMeshNetwork) {
                     </span>
                   </td>
 
-                  <!-- Display name -->
-                  <td class="px-5 py-3 text-gray-800 dark:text-gray-200 font-medium">
-                    {{ member.display_name || '—' }}
+                  <!-- Public IP (VPN tunnel IP) -->
+                  <td class="px-5 py-3">
+                    <span v-if="member.public_ip" class="font-mono text-xs text-gray-600 dark:text-gray-300">
+                      {{ member.public_ip }}
+                    </span>
+                    <span v-else class="text-gray-400">—</span>
                   </td>
 
                   <!-- Email -->
