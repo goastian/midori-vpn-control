@@ -45,6 +45,10 @@ export const ServerSchema = z.object({
   max_peers: z.number(),
   current_peers: z.number(),
   is_active: z.boolean(),
+  proxy_port: z.number().optional().default(0),
+  supports_wireguard: z.boolean().optional().default(false),
+  supports_proxy: z.boolean().optional().default(false),
+  supports_mesh_exit: z.boolean().optional().default(false),
 })
 
 export type Server = z.infer<typeof ServerSchema>
@@ -96,6 +100,7 @@ export type AdminStats = z.infer<typeof AdminStatsSchema>
 export const AuditLogSchema = z.object({
   id: z.string(),
   user_id: z.string().nullable().optional(),
+  user_email: z.string().optional(),
   action: z.string(),
   metadata: z.record(z.string(), z.unknown()),
   ip_address: z.string(),
@@ -108,6 +113,7 @@ export type AuditLog = z.infer<typeof AuditLogSchema>
 
 export const AdminPeerSchema = ConnectionSchema.extend({
   user_id: z.string(),
+  user_email: z.string().optional(),
   expires_at: z.string().nullable().optional(),
 })
 

@@ -41,6 +41,12 @@ describe('AdminPeersView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    if (!window.confirm) {
+      Object.defineProperty(window, 'confirm', {
+        value: vi.fn(),
+        configurable: true,
+      })
+    }
   })
 
   it('shows loading spinner while fetching', async () => {

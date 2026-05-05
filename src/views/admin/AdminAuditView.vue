@@ -86,7 +86,7 @@ function actionColor(action: string): string {
               </span>
             </td>
             <td class="px-6 py-4 hidden md:table-cell text-xs text-gray-500">
-              {{ log.user_id ? log.user_id.slice(0, 8) + '…' : t('common.system') }}
+              {{ log.user_email || (log.user_id ? log.user_id.slice(0, 8) + '…' : t('common.system')) }}
             </td>
             <td class="px-6 py-4 font-mono text-gray-500 dark:text-gray-400 hidden md:table-cell text-xs">{{ log.ip_address }}</td>
             <td class="px-6 py-4 text-xs text-gray-400 dark:text-gray-500 hidden lg:table-cell font-mono max-w-xs truncate">

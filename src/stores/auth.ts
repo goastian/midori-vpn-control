@@ -75,6 +75,8 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const loading = ref(false)
   const error = ref('')
+  const initialized = ref(false)
+  let restorePromise: Promise<void> | null = null
 
   const isAuthenticated = computed(() => !!accessToken.value)
   const isAdmin = computed(() =>
@@ -143,6 +145,8 @@ export const useAuthStore = defineStore('auth', () => {
       }
 
       await fetchProfile()
+      initialized.value = true
+      startSessionCheck()
     } catch (e: any) {
       error.value = e.message || 'Login failed'
       throw e
@@ -168,6 +172,9 @@ export const useAuthStore = defineStore('auth', () => {
     clearAccessToken() // clear in-memory token from api module
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('token_expires_at')
+    initialized.value = true
+    restorePromise = null
+    stopSessionCheck()
 
     const logoutUrl = `${issuerUrls.endSessionUrl}?post_logout_redirect_uri=${encodeURIComponent(window.location.origin + '/')}`
     window.location.href = logoutUrl
@@ -178,29 +185,37 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken.value = token
   })
 
-  // On page load: if a refresh_token is stored, obtain a fresh access_token in
-  // memory so the user doesn't have to log in again after a reload.
-  {
+  async function restoreSession(): Promise<void> {
+    if (restorePromise) return restorePromise
+
     const savedRefresh = localStorage.getItem('refresh_token')
-    if (savedRefresh) {
+    if (!savedRefresh) {
+      refreshToken.value = ''
+      initialized.value = true
+      return
+    }
+
+    restorePromise = (async () => {
       refreshToken.value = savedRefresh
       loading.value = true
-      initFromStoredRefreshToken()
-        .then((token) => {
-          if (token) {
-            // accessToken.value already updated via onAccessTokenRefreshed
-            fetchProfile()
-          } else {
-            refreshToken.value = ''
-          }
-        })
-        .catch(() => {
+      try {
+        const token = await initFromStoredRefreshToken()
+        if (token) {
+          accessToken.value = token
+          await fetchProfile()
+          startSessionCheck()
+        } else {
           refreshToken.value = ''
-        })
-        .finally(() => {
-          loading.value = false
-        })
-    }
+        }
+      } catch {
+        refreshToken.value = ''
+      } finally {
+        loading.value = false
+        initialized.value = true
+      }
+    })()
+
+    return restorePromise
   }
 
   // Periodic session validity check (every 5 minutes).
@@ -238,10 +253,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // Start checking as soon as the store is initialized (if already authenticated).
-  if (localStorage.getItem('refresh_token')) {
-    startSessionCheck()
-  }
+  void restoreSession()
 
   return {
     accessToken,
@@ -249,9 +261,11 @@ export const useAuthStore = defineStore('auth', () => {
     user,
     loading,
     error,
+    initialized,
     isAuthenticated,
     isAdmin,
     isTokenExpired: () => isTokenExpired(accessToken.value),
+    restoreSession,
     startLogin,
     handleCallback,
     fetchProfile,

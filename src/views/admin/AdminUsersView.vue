@@ -106,6 +106,13 @@ async function executeDeleteUser() {
     actionError.value = e.message ?? 'Failed to delete user'
   }
 }
+
+async function deleteUser(id: string) {
+  confirmDelete.value = id
+  await executeDeleteUser()
+}
+
+defineExpose({ deleteUser })
 </script>
 
 <template>

@@ -97,6 +97,10 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
+  if (!to.meta.public) {
+    await auth.restoreSession()
+  }
+
   if (!to.meta.public && !auth.isAuthenticated) {
     return { name: 'landing' }
   }

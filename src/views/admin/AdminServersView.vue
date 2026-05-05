@@ -22,6 +22,7 @@ const { t } = useLocale()
 const emptyForm = {
   name: '', host: '', endpoint: '', port: 8080, wg_port: 51820,
   public_key: '', core_token: '', location: '', country_code: '', max_peers: 250,
+  proxy_port: 8888,
   is_active: true,
 }
 const form = ref({ ...emptyForm })
@@ -70,6 +71,7 @@ function startEdit(s: Server) {
     name: s.name, host: s.host, endpoint: s.endpoint ?? '', port: s.port, wg_port: s.wg_port,
     public_key: s.public_key, core_token: s.core_token || '',
     location: s.location, country_code: s.country_code, max_peers: s.max_peers,
+    proxy_port: s.proxy_port ?? 0,
     is_active: s.is_active,
   }
   showForm.value = true
@@ -89,6 +91,7 @@ function validateForm(): boolean {
   if (!form.value.host.trim()) errors.host = 'Host is required'
   if (form.value.port < 1 || form.value.port > 65535) errors.port = 'Port must be 1–65535'
   if (form.value.wg_port < 1 || form.value.wg_port > 65535) errors.wg_port = 'WireGuard port must be 1–65535'
+  if (form.value.proxy_port < 0 || form.value.proxy_port > 65535) errors.proxy_port = 'Proxy port must be 0 or 1–65535'
   if (!form.value.public_key.trim()) errors.public_key = 'Public key is required'
   if (!editingId.value && !form.value.core_token.trim()) errors.core_token = 'Core token is required for new servers'
   if (form.value.max_peers < 1) errors.max_peers = 'Max peers must be at least 1'
@@ -184,6 +187,10 @@ async function executeDeleteServer() {
           <p v-if="formErrors.wg_port" class="text-xs text-red-500 mt-1">{{ formErrors.wg_port }}</p>
         </div>
         <div>
+          <input v-model.number="form.proxy_port" type="number" min="0" max="65535" placeholder="Proxy port (0 = disabled)" class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" :class="formErrors.proxy_port ? 'border-red-400' : ''" />
+          <p v-if="formErrors.proxy_port" class="text-xs text-red-500 mt-1">{{ formErrors.proxy_port }}</p>
+        </div>
+        <div>
           <input v-model="form.public_key" :placeholder="t('adminServers.wgPublicKey')" required class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm font-mono bg-white dark:bg-gray-700 dark:text-gray-200" :class="formErrors.public_key ? 'border-red-400' : ''" />
           <p v-if="formErrors.public_key" class="text-xs text-red-500 mt-1">{{ formErrors.public_key }}</p>
         </div>
@@ -240,6 +247,7 @@ async function executeDeleteServer() {
             <th class="px-6 py-3">Host</th>
             <th class="px-6 py-3 hidden md:table-cell">{{ t('adminServers.location') }}</th>
             <th class="px-6 py-3">{{ t('common.peers') }}</th>
+            <th class="px-6 py-3 hidden lg:table-cell">Capabilities</th>
             <th class="px-6 py-3">{{ t('common.status') }}</th>
             <th class="px-6 py-3">{{ t('common.actions') }}</th>
           </tr>
@@ -250,6 +258,14 @@ async function executeDeleteServer() {
             <td class="px-6 py-4 font-mono text-xs text-gray-600 dark:text-gray-400">{{ s.host }}:{{ s.port }}</td>
             <td class="px-6 py-4 hidden md:table-cell text-gray-500 dark:text-gray-400">{{ s.location }} {{ s.country_code ? `(${s.country_code})` : '' }}</td>
             <td class="px-6 py-4">{{ s.current_peers }}/{{ s.max_peers }}</td>
+            <td class="px-6 py-4 hidden lg:table-cell">
+              <div class="flex flex-wrap gap-1">
+                <span v-if="s.supports_wireguard" class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">WG</span>
+                <span v-if="s.supports_proxy" class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">Proxy:{{ s.proxy_port }}</span>
+                <span v-if="s.supports_mesh_exit" class="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">Mesh exit</span>
+                <span v-if="!s.supports_wireguard && !s.supports_proxy && !s.supports_mesh_exit" class="text-xs text-gray-400">—</span>
+              </div>
+            </td>
             <td class="px-6 py-4">
               <span :class="isServerOnline(s) ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'" class="text-xs font-medium px-2 py-1 rounded-full">
                 {{ isServerOnline(s) ? t('common.active') : t('common.inactive') }}

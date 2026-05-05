@@ -44,7 +44,8 @@ describe('Zod API schemas', () => {
     })
 
     it('rejects missing email', () => {
-      const { email, ...incomplete } = validUser
+      const incomplete: Partial<typeof validUser> = { ...validUser }
+      delete incomplete.email
       expect(() => UserSchema.parse(incomplete)).toThrow()
     })
 

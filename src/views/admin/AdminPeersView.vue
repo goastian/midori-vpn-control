@@ -68,7 +68,9 @@ function formatBytes(bytes: number): string {
           <tr v-for="p in peers" :key="p.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
             <td class="px-6 py-4 text-gray-900">{{ p.device_name || '—' }}</td>
             <td class="px-6 py-4 font-mono text-xs text-gray-600 dark:text-gray-400">{{ p.assigned_ip }}</td>
-            <td class="px-6 py-4 hidden md:table-cell text-xs text-gray-500">{{ p.user_id.slice(0, 8) }}…</td>
+            <td class="px-6 py-4 hidden md:table-cell text-xs text-gray-500">
+              {{ p.user_email || p.user_id.slice(0, 8) + '…' }}
+            </td>
             <td class="px-6 py-4 hidden md:table-cell text-xs text-gray-500">
               ↑{{ formatBytes(p.bytes_sent) }} ↓{{ formatBytes(p.bytes_received) }}
             </td>
