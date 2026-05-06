@@ -6,16 +6,18 @@ import type { AdminPeer } from '../../lib/schemas'
 
 const peers = ref<AdminPeer[]>([])
 const loading = ref(true)
+const loadError = ref('')
 const { t } = useLocale()
 
 onMounted(() => loadPeers())
 
 async function loadPeers() {
   loading.value = true
+  loadError.value = ''
   try {
     peers.value = (await api.get<AdminPeer[]>('/api/v1/admin/peers')) || []
-  } catch (e) {
-    console.error('Failed to load peers', e)
+  } catch (e: any) {
+    loadError.value = e.message ?? 'Failed to load peers'
   } finally {
     loading.value = false
   }
@@ -43,6 +45,11 @@ function formatBytes(bytes: number): string {
 <template>
   <div>
     <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">{{ t('adminPeers.title') }}</h1>
+
+    <div v-if="loadError" class="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg text-sm text-red-700 dark:text-red-300 flex items-center justify-between">
+      <span>{{ loadError }}</span>
+      <button @click="loadPeers()" class="text-xs underline ml-3">{{ t('common.retry') }}</button>
+    </div>
 
     <div v-if="loading" class="flex justify-center py-12">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>

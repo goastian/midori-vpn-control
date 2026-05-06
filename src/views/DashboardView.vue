@@ -180,6 +180,12 @@ onMounted(async () => {
         adminStats.value = msg.data
       }
     }
+    ws.onerror = () => {
+      // WebSocket is optional — silently ignore transport errors
+    }
+    ws.onclose = () => {
+      // Connection closed normally or after an error — no reconnect needed here
+    }
   } catch {
     // WebSocket is optional
   }

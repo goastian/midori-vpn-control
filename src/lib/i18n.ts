@@ -106,6 +106,8 @@ const messages: Record<LocaleCode, TranslationTree> = {
       connecting: 'Conectando...',
       disconnect: 'Desconectar',
       search: 'Buscar',
+      retry: 'Reintentar',
+      loadMore: 'Cargar más',
     },
     theme: {
       light: 'Claro',
@@ -423,7 +425,7 @@ const messages: Record<LocaleCode, TranslationTree> = {
   en: {
     language: { label: 'Language', switcherAria: 'Select language' },
     common: {
-      appName: 'MidoriVPN', loading: 'Loading...', save: 'Save', cancel: 'Cancel', create: 'Create', edit: 'Edit', delete: 'Delete', close: 'Close', copy: 'Copy', view: 'View', actions: 'Actions', active: 'Active', inactive: 'Inactive', status: 'Status', date: 'Date', details: 'Details', traffic: 'Traffic', device: 'Device', server: 'Server', user: 'User', users: 'Users', servers: 'Servers', peers: 'Peers', ip: 'IP', name: 'Name', email: 'Email', groups: 'Groups', back: 'Back', allActions: 'All actions', noResults: 'No results.', system: 'system', unnamed: 'Unnamed', yes: 'Yes', no: 'No', topFive: 'Top 5', live: 'live', total: 'Total', registeredAccounts: 'registered accounts', available: '{count} available', provisioned: '{count} provisioned', totalConnections: '{count} total', peersConnected: 'connected peers', sessionActive: 'Active session', roleAdmin: 'Admin profile', roleUser: 'User profile', signOut: 'Sign out', noNamedDevice: 'Unnamed device', noDataYet: 'No data yet.', connect: 'Connect', connecting: 'Connecting...', disconnect: 'Disconnect', search: 'Search'
+      appName: 'MidoriVPN', loading: 'Loading...', save: 'Save', cancel: 'Cancel', create: 'Create', edit: 'Edit', delete: 'Delete', close: 'Close', copy: 'Copy', view: 'View', actions: 'Actions', active: 'Active', inactive: 'Inactive', status: 'Status', date: 'Date', details: 'Details', traffic: 'Traffic', device: 'Device', server: 'Server', user: 'User', users: 'Users', servers: 'Servers', peers: 'Peers', ip: 'IP', name: 'Name', email: 'Email', groups: 'Groups', back: 'Back', allActions: 'All actions', noResults: 'No results.', system: 'system', unnamed: 'Unnamed', yes: 'Yes', no: 'No', topFive: 'Top 5', live: 'live', total: 'Total', registeredAccounts: 'registered accounts', available: '{count} available', provisioned: '{count} provisioned', totalConnections: '{count} total', peersConnected: 'connected peers', sessionActive: 'Active session', roleAdmin: 'Admin profile', roleUser: 'User profile', signOut: 'Sign out', noNamedDevice: 'Unnamed device', noDataYet: 'No data yet.', connect: 'Connect', connecting: 'Connecting...', disconnect: 'Disconnect', search: 'Search', retry: 'Retry', loadMore: 'Load more'
     },
     theme: { light: 'Light', dark: 'Dark', switchToLight: 'Light mode', switchToDark: 'Dark mode', label: 'Theme' },
     nav: { general: 'General', administration: 'Administration', dashboard: 'Dashboard', servers: 'Servers', connections: 'Connections', audit: 'Audit', adminUsers: 'Users', adminServers: 'Admin Servers', adminPeers: 'Admin Peers', adminMesh: 'Mesh', adminLogs: 'Admin Logs', openMenu: 'Open menu', closeMenu: 'Close menu' },

@@ -6,6 +6,10 @@ import type { User } from '../../lib/schemas'
 
 const users = ref<User[]>([])
 const loading = ref(true)
+const loadError = ref('')
+const currentOffset = ref(0)
+const hasMore = ref(true)
+const PAGE_SIZE = 50
 const showCreate = ref(false)
 const { t } = useLocale()
 
@@ -28,15 +32,29 @@ onMounted(async () => {
   await loadUsers()
 })
 
-async function loadUsers() {
+async function loadUsers(append = false) {
   loading.value = true
+  loadError.value = ''
   try {
-    users.value = (await api.get<User[]>('/api/v1/admin/users')) || []
-  } catch (e) {
-    console.error('Failed to load users', e)
+    const offset = append ? currentOffset.value : 0
+    const page = (await api.get<User[]>(`/api/v1/admin/users?limit=${PAGE_SIZE}&offset=${offset}`)) || []
+    if (append) {
+      users.value = [...users.value, ...page]
+    } else {
+      users.value = page
+      currentOffset.value = 0
+    }
+    hasMore.value = page.length >= PAGE_SIZE
+    currentOffset.value = (append ? currentOffset.value : 0) + page.length
+  } catch (e: any) {
+    loadError.value = e.message ?? 'Failed to load users'
   } finally {
     loading.value = false
   }
+}
+
+async function loadMoreUsers() {
+  await loadUsers(true)
 }
 
 function validateCreateForm(): boolean {
@@ -183,7 +201,12 @@ defineExpose({ deleteUser })
       </form>
     </div>
 
-    <div v-if="loading" class="flex justify-center py-12">
+    <div v-if="loadError" class="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg text-sm text-red-700 dark:text-red-300 flex items-center justify-between">
+      <span>{{ loadError }}</span>
+      <button @click="loadUsers()" class="text-xs underline ml-3">{{ t('common.retry') }}</button>
+    </div>
+
+    <div v-if="loading && users.length === 0" class="flex justify-center py-12">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
     </div>
 
@@ -219,6 +242,15 @@ defineExpose({ deleteUser })
           </tr>
         </tbody>
       </table>
+      <div v-if="hasMore" class="px-6 py-3 border-t border-gray-100 dark:border-gray-700 text-center">
+        <button
+          @click="loadMoreUsers"
+          :disabled="loading"
+          class="text-sm text-midori-600 hover:text-midori-700 disabled:opacity-50"
+        >
+          {{ loading ? t('common.loading') : t('common.loadMore') }}
+        </button>
+      </div>
     </div>
   </div>
 </template>

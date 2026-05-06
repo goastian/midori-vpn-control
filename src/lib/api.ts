@@ -31,6 +31,11 @@ export function clearAccessToken(): void {
   _accessToken = ''
 }
 
+/** Returns the current in-memory access token without exposing the variable. */
+export function getAccessToken(): string {
+  return _accessToken
+}
+
 export function onAccessTokenRefreshed(cb: (token: string) => void): void {
   _onRefreshCallback = cb
 }
@@ -135,6 +140,16 @@ async function request<T>(path: string, options: RequestInit = {}, _isRetry = fa
     localStorage.removeItem('refresh_token')
     window.location.href = '/login'
     throw new Error('Unauthorized')
+  }
+
+  if (res.status === 429) {
+    const retryAfter = res.headers.get('Retry-After')
+    const seconds = retryAfter ? parseInt(retryAfter, 10) : 60
+    const waitSecs = isNaN(seconds) ? 60 : Math.min(seconds, 120)
+    throw Object.assign(new Error(`Too many requests. Please wait ${waitSecs} seconds.`), {
+      status: 429,
+      retryAfter: waitSecs,
+    })
   }
 
   const json: ApiResponse<T> = await res.json()

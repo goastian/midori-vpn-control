@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import QRCode from 'qrcode'
-import { api } from '../lib/api'
+import { api, getAccessToken } from '../lib/api'
 import { useLocale } from '../lib/i18n'
 import type { Server, Connection, ConnectionConfig } from '../lib/schemas'
 
@@ -274,7 +274,7 @@ function getPrivateKeyForPeer(peerID: string): string {
 }
 
 function authHeader(): Record<string, string> {
-  const token = localStorage.getItem('access_token')
+  const token = getAccessToken()
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 

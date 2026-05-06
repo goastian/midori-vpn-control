@@ -6,21 +6,40 @@ import type { AuditLog } from '../../lib/schemas'
 
 const logs = ref<AuditLog[]>([])
 const loading = ref(true)
+const loadError = ref('')
+const currentOffset = ref(0)
+const hasMore = ref(true)
+const PAGE_SIZE = 50
 const actionFilter = ref('')
 const { t, formatDateTime } = useLocale()
 
 onMounted(() => loadLogs())
 
-async function loadLogs() {
+async function loadLogs(append = false) {
   loading.value = true
+  loadError.value = ''
   try {
-    const params = actionFilter.value ? `?action=${encodeURIComponent(actionFilter.value)}` : ''
-    logs.value = (await api.get<AuditLog[]>(`/api/v1/admin/audit-logs${params}`)) || []
-  } catch (e) {
-    console.error('Failed to load audit logs', e)
+    const offset = append ? currentOffset.value : 0
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) })
+    if (actionFilter.value) params.set('action', actionFilter.value)
+    const page = (await api.get<AuditLog[]>(`/api/v1/admin/audit-logs?${params}`)) || []
+    if (append) {
+      logs.value = [...logs.value, ...page]
+    } else {
+      logs.value = page
+      currentOffset.value = 0
+    }
+    hasMore.value = page.length >= PAGE_SIZE
+    currentOffset.value = (append ? currentOffset.value : 0) + page.length
+  } catch (e: any) {
+    loadError.value = e.message ?? 'Failed to load audit logs'
   } finally {
     loading.value = false
   }
+}
+
+async function loadMoreLogs() {
+  await loadLogs(true)
 }
 
 function actionLabel(action: string): string {
@@ -42,7 +61,7 @@ function actionColor(action: string): string {
     <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">{{ t('adminAudit.title') }}</h1>
 
     <div class="flex items-center gap-3 mb-6">
-      <select v-model="actionFilter" @change="loadLogs" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200">
+      <select v-model="actionFilter" @change="loadLogs()" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200">
         <option value="">{{ t('common.allActions') }}</option>
         <option value="peer.connect">peer.connect</option>
         <option value="peer.disconnect">peer.disconnect</option>
@@ -56,7 +75,12 @@ function actionColor(action: string): string {
       </select>
     </div>
 
-    <div v-if="loading" class="flex justify-center py-12">
+    <div v-if="loadError" class="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg text-sm text-red-700 dark:text-red-300 flex items-center justify-between">
+      <span>{{ loadError }}</span>
+      <button @click="loadLogs()" class="text-xs underline ml-3">{{ t('common.retry') }}</button>
+    </div>
+
+    <div v-if="loading && logs.length === 0" class="flex justify-center py-12">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
     </div>
 
@@ -95,6 +119,15 @@ function actionColor(action: string): string {
           </tr>
         </tbody>
       </table>
+      <div v-if="hasMore" class="px-6 py-3 border-t border-gray-100 dark:border-gray-700 text-center">
+        <button
+          @click="loadMoreLogs"
+          :disabled="loading"
+          class="text-sm text-midori-600 hover:text-midori-700 disabled:opacity-50"
+        >
+          {{ loading ? t('common.loading') : t('common.loadMore') }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
