@@ -359,69 +359,71 @@ onUnmounted(() => {
     </div>
 
     <template v-else>
-      <section class="relative overflow-hidden rounded-[2rem] border border-cyan-400/20 bg-gradient-to-br from-cyan-500/12 via-slate-900 to-midori-500/12 p-6 shadow-xl shadow-cyan-950/10 dark:border-cyan-400/25 dark:from-cyan-500/10 dark:via-slate-900 dark:to-midori-500/10 lg:p-8">
-        <div class="absolute -left-16 top-0 h-40 w-40 rounded-full bg-cyan-400/20 blur-3xl"></div>
-        <div class="absolute right-0 top-0 h-48 w-48 rounded-full bg-midori-500/20 blur-3xl"></div>
-        <div class="absolute bottom-0 left-1/3 h-32 w-32 rounded-full bg-white/10 blur-2xl"></div>
+      <section class="relative overflow-hidden rounded-[2rem] border border-cyan-400/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(15,23,42,0.9))] p-6 shadow-xl shadow-cyan-950/10 lg:p-8">
+        <div class="absolute right-0 top-0 h-56 w-56 rounded-full bg-midori-500/10 blur-3xl"></div>
+        <div class="absolute bottom-0 left-1/4 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl"></div>
 
-        <div class="relative z-10 grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr_0.9fr] xl:items-stretch">
-          <div class="flex flex-col justify-between">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.26em] text-cyan-300">{{ t('dashboard.desktopDownload.eyebrow') }}</p>
-              <h2 class="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-white lg:text-4xl">{{ t('dashboard.desktopDownload.title') }}</h2>
-              <p class="mt-3 max-w-2xl text-sm leading-7 text-slate-300 lg:text-base">{{ t('dashboard.desktopDownload.subtitle') }}</p>
+        <div class="relative z-10 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.25fr)_420px] xl:items-center">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.26em] text-cyan-300">{{ t('dashboard.desktopDownload.eyebrow') }}</p>
+            <h2 class="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-white lg:text-4xl">{{ t('dashboard.desktopDownload.title') }}</h2>
+            <p class="mt-3 max-w-2xl text-sm leading-7 text-slate-300 lg:text-base">{{ t('dashboard.desktopDownload.subtitle') }}</p>
 
-              <div class="mt-5 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 backdrop-blur">
-                <span class="mr-2 h-2.5 w-2.5 rounded-full bg-midori-400"></span>
-                {{ t('dashboard.desktopDownload.detected', { platform: desktopPlatformLabel(detectedDesktopPlatform) }) }}
-              </div>
+            <div class="mt-5 inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm text-cyan-50 backdrop-blur">
+              <span class="mr-2 h-2.5 w-2.5 rounded-full bg-midori-400"></span>
+              {{ t('dashboard.desktopDownload.detected', { platform: desktopPlatformLabel(detectedDesktopPlatform) }) }}
             </div>
 
-            <div class="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div class="mt-6 flex flex-wrap gap-3">
               <a
                 v-for="download in desktopDownloads"
                 :key="download.key"
                 :href="desktopDownloadUrl(download.filename)"
                 target="_blank"
                 rel="noreferrer"
-                class="group rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm transition hover:-translate-y-1 hover:border-cyan-300/50 hover:bg-white/10"
+                class="group inline-flex min-w-[220px] flex-1 items-center justify-between rounded-2xl border px-4 py-3 transition md:flex-none"
+                :class="download.primary
+                  ? 'border-midori-400/40 bg-midori-500/12 text-white hover:bg-midori-500/18'
+                  : 'border-white/10 bg-white/5 text-slate-200 hover:border-cyan-300/40 hover:bg-white/10'"
               >
-                <div class="flex items-start justify-between gap-3">
-                  <div>
-                    <p class="text-sm font-semibold text-white">{{ download.label }}</p>
-                    <p class="mt-1 text-xs leading-5 text-slate-300">{{ t(download.hintKey) }}</p>
-                  </div>
-                  <span v-if="download.primary" class="shrink-0 rounded-full bg-cyan-400/15 px-2.5 py-1 text-[11px] font-semibold text-cyan-200">
-                    {{ t('dashboard.desktopDownload.recommendedBadge') }}
-                  </span>
+                <div>
+                  <p class="text-sm font-semibold">{{ download.label }}</p>
+                  <p class="mt-1 text-xs text-slate-400">{{ t(download.hintKey) }}</p>
                 </div>
-                <p class="mt-4 text-xs font-mono text-slate-400 transition group-hover:text-slate-300">{{ download.filename }}</p>
+                <span
+                  v-if="download.primary"
+                  class="ml-4 shrink-0 rounded-full bg-midori-400/15 px-2.5 py-1 text-[11px] font-semibold text-midori-200"
+                >
+                  {{ t('dashboard.desktopDownload.recommendedBadge') }}
+                </span>
               </a>
             </div>
           </div>
 
-          <div v-if="primaryDesktopDownload" class="flex h-full flex-col justify-between rounded-[1.75rem] border border-white/10 bg-white/80 p-6 shadow-2xl shadow-slate-950/15 dark:bg-slate-100">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.22em] text-midori-500">{{ t('dashboard.desktopDownload.recommended') }}</p>
-              <p class="mt-3 text-2xl font-semibold tracking-tight text-slate-900">{{ primaryDesktopDownload.label }}</p>
-              <p class="mt-2 text-sm leading-6 text-slate-600">{{ t(primaryDesktopDownload.hintKey) }}</p>
-            </div>
+          <div v-if="primaryDesktopDownload" class="rounded-[1.75rem] border border-white/10 bg-slate-950/40 p-5 backdrop-blur-md">
+            <div class="rounded-[1.4rem] border border-midori-400/20 bg-gradient-to-br from-midori-500 via-midori-600 to-emerald-500 p-6 text-white shadow-lg shadow-midori-950/20">
+              <p class="text-xs font-semibold uppercase tracking-[0.22em] text-midori-100/90">{{ t('dashboard.desktopDownload.recommended') }}</p>
+              <p class="mt-3 text-2xl font-semibold tracking-tight">{{ primaryDesktopDownload.label }}</p>
+              <p class="mt-2 text-sm leading-6 text-midori-50/90">{{ t(primaryDesktopDownload.hintKey) }}</p>
 
-            <div class="mt-6">
               <a
                 :href="desktopDownloadUrl(primaryDesktopDownload.filename)"
                 target="_blank"
                 rel="noreferrer"
-                class="inline-flex w-full items-center justify-center rounded-2xl bg-midori-600 px-5 py-4 text-base font-semibold text-white transition hover:bg-midori-700"
+                class="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-white px-5 py-4 text-base font-semibold text-midori-700 transition hover:bg-slate-100"
               >
                 {{ t('dashboard.desktopDownload.primaryAction') }}
               </a>
-              <p class="mt-3 break-all text-xs font-mono text-slate-500">{{ primaryDesktopDownload.filename }}</p>
+
+              <div class="mt-4 rounded-2xl border border-white/15 bg-black/10 px-4 py-3">
+                <p class="text-[11px] uppercase tracking-[0.2em] text-midori-100/70">Asset</p>
+                <p class="mt-1 break-all text-xs font-mono text-white/90">{{ primaryDesktopDownload.filename }}</p>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="relative z-10 mt-6 flex flex-wrap items-center gap-3 text-sm">
+        <div class="relative z-10 mt-5 flex flex-wrap items-center gap-3 text-sm">
           <a
             href="https://github.com/goastian/midori-vpn-desktop/releases"
             target="_blank"
