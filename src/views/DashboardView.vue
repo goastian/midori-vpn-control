@@ -183,21 +183,22 @@ const desktopDownloads = computed<DesktopDownload[]>(() => {
   }
 
   if (platform === 'linux') {
-    const prefersRpm = linuxPackageFormat === 'rpm'
+    const isRpmDetected = linuxPackageFormat === 'rpm'
+    const isDebDetected = linuxPackageFormat === 'deb'
     return [
       {
         key: 'linux-rpm',
         label: t('dashboard.desktopDownload.actions.linuxRpm'),
         filename: 'MidoriVPN-linux-x64.rpm',
         hintKey: 'dashboard.desktopDownload.hints.linuxRpm',
-        primary: prefersRpm,
+        primary: isRpmDetected,
       },
       {
         key: 'linux-deb',
         label: t('dashboard.desktopDownload.actions.linuxDeb'),
         filename: 'MidoriVPN-linux-x64.deb',
         hintKey: 'dashboard.desktopDownload.hints.linuxDeb',
-        primary: !prefersRpm,
+        primary: isDebDetected,
       },
       {
         key: 'linux-appimage',
@@ -294,9 +295,12 @@ function detectDesktopPlatform(): { platform: DesktopPlatform; architecture: str
 
   let linuxPackageFormat: LinuxPackageFormat = 'unknown'
   if (detectedPlatform === 'linux') {
-    if (/fedora|rhel|red hat|centos|rocky|alma|suse|opensuse/.test(platformSource)) {
+    // RPM-based: Fedora, RHEL, CentOS, Rocky, Alma, openSUSE, SUSE
+    if (/fedora|rhel|red hat|centos|rocky|alma|opensuse|suse/.test(platformSource)) {
       linuxPackageFormat = 'rpm'
-    } else if (/debian|ubuntu|mint|pop!_os|kali|elementary|zorin/.test(platformSource)) {
+    } 
+    // DEB-based: Debian, Ubuntu, Mint, Pop!_OS, Kali, Elementary, Zorin, Raspbian
+    else if (/debian|ubuntu|mint|pop!_os|kali|elementary|zorin|raspbian/.test(platformSource)) {
       linuxPackageFormat = 'deb'
     }
   }
