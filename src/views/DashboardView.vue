@@ -3,10 +3,9 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { api } from '../lib/api'
 import { useLocale } from '../lib/i18n'
+import { detectDesktopEnvironment } from '../lib/platform'
 import type { AdminStats, Connection } from '../lib/schemas'
-
-type DesktopPlatform = 'windows' | 'macos' | 'linux' | 'unknown'
-type LinuxPackageFormat = 'deb' | 'rpm' | 'unknown'
+import type { DesktopPlatform, LinuxPackageFormat, DetectionConfidence } from '../lib/platform'
 
 type DesktopDownload = {
   key: string
@@ -15,13 +14,6 @@ type DesktopDownload = {
   hintKey: string
   primary?: boolean
   visible?: boolean
-}
-
-type NavigatorWithUAData = Navigator & {
-  userAgentData?: {
-    platform?: string
-    architecture?: string
-  }
 }
 
 const auth = useAuthStore()
@@ -36,6 +28,7 @@ const desktopReleaseBase = 'https://github.com/goastian/midori-vpn-desktop/relea
 const detectedDesktopPlatform = ref<DesktopPlatform>('unknown')
 const detectedDesktopArchitecture = ref('unknown')
 const detectedLinuxPackageFormat = ref<LinuxPackageFormat>('unknown')
+const detectedConfidence = ref<DetectionConfidence>('unknown')
 
 const connectionTotals = computed(() => {
   const active = connections.value.filter((c) => c.is_active).length
@@ -169,6 +162,8 @@ const desktopDownloads = computed<DesktopDownload[]>(() => {
   const platform = detectedDesktopPlatform.value
   const architecture = detectedDesktopArchitecture.value
   const linuxPackageFormat = detectedLinuxPackageFormat.value
+  // Only mark a primary when confidence is 'detected' — avoids false recommendations.
+  const canRecommend = detectedConfidence.value === 'detected'
 
   if (platform === 'windows') {
     return [
@@ -177,65 +172,62 @@ const desktopDownloads = computed<DesktopDownload[]>(() => {
         label: t('dashboard.desktopDownload.actions.windows'),
         filename: 'MidoriVPN-windows-x64.msi',
         hintKey: 'dashboard.desktopDownload.hints.windows',
-        primary: true,
+        primary: canRecommend,
       },
     ]
   }
 
   if (platform === 'linux') {
-    const isRpmDetected = linuxPackageFormat === 'rpm'
-    const isDebDetected = linuxPackageFormat === 'deb'
     return [
       {
         key: 'linux-rpm',
         label: t('dashboard.desktopDownload.actions.linuxRpm'),
         filename: 'MidoriVPN-linux-x64.rpm',
         hintKey: 'dashboard.desktopDownload.hints.linuxRpm',
-        primary: isRpmDetected,
+        primary: canRecommend && linuxPackageFormat === 'rpm',
       },
       {
         key: 'linux-deb',
         label: t('dashboard.desktopDownload.actions.linuxDeb'),
         filename: 'MidoriVPN-linux-x64.deb',
         hintKey: 'dashboard.desktopDownload.hints.linuxDeb',
-        primary: isDebDetected,
+        primary: canRecommend && linuxPackageFormat === 'deb',
       },
       {
         key: 'linux-appimage',
         label: t('dashboard.desktopDownload.actions.linuxAppImage'),
         filename: 'MidoriVPN-linux-x64.AppImage',
         hintKey: 'dashboard.desktopDownload.hints.linuxAppImage',
-        visible: true,
       },
     ]
   }
 
   if (platform === 'macos') {
-    const prefersArm = architecture === 'arm64'
     return [
       {
         key: 'macos-arm64',
         label: t('dashboard.desktopDownload.actions.macosArm'),
         filename: 'MidoriVPN-macos-arm64.dmg',
         hintKey: 'dashboard.desktopDownload.hints.macosArm',
-        primary: prefersArm,
+        primary: canRecommend && architecture === 'arm64',
       },
       {
         key: 'macos-x64',
         label: t('dashboard.desktopDownload.actions.macosIntel'),
         filename: 'MidoriVPN-macos-x64.dmg',
         hintKey: 'dashboard.desktopDownload.hints.macosIntel',
-        primary: !prefersArm,
+        primary: canRecommend && architecture === 'x64',
       },
     ]
   }
 
+  // unknown platform — show all options without recommendation
   return [
-      {
-        key: 'windows',
-        label: t('dashboard.desktopDownload.actions.windows'),
-        filename: 'MidoriVPN-windows-x64.msi',
-        hintKey: 'dashboard.desktopDownload.hints.windows',
+    {
+      key: 'windows',
+      label: t('dashboard.desktopDownload.actions.windows'),
+      filename: 'MidoriVPN-windows-x64.msi',
+      hintKey: 'dashboard.desktopDownload.hints.windows',
     },
     {
       key: 'macos-arm64',
@@ -250,63 +242,27 @@ const desktopDownloads = computed<DesktopDownload[]>(() => {
       hintKey: 'dashboard.desktopDownload.hints.macosIntel',
     },
     {
-        key: 'linux-rpm',
-        label: t('dashboard.desktopDownload.actions.linuxRpm'),
-        filename: 'MidoriVPN-linux-x64.rpm',
-        hintKey: 'dashboard.desktopDownload.hints.linuxRpm',
-      },
-      {
-        key: 'linux-deb',
-        label: t('dashboard.desktopDownload.actions.linuxDeb'),
-        filename: 'MidoriVPN-linux-x64.deb',
-        hintKey: 'dashboard.desktopDownload.hints.linuxDeb',
-      },
-      {
-        key: 'linux-appimage',
-        label: t('dashboard.desktopDownload.actions.linuxAppImage'),
-        filename: 'MidoriVPN-linux-x64.AppImage',
-        hintKey: 'dashboard.desktopDownload.hints.linuxAppImage',
-      },
-    ]
-  })
+      key: 'linux-rpm',
+      label: t('dashboard.desktopDownload.actions.linuxRpm'),
+      filename: 'MidoriVPN-linux-x64.rpm',
+      hintKey: 'dashboard.desktopDownload.hints.linuxRpm',
+    },
+    {
+      key: 'linux-deb',
+      label: t('dashboard.desktopDownload.actions.linuxDeb'),
+      filename: 'MidoriVPN-linux-x64.deb',
+      hintKey: 'dashboard.desktopDownload.hints.linuxDeb',
+    },
+    {
+      key: 'linux-appimage',
+      label: t('dashboard.desktopDownload.actions.linuxAppImage'),
+      filename: 'MidoriVPN-linux-x64.AppImage',
+      hintKey: 'dashboard.desktopDownload.hints.linuxAppImage',
+    },
+  ]
+})
 
 const primaryDesktopDownload = computed(() => desktopDownloads.value.find((download) => download.primary) || null)
-
-function detectDesktopPlatform(): { platform: DesktopPlatform; architecture: string; linuxPackageFormat: LinuxPackageFormat } {
-  const nav = navigator as NavigatorWithUAData
-  const userAgent = navigator.userAgent || ''
-  const platform = navigator.platform || ''
-  const uaPlatform = nav.userAgentData?.platform || ''
-  const uaArchitecture = nav.userAgentData?.architecture || ''
-  const platformSource = `${uaPlatform} ${platform} ${userAgent}`.toLowerCase()
-  const architectureSource = `${uaArchitecture} ${platform} ${userAgent}`.toLowerCase()
-
-  let detectedPlatform: DesktopPlatform = 'unknown'
-  if (/windows|win32|win64/.test(platformSource)) detectedPlatform = 'windows'
-  else if (/macintosh|mac os x|macos|darwin/.test(platformSource)) detectedPlatform = 'macos'
-  else if (/linux|x11|ubuntu|fedora|debian|cros/.test(platformSource)) detectedPlatform = 'linux'
-
-  let architecture = 'unknown'
-  if (/arm64|aarch64|arm/.test(architectureSource)) {
-    architecture = 'arm64'
-  } else if (/x86_64|win64|x64|amd64|wow64|intel|x86/.test(architectureSource)) {
-    architecture = 'x64'
-  }
-
-  let linuxPackageFormat: LinuxPackageFormat = 'unknown'
-  if (detectedPlatform === 'linux') {
-    // RPM-based: Fedora, RHEL, CentOS, Rocky, Alma, openSUSE, SUSE
-    if (/fedora|rhel|red hat|centos|rocky|alma|opensuse|suse/.test(platformSource)) {
-      linuxPackageFormat = 'rpm'
-    } 
-    // DEB-based: Debian, Ubuntu, Mint, Pop!_OS, Kali, Elementary, Zorin, Raspbian
-    else if (/debian|ubuntu|mint|pop!_os|kali|elementary|zorin|raspbian/.test(platformSource)) {
-      linuxPackageFormat = 'deb'
-    }
-  }
-
-  return { platform: detectedPlatform, architecture, linuxPackageFormat }
-}
 
 function desktopDownloadUrl(filename: string): string {
   return `${desktopReleaseBase}/${filename}`
@@ -334,10 +290,11 @@ function formatBytes(bytes: number): string {
 }
 
 onMounted(async () => {
-  const desktopEnvironment = detectDesktopPlatform()
+  const desktopEnvironment = await detectDesktopEnvironment()
   detectedDesktopPlatform.value = desktopEnvironment.platform
   detectedDesktopArchitecture.value = desktopEnvironment.architecture
   detectedLinuxPackageFormat.value = desktopEnvironment.linuxPackageFormat
+  detectedConfidence.value = desktopEnvironment.confidence
 
   try {
     const promises: Promise<any>[] = [
@@ -408,7 +365,7 @@ onUnmounted(() => {
     </div>
 
     <template v-else>
-      <section class="relative overflow-hidden rounded-[2rem] border border-cyan-400/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(15,23,42,0.9))] p-6 shadow-xl shadow-cyan-950/10 lg:p-8">
+      <section v-if="detectedConfidence !== 'mobile'" class="relative overflow-hidden rounded-[2rem] border border-cyan-400/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(15,23,42,0.9))] p-6 shadow-xl shadow-cyan-950/10 lg:p-8">
         <div class="absolute right-0 top-0 h-56 w-56 rounded-full bg-midori-500/10 blur-3xl"></div>
         <div class="absolute bottom-0 left-1/4 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl"></div>
 
