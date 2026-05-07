@@ -161,6 +161,73 @@ async function request<T>(path: string, options: RequestInit = {}, _isRetry = fa
   return json.data
 }
 
+/**
+ * Like request() but returns the raw Response instead of parsing JSON.
+ * Used for binary/text endpoints (WireGuard .conf download, QR image, etc.)
+ * so that token refresh and 401 handling still apply.
+ */
+async function requestRaw(path: string, options: RequestInit = {}, _isRetry = false): Promise<Response> {
+  const token = _accessToken
+
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string> || {}),
+  }
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers,
+  })
+
+  if (res.status === 401 && !_isRetry) {
+    if (!isRefreshing) {
+      isRefreshing = true
+      try {
+        const newToken = await tryRefreshToken()
+        isRefreshing = false
+        processRefreshQueue(null, newToken)
+        return requestRaw(path, options, true)
+      } catch (err) {
+        isRefreshing = false
+        processRefreshQueue(err as Error, null)
+        clearAccessToken()
+        localStorage.removeItem('refresh_token')
+        window.location.href = '/login'
+        throw new Error('Unauthorized')
+      }
+    } else {
+      return new Promise<Response>((resolve, reject) => {
+        refreshQueue.push({
+          resolve: () => resolve(requestRaw(path, options, true)),
+          reject,
+        })
+      })
+    }
+  }
+
+  if (res.status === 401 && _isRetry) {
+    clearAccessToken()
+    localStorage.removeItem('refresh_token')
+    window.location.href = '/login'
+    throw new Error('Unauthorized')
+  }
+
+  if (res.status === 429) {
+    const retryAfter = res.headers.get('Retry-After')
+    const seconds = retryAfter ? parseInt(retryAfter, 10) : 60
+    const waitSecs = isNaN(seconds) ? 60 : Math.min(seconds, 120)
+    throw Object.assign(new Error(`Too many requests. Please wait ${waitSecs} seconds.`), {
+      status: 429,
+      retryAfter: waitSecs,
+    })
+  }
+
+  return res
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: any) =>
@@ -172,6 +239,13 @@ export const api = {
   /** Type-safe request with Zod schema validation on the response. */
   validated: <T>(path: string, schema: ZodType<T>, options?: RequestInit) =>
     request<unknown>(path, options).then((data) => schema.parse(data)),
+
+  /**
+   * Authenticated request that returns the raw Response object.
+   * Use this for binary or plain-text endpoints (file downloads, images).
+   * Token refresh and 401 handling are applied identically to api.get/post.
+   */
+  fetchRaw: (path: string, options?: RequestInit) => requestRaw(path, options),
 }
 
 import { TokenResponseSchema } from './schemas'

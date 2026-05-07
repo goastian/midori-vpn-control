@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import QRCode from 'qrcode'
-import { api, getAccessToken } from '../lib/api'
+import { api } from '../lib/api'
+import { PRIVATE_KEYS_STORAGE_KEY } from '../lib/storage-keys'
 import { useLocale } from '../lib/i18n'
 import type { Server, Connection, ConnectionConfig } from '../lib/schemas'
 
@@ -16,8 +17,6 @@ type ServerPingResult = {
   available: boolean
 }
 
-const API_URL = import.meta.env.VITE_API_URL || ''
-
 const servers = ref<Server[]>([])
 const connections = ref<Connection[]>([])
 const serverPing = ref<Record<string, ServerPingResult>>({})
@@ -28,7 +27,6 @@ const lastConfig = ref<ConnectionConfig | null>(null)
 const generatedPrivateKey = ref('')
 const lastProvisionedDeviceName = ref('midori-client')
 const { t } = useLocale()
-const PRIVATE_KEYS_STORAGE_KEY = 'midori-private-keys-by-peer'
 
 // Inline notification
 const notification = ref<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -273,16 +271,9 @@ function getPrivateKeyForPeer(peerID: string): string {
   return map[peerID] || ''
 }
 
-function authHeader(): Record<string, string> {
-  const token = getAccessToken()
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
-
 async function downloadConfig(id: string, deviceName: string) {
   try {
-    const res = await fetch(`${API_URL}/api/v1/control/connections/${id}/config`, {
-      headers: authHeader(),
-    })
+    const res = await api.fetchRaw(`/api/v1/control/connections/${id}/config`)
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: `Request failed: ${res.status}` }))
       throw new Error(err.error || `Request failed: ${res.status}`)
@@ -312,9 +303,7 @@ async function downloadConfig(id: string, deviceName: string) {
 async function openQRModal(id: string, deviceName: string) {
   qrModal.value = { open: true, url: '', loading: true, deviceName: deviceName || id.slice(0, 8) }
   try {
-    const res = await fetch(`${API_URL}/api/v1/control/connections/${id}/qr`, {
-      headers: authHeader(),
-    })
+    const res = await api.fetchRaw(`/api/v1/control/connections/${id}/qr`)
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: `Request failed: ${res.status}` }))
       throw new Error(err.error || `Request failed: ${res.status}`)

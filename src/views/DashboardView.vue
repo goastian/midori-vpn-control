@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import { AUTH_LOGOUT_EVENT } from '../stores/auth'
 import { api } from '../lib/api'
 import { useLocale } from '../lib/i18n'
 import { detectDesktopEnvironment } from '../lib/platform'
@@ -338,8 +339,18 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  ws?.close()
+  ws?.close(1000, 'unmount')
+  window.removeEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
 })
+
+function closeWsForLogout() {
+  // Close the WebSocket cleanly before the auth store redirects to the IdP
+  // end-session endpoint, so the server-side connection — still authenticated
+  // with the access_token — is not left lingering during the redirect.
+  try { ws?.close(1000, 'logout') } catch { /* already closed */ }
+  ws = null
+}
+window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
 </script>
 
 <template>

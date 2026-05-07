@@ -14,13 +14,13 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: () => import('../views/LoginView.vue'),
-      meta: { public: true },
+      meta: { public: true, fullPage: true },
     },
     {
       path: '/auth/callback',
       name: 'auth-callback',
       component: () => import('../views/AuthCallback.vue'),
-      meta: { public: true },
+      meta: { public: true, fullPage: true },
     },
     {
       // Dedicated callback route for the browser extension.
@@ -29,7 +29,7 @@ const router = createRouter({
       path: '/extension/callback',
       name: 'extension-callback',
       component: () => import('../views/ExtensionCallback.vue'),
-      meta: { public: true },
+      meta: { public: true, fullPage: true },
     },
     {
       path: '/dashboard',
@@ -95,17 +95,27 @@ const router = createRouter({
   ],
 })
 
+// Auth-only routes that should redirect authenticated users to the dashboard.
+const REDIRECT_IF_AUTHED = new Set<string | symbol>(['login', 'landing'])
+
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
-  if (!to.meta.public) {
-    await auth.restoreSession()
+
+  // Always resolve the session before making any routing decision.
+  // restoreSession() is idempotent — subsequent calls return the same promise.
+  await auth.restoreSession()
+
+  // Redirect authenticated users away from login / landing.
+  if (typeof to.name === 'string' && REDIRECT_IF_AUTHED.has(to.name) && auth.isAuthenticated) {
+    return { name: 'dashboard' }
   }
 
+  // Protect all non-public routes.
   if (!to.meta.public && !auth.isAuthenticated) {
     return { name: 'landing' }
   }
 
-  // Revalidate profile from server on every admin navigation
+  // Revalidate profile from server on every admin navigation.
   if (to.meta.admin) {
     try {
       await auth.fetchProfile()

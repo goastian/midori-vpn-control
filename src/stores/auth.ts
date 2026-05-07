@@ -3,6 +3,12 @@ import { ref, computed } from 'vue'
 import { generateCodeVerifier, generateCodeChallenge } from '../lib/pkce'
 import { exchangeCode, api, setAccessToken, clearAccessToken, onAccessTokenRefreshed, initFromStoredRefreshToken } from '../lib/api'
 import { UserSchema, type User } from '../lib/schemas'
+import { SENSITIVE_SESSION_KEYS } from '../lib/storage-keys'
+
+/** Event name dispatched on `window` right before the logout redirect.
+ *  Subscribers (e.g. the dashboard WebSocket) should release resources
+ *  synchronously or within ~50ms — see `logout()` below. */
+export const AUTH_LOGOUT_EVENT = 'auth:logout'
 
 function normalizeIssuer(value: string | undefined): string {
   return (value || '').replace(/\/+$/, '')
@@ -165,16 +171,28 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  function logout() {
+  async function logout() {
     accessToken.value = ''
     refreshToken.value = ''
     user.value = null
     clearAccessToken() // clear in-memory token from api module
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('token_expires_at')
+    // Wipe sensitive material from sessionStorage (e.g. WireGuard private keys).
+    // Non-sensitive caches (platform detection, etc.) are intentionally preserved.
+    for (const key of SENSITIVE_SESSION_KEYS) {
+      try { sessionStorage.removeItem(key) } catch { /* sessionStorage unavailable */ }
+    }
     initialized.value = true
     restorePromise = null
     stopSessionCheck()
+
+    // Notify subscribers (e.g. dashboard WS) so they can release resources
+    // before the page is unloaded by the redirect below.
+    try { window.dispatchEvent(new Event(AUTH_LOGOUT_EVENT)) } catch { /* ignore */ }
+    // Yield one tick so listeners have a chance to call ws.close() before
+    // the navigation tears down the page.
+    await new Promise((resolve) => setTimeout(resolve, 50))
 
     const logoutUrl = `${issuerUrls.endSessionUrl}?post_logout_redirect_uri=${encodeURIComponent(window.location.origin + '/')}`
     window.location.href = logoutUrl
