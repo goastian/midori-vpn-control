@@ -183,13 +183,21 @@ const desktopDownloads = computed<DesktopDownload[]>(() => {
   }
 
   if (platform === 'linux') {
+    const prefersRpm = linuxPackageFormat === 'rpm'
     return [
       {
+        key: 'linux-rpm',
+        label: t('dashboard.desktopDownload.actions.linuxRpm'),
+        filename: 'MidoriVPN-linux-x64.rpm',
+        hintKey: 'dashboard.desktopDownload.hints.linuxRpm',
+        primary: prefersRpm,
+      },
+      {
         key: 'linux-deb',
-        label: t('dashboard.desktopDownload.actions.linuxPackage'),
+        label: t('dashboard.desktopDownload.actions.linuxDeb'),
         filename: 'MidoriVPN-linux-x64.deb',
-        hintKey: 'dashboard.desktopDownload.hints.linuxPackage',
-        primary: true,
+        hintKey: 'dashboard.desktopDownload.hints.linuxDeb',
+        primary: !prefersRpm,
       },
       {
         key: 'linux-appimage',
@@ -241,10 +249,16 @@ const desktopDownloads = computed<DesktopDownload[]>(() => {
       hintKey: 'dashboard.desktopDownload.hints.macosIntel',
     },
     {
-        key: 'linux',
-        label: t('dashboard.desktopDownload.actions.linuxPackage'),
+        key: 'linux-rpm',
+        label: t('dashboard.desktopDownload.actions.linuxRpm'),
+        filename: 'MidoriVPN-linux-x64.rpm',
+        hintKey: 'dashboard.desktopDownload.hints.linuxRpm',
+      },
+      {
+        key: 'linux-deb',
+        label: t('dashboard.desktopDownload.actions.linuxDeb'),
         filename: 'MidoriVPN-linux-x64.deb',
-        hintKey: 'dashboard.desktopDownload.hints.linuxPackage',
+        hintKey: 'dashboard.desktopDownload.hints.linuxDeb',
       },
       {
         key: 'linux-appimage',
