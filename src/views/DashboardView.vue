@@ -13,6 +13,7 @@ type DesktopDownload = {
   filename: string
   hintKey: string
   primary?: boolean
+  visible?: boolean
 }
 
 type NavigatorWithUAData = Navigator & {
@@ -181,11 +182,18 @@ const desktopDownloads = computed<DesktopDownload[]>(() => {
   if (platform === 'linux') {
     return [
       {
-        key: 'linux',
-        label: t('dashboard.desktopDownload.actions.linux'),
-        filename: 'MidoriVPN-linux-x64.AppImage',
-        hintKey: 'dashboard.desktopDownload.hints.linux',
+        key: 'linux-deb',
+        label: t('dashboard.desktopDownload.actions.linuxPackage'),
+        filename: 'MidoriVPN-linux-x64.deb',
+        hintKey: 'dashboard.desktopDownload.hints.linuxPackage',
         primary: true,
+      },
+      {
+        key: 'linux-appimage',
+        label: t('dashboard.desktopDownload.actions.linuxAppImage'),
+        filename: 'MidoriVPN-linux-x64.AppImage',
+        hintKey: 'dashboard.desktopDownload.hints.linuxAppImage',
+        visible: true,
       },
     ]
   }
@@ -211,11 +219,11 @@ const desktopDownloads = computed<DesktopDownload[]>(() => {
   }
 
   return [
-    {
-      key: 'windows',
-      label: t('dashboard.desktopDownload.actions.windows'),
-      filename: 'MidoriVPN-windows-x64.msi',
-      hintKey: 'dashboard.desktopDownload.hints.windows',
+      {
+        key: 'windows',
+        label: t('dashboard.desktopDownload.actions.windows'),
+        filename: 'MidoriVPN-windows-x64.msi',
+        hintKey: 'dashboard.desktopDownload.hints.windows',
     },
     {
       key: 'macos-arm64',
@@ -230,34 +238,44 @@ const desktopDownloads = computed<DesktopDownload[]>(() => {
       hintKey: 'dashboard.desktopDownload.hints.macosIntel',
     },
     {
-      key: 'linux',
-      label: t('dashboard.desktopDownload.actions.linux'),
-      filename: 'MidoriVPN-linux-x64.AppImage',
-      hintKey: 'dashboard.desktopDownload.hints.linux',
-    },
-  ]
-})
+        key: 'linux',
+        label: t('dashboard.desktopDownload.actions.linuxPackage'),
+        filename: 'MidoriVPN-linux-x64.deb',
+        hintKey: 'dashboard.desktopDownload.hints.linuxPackage',
+      },
+      {
+        key: 'linux-appimage',
+        label: t('dashboard.desktopDownload.actions.linuxAppImage'),
+        filename: 'MidoriVPN-linux-x64.AppImage',
+        hintKey: 'dashboard.desktopDownload.hints.linuxAppImage',
+      },
+    ]
+  })
 
 const primaryDesktopDownload = computed(() => desktopDownloads.value.find((download) => download.primary) || null)
 
 function detectDesktopPlatform(): { platform: DesktopPlatform; architecture: string } {
   const nav = navigator as NavigatorWithUAData
-  const platformSource = `${nav.userAgentData?.platform || ''} ${navigator.platform || ''} ${navigator.userAgent || ''}`.toLowerCase()
-  const architectureSource = `${nav.userAgentData?.architecture || ''} ${navigator.platform || ''} ${navigator.userAgent || ''}`.toLowerCase()
+  const userAgent = navigator.userAgent || ''
+  const platform = navigator.platform || ''
+  const uaPlatform = nav.userAgentData?.platform || ''
+  const uaArchitecture = nav.userAgentData?.architecture || ''
+  const platformSource = `${uaPlatform} ${platform} ${userAgent}`.toLowerCase()
+  const architectureSource = `${uaArchitecture} ${platform} ${userAgent}`.toLowerCase()
 
-  let platform: DesktopPlatform = 'unknown'
-  if (platformSource.includes('win')) platform = 'windows'
-  else if (platformSource.includes('mac') || platformSource.includes('darwin')) platform = 'macos'
-  else if (platformSource.includes('linux') || platformSource.includes('x11')) platform = 'linux'
+  let detectedPlatform: DesktopPlatform = 'unknown'
+  if (/windows|win32|win64/.test(platformSource)) detectedPlatform = 'windows'
+  else if (/macintosh|mac os x|macos|darwin/.test(platformSource)) detectedPlatform = 'macos'
+  else if (/linux|x11|ubuntu|fedora|debian|cros/.test(platformSource)) detectedPlatform = 'linux'
 
   let architecture = 'unknown'
-  if (architectureSource.includes('arm64') || architectureSource.includes('aarch64') || architectureSource.includes('arm')) {
+  if (/arm64|aarch64|arm/.test(architectureSource)) {
     architecture = 'arm64'
-  } else if (architectureSource.includes('x86_64') || architectureSource.includes('win64') || architectureSource.includes('x64') || architectureSource.includes('amd64') || architectureSource.includes('intel')) {
+  } else if (/x86_64|win64|x64|amd64|wow64|intel|x86/.test(architectureSource)) {
     architecture = 'x64'
   }
 
-  return { platform, architecture }
+  return { platform: detectedPlatform, architecture }
 }
 
 function desktopDownloadUrl(filename: string): string {
