@@ -5,6 +5,23 @@ import { api } from '../lib/api'
 import { useLocale } from '../lib/i18n'
 import type { AdminStats, Connection } from '../lib/schemas'
 
+type DesktopPlatform = 'windows' | 'macos' | 'linux' | 'unknown'
+
+type DesktopDownload = {
+  key: string
+  label: string
+  filename: string
+  hintKey: string
+  primary?: boolean
+}
+
+type NavigatorWithUAData = Navigator & {
+  userAgentData?: {
+    platform?: string
+    architecture?: string
+  }
+}
+
 const auth = useAuthStore()
 const { t, formatDateTime, formatWeekdayShort } = useLocale()
 
@@ -12,6 +29,10 @@ const connections = ref<Connection[]>([])
 const adminStats = ref<AdminStats | null>(null)
 const loading = ref(true)
 let ws: WebSocket | null = null
+
+const desktopReleaseBase = 'https://github.com/goastian/midori-vpn-desktop/releases/latest/download'
+const detectedDesktopPlatform = ref<DesktopPlatform>('unknown')
+const detectedDesktopArchitecture = ref('unknown')
 
 const connectionTotals = computed(() => {
   const active = connections.value.filter((c) => c.is_active).length
@@ -141,6 +162,121 @@ const deviceUsage = computed(() => {
 
 const mostUsedDeviceBytes = computed(() => Math.max(...deviceUsage.value.map((d) => d.total), 1))
 
+const desktopDownloads = computed<DesktopDownload[]>(() => {
+  const platform = detectedDesktopPlatform.value
+  const architecture = detectedDesktopArchitecture.value
+
+  if (platform === 'windows') {
+    return [
+      {
+        key: 'windows',
+        label: t('dashboard.desktopDownload.actions.windows'),
+        filename: 'MidoriVPN-windows-x64.msi',
+        hintKey: 'dashboard.desktopDownload.hints.windows',
+        primary: true,
+      },
+    ]
+  }
+
+  if (platform === 'linux') {
+    return [
+      {
+        key: 'linux',
+        label: t('dashboard.desktopDownload.actions.linux'),
+        filename: 'MidoriVPN-linux-x64.AppImage',
+        hintKey: 'dashboard.desktopDownload.hints.linux',
+        primary: true,
+      },
+    ]
+  }
+
+  if (platform === 'macos') {
+    const prefersArm = architecture === 'arm64'
+    return [
+      {
+        key: 'macos-arm64',
+        label: t('dashboard.desktopDownload.actions.macosArm'),
+        filename: 'MidoriVPN-macos-arm64.dmg',
+        hintKey: 'dashboard.desktopDownload.hints.macosArm',
+        primary: prefersArm,
+      },
+      {
+        key: 'macos-x64',
+        label: t('dashboard.desktopDownload.actions.macosIntel'),
+        filename: 'MidoriVPN-macos-x64.dmg',
+        hintKey: 'dashboard.desktopDownload.hints.macosIntel',
+        primary: !prefersArm,
+      },
+    ]
+  }
+
+  return [
+    {
+      key: 'windows',
+      label: t('dashboard.desktopDownload.actions.windows'),
+      filename: 'MidoriVPN-windows-x64.msi',
+      hintKey: 'dashboard.desktopDownload.hints.windows',
+    },
+    {
+      key: 'macos-arm64',
+      label: t('dashboard.desktopDownload.actions.macosArm'),
+      filename: 'MidoriVPN-macos-arm64.dmg',
+      hintKey: 'dashboard.desktopDownload.hints.macosArm',
+    },
+    {
+      key: 'macos-x64',
+      label: t('dashboard.desktopDownload.actions.macosIntel'),
+      filename: 'MidoriVPN-macos-x64.dmg',
+      hintKey: 'dashboard.desktopDownload.hints.macosIntel',
+    },
+    {
+      key: 'linux',
+      label: t('dashboard.desktopDownload.actions.linux'),
+      filename: 'MidoriVPN-linux-x64.AppImage',
+      hintKey: 'dashboard.desktopDownload.hints.linux',
+    },
+  ]
+})
+
+const primaryDesktopDownload = computed(() => desktopDownloads.value.find((download) => download.primary) || null)
+
+function detectDesktopPlatform(): { platform: DesktopPlatform; architecture: string } {
+  const nav = navigator as NavigatorWithUAData
+  const platformSource = `${nav.userAgentData?.platform || ''} ${navigator.platform || ''} ${navigator.userAgent || ''}`.toLowerCase()
+  const architectureSource = `${nav.userAgentData?.architecture || ''} ${navigator.platform || ''} ${navigator.userAgent || ''}`.toLowerCase()
+
+  let platform: DesktopPlatform = 'unknown'
+  if (platformSource.includes('win')) platform = 'windows'
+  else if (platformSource.includes('mac') || platformSource.includes('darwin')) platform = 'macos'
+  else if (platformSource.includes('linux') || platformSource.includes('x11')) platform = 'linux'
+
+  let architecture = 'unknown'
+  if (architectureSource.includes('arm64') || architectureSource.includes('aarch64') || architectureSource.includes('arm')) {
+    architecture = 'arm64'
+  } else if (architectureSource.includes('x86_64') || architectureSource.includes('win64') || architectureSource.includes('x64') || architectureSource.includes('amd64') || architectureSource.includes('intel')) {
+    architecture = 'x64'
+  }
+
+  return { platform, architecture }
+}
+
+function desktopDownloadUrl(filename: string): string {
+  return `${desktopReleaseBase}/${filename}`
+}
+
+function desktopPlatformLabel(platform: DesktopPlatform): string {
+  switch (platform) {
+    case 'windows':
+      return t('dashboard.desktopDownload.platforms.windows')
+    case 'macos':
+      return t('dashboard.desktopDownload.platforms.macos')
+    case 'linux':
+      return t('dashboard.desktopDownload.platforms.linux')
+    default:
+      return t('dashboard.desktopDownload.platforms.unknown')
+  }
+}
+
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
   const k = 1024
@@ -150,6 +286,10 @@ function formatBytes(bytes: number): string {
 }
 
 onMounted(async () => {
+  const desktopEnvironment = detectDesktopPlatform()
+  detectedDesktopPlatform.value = desktopEnvironment.platform
+  detectedDesktopArchitecture.value = desktopEnvironment.architecture
+
   try {
     const promises: Promise<any>[] = [
       api.get<Connection[]>('/api/v1/control/connections'),
@@ -372,6 +512,68 @@ onUnmounted(() => {
             {{ t('dashboard.noRecentConnections') }}
           </p>
         </article>
+      </section>
+
+      <section class="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+        <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div class="max-w-2xl">
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-500">{{ t('dashboard.desktopDownload.eyebrow') }}</p>
+            <h2 class="mt-2 text-lg font-semibold text-slate-900 dark:text-slate-100">{{ t('dashboard.desktopDownload.title') }}</h2>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">{{ t('dashboard.desktopDownload.subtitle') }}</p>
+            <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+              {{ t('dashboard.desktopDownload.detected', { platform: desktopPlatformLabel(detectedDesktopPlatform) }) }}
+            </p>
+          </div>
+
+          <div v-if="primaryDesktopDownload" class="rounded-2xl border border-midori-200 bg-midori-50/80 p-4 dark:border-midori-900/40 dark:bg-midori-950/30">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-midori-700 dark:text-midori-300">{{ t('dashboard.desktopDownload.recommended') }}</p>
+            <p class="mt-2 text-sm font-medium text-slate-800 dark:text-slate-100">{{ primaryDesktopDownload.label }}</p>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ t(primaryDesktopDownload.hintKey) }}</p>
+            <a
+              :href="desktopDownloadUrl(primaryDesktopDownload.filename)"
+              target="_blank"
+              rel="noreferrer"
+              class="mt-4 inline-flex items-center justify-center rounded-xl bg-midori-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-midori-700"
+            >
+              {{ t('dashboard.desktopDownload.primaryAction') }}
+            </a>
+          </div>
+        </div>
+
+        <div class="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <a
+            v-for="download in desktopDownloads"
+            :key="download.key"
+            :href="desktopDownloadUrl(download.filename)"
+            target="_blank"
+            rel="noreferrer"
+            class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 transition hover:-translate-y-0.5 hover:border-cyan-300 hover:bg-cyan-50/70 dark:border-slate-700 dark:bg-slate-800/70 dark:hover:border-cyan-700 dark:hover:bg-slate-800"
+          >
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ download.label }}</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ t(download.hintKey) }}</p>
+              </div>
+              <span v-if="download.primary" class="rounded-full bg-cyan-100 px-2 py-1 text-[11px] font-semibold text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300">
+                {{ t('dashboard.desktopDownload.recommendedBadge') }}
+              </span>
+            </div>
+            <p class="mt-3 text-xs font-mono text-slate-400">{{ download.filename }}</p>
+          </a>
+        </div>
+
+        <div class="mt-4 flex flex-wrap items-center gap-3 text-sm">
+          <a
+            href="https://github.com/goastian/midori-vpn-desktop/releases"
+            target="_blank"
+            rel="noreferrer"
+            class="font-medium text-cyan-700 transition hover:text-cyan-900 dark:text-cyan-300 dark:hover:text-cyan-200"
+          >
+            {{ t('dashboard.desktopDownload.allReleases') }}
+          </a>
+          <span class="text-slate-300 dark:text-slate-600">•</span>
+          <span class="text-slate-500 dark:text-slate-400">{{ t('dashboard.desktopDownload.releaseSource') }}</span>
+        </div>
       </section>
 
       <section v-if="auth.isAdmin && adminStats" class="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
