@@ -6,6 +6,7 @@ import { useLocale } from '../lib/i18n'
 import type { AdminStats, Connection } from '../lib/schemas'
 
 type DesktopPlatform = 'windows' | 'macos' | 'linux' | 'unknown'
+type LinuxPackageFormat = 'deb' | 'rpm' | 'unknown'
 
 type DesktopDownload = {
   key: string
@@ -34,6 +35,7 @@ let ws: WebSocket | null = null
 const desktopReleaseBase = 'https://github.com/goastian/midori-vpn-desktop/releases/latest/download'
 const detectedDesktopPlatform = ref<DesktopPlatform>('unknown')
 const detectedDesktopArchitecture = ref('unknown')
+const detectedLinuxPackageFormat = ref<LinuxPackageFormat>('unknown')
 
 const connectionTotals = computed(() => {
   const active = connections.value.filter((c) => c.is_active).length
@@ -166,6 +168,7 @@ const mostUsedDeviceBytes = computed(() => Math.max(...deviceUsage.value.map((d)
 const desktopDownloads = computed<DesktopDownload[]>(() => {
   const platform = detectedDesktopPlatform.value
   const architecture = detectedDesktopArchitecture.value
+  const linuxPackageFormat = detectedLinuxPackageFormat.value
 
   if (platform === 'windows') {
     return [
@@ -254,7 +257,7 @@ const desktopDownloads = computed<DesktopDownload[]>(() => {
 
 const primaryDesktopDownload = computed(() => desktopDownloads.value.find((download) => download.primary) || null)
 
-function detectDesktopPlatform(): { platform: DesktopPlatform; architecture: string } {
+function detectDesktopPlatform(): { platform: DesktopPlatform; architecture: string; linuxPackageFormat: LinuxPackageFormat } {
   const nav = navigator as NavigatorWithUAData
   const userAgent = navigator.userAgent || ''
   const platform = navigator.platform || ''
@@ -275,7 +278,16 @@ function detectDesktopPlatform(): { platform: DesktopPlatform; architecture: str
     architecture = 'x64'
   }
 
-  return { platform: detectedPlatform, architecture }
+  let linuxPackageFormat: LinuxPackageFormat = 'unknown'
+  if (detectedPlatform === 'linux') {
+    if (/fedora|rhel|red hat|centos|rocky|alma|suse|opensuse/.test(platformSource)) {
+      linuxPackageFormat = 'rpm'
+    } else if (/debian|ubuntu|mint|pop!_os|kali|elementary|zorin/.test(platformSource)) {
+      linuxPackageFormat = 'deb'
+    }
+  }
+
+  return { platform: detectedPlatform, architecture, linuxPackageFormat }
 }
 
 function desktopDownloadUrl(filename: string): string {
@@ -307,6 +319,7 @@ onMounted(async () => {
   const desktopEnvironment = detectDesktopPlatform()
   detectedDesktopPlatform.value = desktopEnvironment.platform
   detectedDesktopArchitecture.value = desktopEnvironment.architecture
+  detectedLinuxPackageFormat.value = desktopEnvironment.linuxPackageFormat
 
   try {
     const promises: Promise<any>[] = [
