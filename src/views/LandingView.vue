@@ -164,6 +164,7 @@ const desktopDownloads = computed<Record<DesktopOS, { label: string; ext: string
     { label: 'AppImage', ext: '.AppImage', url: DESKTOP_RELEASES_URL },
     { label: 'Debian / Ubuntu', ext: '.deb', url: DESKTOP_RELEASES_URL },
     { label: 'Fedora / RHEL', ext: '.rpm', url: DESKTOP_RELEASES_URL },
+    { label: 'openSUSE / SUSE', ext: '.rpm', url: DESKTOP_RELEASES_URL },
   ],
   windows: [
     { label: 'Installer', ext: '.msi', url: DESKTOP_RELEASES_URL },
