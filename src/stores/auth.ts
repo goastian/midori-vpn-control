@@ -38,7 +38,7 @@ function parseIssuerUrls(value: string | undefined) {
 
 const issuerUrls = parseIssuerUrls(import.meta.env.VITE_AUTHENTIK_ISSUER)
 const CLIENT_ID = import.meta.env.VITE_AUTHENTIK_CLIENT_ID
-const REDIRECT_URI = import.meta.env.VITE_AUTHENTIK_REDIRECT_URI
+const REDIRECT_URI = import.meta.env.VITE_AUTHENTIK_REDIRECT_URI || `${window.location.origin}/auth/callback`
 
 interface JWTPayload {
   sub?: string
