@@ -122,7 +122,6 @@ const messages: Record<LocaleCode, TranslationTree> = {
       dashboard: 'Dashboard',
       servers: 'Servidores',
       connections: 'Conexiones',
-      audit: 'Auditoría',
       adminUsers: 'Usuarios',
       adminServers: 'Admin Servers',
       adminPeers: 'Admin Peers',
@@ -271,12 +270,6 @@ const messages: Record<LocaleCode, TranslationTree> = {
           desc: 'Tratamiento de datos conforme. Servidores europeos disponibles.',
         },
       },
-    },
-    login: {
-      subtitle: 'Panel de control',
-      submit: 'Iniciar sesión con Astian',
-      connecting: 'Conectando...',
-      providerHint: 'Inicia sesión con tu cuenta de Astian',
     },
     authCallback: {
       missingCode: 'No se recibió código de autorización',
@@ -465,14 +458,13 @@ const messages: Record<LocaleCode, TranslationTree> = {
       appName: 'MidoriVPN', loading: 'Loading...', save: 'Save', cancel: 'Cancel', create: 'Create', edit: 'Edit', delete: 'Delete', close: 'Close', copy: 'Copy', view: 'View', actions: 'Actions', active: 'Active', inactive: 'Inactive', status: 'Status', date: 'Date', details: 'Details', traffic: 'Traffic', device: 'Device', server: 'Server', user: 'User', users: 'Users', servers: 'Servers', peers: 'Peers', ip: 'IP', name: 'Name', email: 'Email', groups: 'Groups', back: 'Back', allActions: 'All actions', noResults: 'No results.', system: 'system', unnamed: 'Unnamed', yes: 'Yes', no: 'No', topFive: 'Top 5', live: 'live', total: 'Total', registeredAccounts: 'registered accounts', available: '{count} available', provisioned: '{count} provisioned', totalConnections: '{count} total', peersConnected: 'connected peers', sessionActive: 'Active session', roleAdmin: 'Admin profile', roleUser: 'User profile', signOut: 'Sign out', noNamedDevice: 'Unnamed device', noDataYet: 'No data yet.', connect: 'Connect', connecting: 'Connecting...', disconnect: 'Disconnect', search: 'Search', retry: 'Retry', loadMore: 'Load more'
     },
     theme: { light: 'Light', dark: 'Dark', switchToLight: 'Light mode', switchToDark: 'Dark mode', label: 'Theme' },
-    nav: { general: 'General', administration: 'Administration', dashboard: 'Dashboard', servers: 'Servers', connections: 'Connections', audit: 'Audit', adminUsers: 'Users', adminServers: 'Admin Servers', adminPeers: 'Admin Peers', adminMesh: 'Mesh', adminLogs: 'Admin Logs', openMenu: 'Open menu', closeMenu: 'Close menu' },
+    nav: { general: 'General', administration: 'Administration', dashboard: 'Dashboard', servers: 'Servers', connections: 'Connections', adminUsers: 'Users', adminServers: 'Admin Servers', adminPeers: 'Admin Peers', adminMesh: 'Mesh', adminLogs: 'Admin Logs', openMenu: 'Open menu', closeMenu: 'Close menu' },
     landing: {
       featuresNav: 'Features', pricingNav: 'Pricing', securityNav: 'Security', login: 'Log in', getStarted: 'Get started', heroBadge: 'Now with WireGuard protocol', heroTitleA: 'VPN', heroTitleB: 'Secure, fast and', heroTitleAccent: 'transparent', heroDescription: 'Open-source VPN built on WireGuard. Real-time analytics, global servers, and a zero-log guarantee in one dashboard.', heroPrimary: 'Start for free', heroSecondary: 'See features', activeUsers: 'Active users', servers: 'Servers', uptime: 'Uptime', networkTraffic: 'Network traffic', last24h: 'Last 24 hours, real time', live: 'Live', bandwidth: 'Bandwidth', latency: 'Latency', encrypted: 'Encrypted', featuresTitle: 'Everything you need for secure networking', featuresSubtitle: 'Built for speed, privacy, and developer experience. Every feature is designed to just work.', pricingTitle: 'Simple, transparent pricing', pricingSubtitle: 'Start free. Upgrade when you need more. No hidden fees.', monthly: 'Monthly', annual: 'Annual', forever: 'forever', perMonth: '/mo', mostPopular: 'Most popular', trustTitle: 'Built on transparency', trustSubtitle: 'Open source. Audited. No privacy compromises.', downloadTitle: 'Download the desktop client', downloadSubtitle: 'Connect to MidoriVPN from your computer. Pick your operating system.', osLinux: 'Linux', osWindows: 'Windows', osMacOS: 'macOS', ctaTitle: 'Ready to take control of your privacy?', ctaSubtitle: 'Join thousands of users who trust MidoriVPN for fast, secure, and transparent networking.', ctaPrimary: 'Get started for free', ctaSecondary: 'View on GitHub', footerDescription: 'Open-source VPN built for speed, privacy, and transparency.', footerProduct: 'Product', footerCompany: 'Company', footerLegal: 'Legal', footerDownload: 'Download', footerChangelog: 'Changelog', footerAbout: 'About Astian', footerBlog: 'Blog', footerCareers: 'Careers', footerContact: 'Contact', footerPrivacy: 'Privacy policy', footerTerms: 'Terms of service', footerRights: 'All rights reserved.',
       plans: { free: { name: 'Free', desc: 'Share bandwidth and browse for free', cta: 'Get started', features: { a: '1 connected device', b: 'Bandwidth sharing node', c: '3 server locations', d: 'Community support', e: 'Basic analytics' } }, pro: { name: 'Pro', desc: 'For individuals who need more', cta: 'Start free trial', features: { a: '5 connected devices', b: '24 server locations', c: 'WireGuard + OpenVPN', d: 'Real-time analytics', e: 'Priority support', f: 'No bandwidth sharing' } }, business: { name: 'Business', desc: 'For teams and organizations', cta: 'Contact sales', features: { a: 'Unlimited devices', b: '48+ server locations', c: 'All protocols', d: 'Admin dashboard', e: 'Dedicated support', f: 'Custom DNS', g: 'SSO integration' } } },
       featureCards: { wireguard: { title: 'WireGuard protocol', desc: 'State-of-the-art cryptography with blazing-fast speeds. Up to 3x faster than traditional protocols.' }, analytics: { title: 'Real-time analytics', desc: 'Monitor bandwidth, latency, and connection health with live WebSocket-powered dashboards.' }, global: { title: 'Global server network', desc: 'Connect to 48+ servers. Automatic low-latency selection for optimal performance.' }, devices: { title: 'Multi-device support', desc: 'Protect every device with one account. Export configs as QR codes for instant mobile setup.' }, noLogs: { title: 'Zero-log policy', desc: 'We never store your browsing data. Open-source code for complete transparency and trust.' }, mesh: { title: 'Mesh networking', desc: 'Peer-to-peer connections with NAT traversal. Decentralized architecture for maximum resilience.' } },
       trustCards: { openSource: { title: 'Open source', desc: 'Full source code available on GitHub. Audit it anytime.' }, zeroLog: { title: 'Zero-log', desc: 'We never log browsing activity or connection metadata.' }, wireguard: { title: 'WireGuard', desc: 'Modern cryptography with a minimal attack surface.' }, gdpr: { title: 'GDPR ready', desc: 'Compliant data handling with EU servers available.' } }
     },
-    login: { subtitle: 'Control panel', submit: 'Sign in with Astian', connecting: 'Connecting...', providerHint: 'Sign in with your Astian account' },
     authCallback: { missingCode: 'Authorization code was not received', invalidState: 'Invalid OAuth state. Possible CSRF attack. Please sign in again.', authError: 'Authentication error', title: 'Authentication error', backToLogin: 'Back to login', authenticating: 'Authenticating...' },
     dashboard: {
       eyebrow: 'Midori Control Center',

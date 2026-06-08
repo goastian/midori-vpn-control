@@ -13,7 +13,7 @@ const router = createRouter({
     {
       path: '/login',
       name: 'login',
-      component: () => import('../views/LoginView.vue'),
+      redirect: '/dashboard',
       meta: { public: true, fullPage: true },
     },
     {
@@ -99,6 +99,17 @@ router.beforeEach(async (to) => {
   // Always resolve the session before making any routing decision.
   // restoreSession() is idempotent — subsequent calls return the same promise.
   await auth.restoreSession()
+
+  // Never keep users on an intermediate login screen.
+  // Hitting /login should jump directly to the Authentik authorization endpoint.
+  if (to.name === 'login' && !auth.isAuthenticated) {
+    try {
+      await auth.startLogin()
+      return false
+    } catch {
+      return true
+    }
+  }
 
   // Redirect authenticated users away from login / landing.
   if (typeof to.name === 'string' && REDIRECT_IF_AUTHED.has(to.name) && auth.isAuthenticated) {

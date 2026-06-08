@@ -216,8 +216,8 @@ function scrollTo(id: string) {
             <button @click="scrollTo('pricing')" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">{{ t('landing.pricingNav') }}</button>
             <button @click="scrollTo('trust')" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">{{ t('landing.securityNav') }}</button>
             <LanguageSelector tone="dark" />
-            <router-link to="/login" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">{{ t('landing.login') }}</router-link>
-            <router-link to="/login" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-midori-500 rounded-lg hover:bg-midori-600 transition-colors shadow-sm">
+            <router-link to="/dashboard" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">{{ t('landing.login') }}</router-link>
+            <router-link to="/dashboard" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-midori-500 rounded-lg hover:bg-midori-600 transition-colors shadow-sm">
               {{ t('landing.getStarted') }}
             </router-link>
           </div>
@@ -246,8 +246,8 @@ function scrollTo(id: string) {
           <button @click="scrollTo('features')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">{{ t('landing.featuresNav') }}</button>
           <button @click="scrollTo('pricing')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">{{ t('landing.pricingNav') }}</button>
           <button @click="scrollTo('trust')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">{{ t('landing.securityNav') }}</button>
-          <router-link to="/login" class="block px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">{{ t('landing.login') }}</router-link>
-          <router-link to="/login" class="block text-center px-4 py-2 text-sm font-semibold text-white bg-midori-500 rounded-lg">{{ t('landing.getStarted') }}</router-link>
+          <router-link to="/dashboard" class="block px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">{{ t('landing.login') }}</router-link>
+          <router-link to="/dashboard" class="block text-center px-4 py-2 text-sm font-semibold text-white bg-midori-500 rounded-lg">{{ t('landing.getStarted') }}</router-link>
         </div>
       </Transition>
     </nav>
@@ -279,7 +279,7 @@ function scrollTo(id: string) {
             </p>
 
             <div class="mt-8 flex flex-col sm:flex-row gap-3">
-              <router-link to="/login" class="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-white bg-midori-500 rounded-xl hover:bg-midori-600 transition-all shadow-lg shadow-midori-500/25 hover:shadow-midori-500/40">
+              <router-link to="/dashboard" class="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-white bg-midori-500 rounded-xl hover:bg-midori-600 transition-all shadow-lg shadow-midori-500/25 hover:shadow-midori-500/40">
                 {{ t('landing.heroPrimary') }}
                 <svg class="ml-2 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
               </router-link>
@@ -485,7 +485,7 @@ function scrollTo(id: string) {
             </ul>
 
             <router-link
-              to="/login"
+              to="/dashboard"
               class="mt-8 block text-center px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200"
               :class="plan.highlighted
                 ? 'bg-midori-500 text-white hover:bg-midori-600 shadow-lg shadow-midori-500/25'
@@ -604,7 +604,7 @@ function scrollTo(id: string) {
           {{ t('landing.ctaSubtitle') }}
         </p>
         <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-          <router-link to="/login" class="inline-flex items-center px-8 py-3.5 text-base font-semibold text-white bg-midori-500 rounded-xl hover:bg-midori-600 transition-all shadow-lg shadow-midori-500/25 hover:shadow-midori-500/40">
+          <router-link to="/dashboard" class="inline-flex items-center px-8 py-3.5 text-base font-semibold text-white bg-midori-500 rounded-xl hover:bg-midori-600 transition-all shadow-lg shadow-midori-500/25 hover:shadow-midori-500/40">
             {{ t('landing.ctaPrimary') }}
             <svg class="ml-2 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
           </router-link>

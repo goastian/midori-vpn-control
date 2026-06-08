@@ -121,7 +121,7 @@ async function request<T>(path: string, options: RequestInit = {}, _isRetry = fa
         processRefreshQueue(err as Error, null)
         clearAccessToken()
         localStorage.removeItem('refresh_token')
-        window.location.href = '/login'
+        window.location.href = '/dashboard'
         throw new Error('Unauthorized')
       }
     } else {
@@ -138,7 +138,7 @@ async function request<T>(path: string, options: RequestInit = {}, _isRetry = fa
   if (res.status === 401 && _isRetry) {
     clearAccessToken()
     localStorage.removeItem('refresh_token')
-    window.location.href = '/login'
+    window.location.href = '/dashboard'
     throw new Error('Unauthorized')
   }
 
@@ -195,7 +195,7 @@ async function requestRaw(path: string, options: RequestInit = {}, _isRetry = fa
         processRefreshQueue(err as Error, null)
         clearAccessToken()
         localStorage.removeItem('refresh_token')
-        window.location.href = '/login'
+        window.location.href = '/dashboard'
         throw new Error('Unauthorized')
       }
     } else {
@@ -211,7 +211,7 @@ async function requestRaw(path: string, options: RequestInit = {}, _isRetry = fa
   if (res.status === 401 && _isRetry) {
     clearAccessToken()
     localStorage.removeItem('refresh_token')
-    window.location.href = '/login'
+    window.location.href = '/dashboard'
     throw new Error('Unauthorized')
   }
 
