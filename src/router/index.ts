@@ -46,11 +46,6 @@ const router = createRouter({
       name: 'connections',
       component: () => import('../views/PeersView.vue'),
     },
-    {
-      path: '/audit',
-      name: 'audit',
-      component: () => import('../views/AuditView.vue'),
-    },
     // Admin routes
     {
       path: '/admin/users',
