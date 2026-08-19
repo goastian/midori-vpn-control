@@ -2,13 +2,11 @@
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { useDarkMode } from '../composables/useDarkMode'
 import LanguageSelector from './LanguageSelector.vue'
 import { useLocale } from '../lib/i18n'
 
 const auth = useAuthStore()
 const route = useRoute()
-const { isDark, toggle: toggleDark } = useDarkMode()
 const { t } = useLocale()
 const mobileOpen = ref(false)
 
@@ -73,13 +71,13 @@ function closeMobile() {
 </script>
 
 <template>
-  <header class="sticky top-0 z-30 border-b border-slate-200/70 bg-white/85 px-4 py-3 backdrop-blur lg:hidden dark:border-slate-700 dark:bg-slate-900/85">
+  <header class="sticky top-0 z-30 border-b border-slate-800 bg-slate-900/90 px-4 py-3 backdrop-blur lg:hidden text-slate-100">
     <div class="flex items-center justify-between">
-      <router-link to="/dashboard" class="text-lg font-semibold tracking-tight text-midori-700">
+      <router-link to="/dashboard" class="text-xl font-bold tracking-tight text-midori-400">
         MidoriVPN
       </router-link>
       <button
-        class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"
+        class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700 bg-slate-800/80 text-slate-300 hover:text-white"
         @click="mobileOpen = true"
         :aria-label="t('nav.openMenu')"
       >
@@ -90,31 +88,20 @@ function closeMobile() {
     </div>
   </header>
 
-  <aside class="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-slate-200/80 bg-white/90 p-4 backdrop-blur lg:flex lg:flex-col dark:border-slate-700 dark:bg-slate-900/90">
-    <div class="flex items-center justify-between px-2 pb-5">
-      <router-link to="/dashboard" class="text-2xl font-semibold tracking-tight text-midori-700 dark:text-midori-400">
+  <aside class="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-slate-800 bg-slate-900/95 p-5 backdrop-blur-xl lg:flex lg:flex-col text-slate-100 shadow-2xl">
+    <!-- Brand Title & Language Selector with Clean Separation -->
+    <div class="px-2 pb-5 mb-4 border-b border-slate-800/80 space-y-4">
+      <router-link to="/dashboard" class="block text-2xl font-bold tracking-tight text-midori-400 hover:text-midori-300 transition-colors">
         {{ t('common.appName') }}
       </router-link>
-      <div class="flex items-center gap-2">
-        <LanguageSelector />
-        <button
-          @click="toggleDark"
-          class="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-          :title="isDark ? t('theme.switchToLight') : t('theme.switchToDark')"
-        >
-          <svg v-if="isDark" class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd" />
-          </svg>
-          <svg v-else class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-          </svg>
-        </button>
+      <div class="pt-1">
+        <LanguageSelector tone="dark" />
       </div>
     </div>
 
     <nav class="flex-1 space-y-6 overflow-y-auto pr-1">
       <section v-for="group in navGroups" :key="group.title">
-        <p class="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
+        <p class="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
           {{ group.title }}
         </p>
         <div class="space-y-1">
@@ -122,10 +109,10 @@ function closeMobile() {
             v-for="item in group.items"
             :key="item.path"
             :to="item.path"
-            class="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition"
+            class="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all"
             :class="isItemActive(item.path)
-              ? 'bg-midori-600 text-white shadow-lg shadow-midori-900/20'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100'"
+              ? 'bg-midori-600 text-white shadow-lg shadow-midori-900/30 font-semibold'
+              : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'"
           >
             <svg class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
               <path :d="iconPath(item.icon)" />
@@ -135,12 +122,12 @@ function closeMobile() {
         </div>
       </section>
 
-      <div class="rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
-        <p class="truncate text-sm font-semibold text-slate-700 dark:text-slate-200">{{ auth.user?.email }}</p>
-        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ auth.isAdmin ? t('common.roleAdmin') : t('common.roleUser') }}</p>
+      <div class="rounded-2xl border border-slate-700/60 bg-slate-800/80 p-4 shadow-sm">
+        <p class="truncate text-sm font-semibold text-slate-100">{{ auth.user?.email }}</p>
+        <p class="mt-1 text-xs text-slate-400">{{ auth.isAdmin ? t('common.roleAdmin') : t('common.roleUser') }}</p>
         <button
           @click="auth.logout()"
-          class="mt-3 w-full rounded-xl border border-rose-200 px-3 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 dark:border-rose-700/60 dark:text-rose-300 dark:hover:bg-rose-900/30"
+          class="mt-3 w-full rounded-xl border border-rose-700/60 bg-rose-950/20 px-3 py-2 text-sm font-medium text-rose-300 transition hover:bg-rose-900/40"
         >
           {{ t('common.signOut') }}
         </button>
@@ -150,40 +137,33 @@ function closeMobile() {
 
   <transition name="fade">
     <div v-if="mobileOpen" class="fixed inset-0 z-50 lg:hidden">
-      <button class="absolute inset-0 bg-slate-900/55" @click="closeMobile" aria-label="Cerrar menu"></button>
-      <aside class="absolute inset-y-0 left-0 w-72 border-r border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-        <div class="flex items-center justify-between px-2 pb-4">
-          <router-link to="/dashboard" class="text-xl font-semibold text-midori-700 dark:text-midori-400" @click="closeMobile">
+      <button class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" @click="closeMobile" aria-label="Cerrar menu"></button>
+      <aside class="absolute inset-y-0 left-0 w-72 border-r border-slate-800 bg-slate-900 p-5 text-slate-100 shadow-2xl">
+        <div class="flex items-center justify-between px-2 pb-4 border-b border-slate-800">
+          <router-link to="/dashboard" class="text-2xl font-bold text-midori-400" @click="closeMobile">
             {{ t('common.appName') }}
           </router-link>
-          <button class="rounded-xl p-2 text-slate-500 dark:text-slate-300" @click="closeMobile" :aria-label="t('nav.closeMenu')">
+          <button class="rounded-xl p-2 text-slate-400 hover:text-white" @click="closeMobile" :aria-label="t('nav.closeMenu')">
             <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path d="M5.22 5.22a.75.75 0 011.06 0L10 8.94l3.72-3.72a.75.75 0 111.06 1.06L11.06 10l3.72 3.72a.75.75 0 11-1.06 1.06L10 11.06l-3.72 3.72a.75.75 0 11-1.06-1.06L8.94 10 5.22 6.28a.75.75 0 010-1.06z" />
             </svg>
           </button>
         </div>
 
-        <div class="space-y-4">
-          <LanguageSelector />
-          <button
-            @click="toggleDark"
-            class="flex w-full items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300"
-          >
-            {{ t('theme.label') }}
-            <span>{{ isDark ? t('theme.dark') : t('theme.light') }}</span>
-          </button>
+        <div class="space-y-5 pt-4">
+          <LanguageSelector tone="dark" />
 
           <section v-for="group in navGroups" :key="group.title">
-            <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">{{ group.title }}</p>
+            <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ group.title }}</p>
             <div class="space-y-1">
               <router-link
                 v-for="item in group.items"
                 :key="item.path"
                 :to="item.path"
-                class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium"
+                class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition"
                 :class="isItemActive(item.path)
-                  ? 'bg-midori-600 text-white'
-                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
+                  ? 'bg-midori-600 text-white font-semibold'
+                  : 'text-slate-300 hover:bg-slate-800'"
                 @click="closeMobile"
               >
                 <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path :d="iconPath(item.icon)" /></svg>
@@ -194,7 +174,7 @@ function closeMobile() {
 
           <button
             @click="auth.logout()"
-            class="w-full rounded-xl border border-rose-200 px-3 py-2 text-sm font-medium text-rose-600 dark:border-rose-700/60 dark:text-rose-300"
+            class="w-full rounded-xl border border-rose-700/60 bg-rose-950/20 px-3 py-2 text-sm font-medium text-rose-300"
           >
             {{ t('common.signOut') }}
           </button>
