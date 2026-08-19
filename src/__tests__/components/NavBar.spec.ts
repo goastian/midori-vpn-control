@@ -38,8 +38,8 @@ describe('NavBar', () => {
     expect(wrapper.text()).toContain('Dashboard')
     expect(wrapper.text()).toContain('Servidores')
     expect(wrapper.text()).toContain('Conexiones')
-    expect(wrapper.text()).toContain('Auditoría')
     // Admin items should NOT be visible for non-admin users
+    expect(wrapper.text()).not.toContain('Auditoría')
     expect(wrapper.text()).not.toContain('Admin Servers')
   })
 

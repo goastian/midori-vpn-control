@@ -48,9 +48,9 @@ onMounted(async () => {
       <div v-if="errorMsg" class="bg-red-50 text-red-700 rounded-lg p-6 max-w-md">
         <h2 class="text-lg font-semibold mb-2">{{ t('authCallback.title') }}</h2>
         <p class="text-sm">{{ errorMsg }}</p>
-        <router-link to="/dashboard" class="mt-4 inline-block text-midori-600 hover:underline text-sm">
+        <button @click="auth.startLogin()" class="mt-4 inline-block text-midori-600 hover:underline text-sm cursor-pointer">
           {{ t('authCallback.backToLogin') }}
-        </router-link>
+        </button>
       </div>
       <div v-else class="space-y-4">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-midori-600 mx-auto"></div>

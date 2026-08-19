@@ -128,6 +128,7 @@ describe('AdminAuditView', () => {
 
     // The initial call should not have an action query parameter
     const calls = vi.mocked(api.get).mock.calls
-    expect(calls[0][0]).toBe('/api/v1/admin/audit-logs')
+    expect(calls[0][0]).toContain('/api/v1/admin/audit-logs')
+    expect(calls[0][0]).not.toContain('action=')
   })
 })
