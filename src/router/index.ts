@@ -46,7 +46,18 @@ const router = createRouter({
       name: 'connections',
       component: () => import('../views/PeersView.vue'),
     },
+    {
+      path: '/proxy',
+      name: 'proxy-credentials',
+      component: () => import('../views/ProxyManagementView.vue'),
+    },
     // Admin routes
+    {
+      path: '/admin/health',
+      name: 'admin-health',
+      component: () => import('../views/admin/AdminClusterHealthView.vue'),
+      meta: { admin: true },
+    },
     {
       path: '/admin/users',
       name: 'admin-users',
