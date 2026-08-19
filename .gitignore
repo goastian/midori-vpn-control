@@ -1,3 +1,42 @@
-node_modules
+node_modules/
 **.env
+.env.*
+!.env.example
 dist/
+
+# Projects documentation & task tracking
+.projects/
+.projects*/
+.project
+.project/
+
+# Syncthing
+.stfolder/
+.stversions/
+*.syncthing*
+.syncthing.*
+.syncthing*.tmp
+
+# AI Assistants & LLM tools
+.gemini/
+.agents/
+.opencode/
+.claude/
+.cursor/
+.windsurf/
+*.prompt
+*.ai
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
