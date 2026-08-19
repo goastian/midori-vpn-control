@@ -2,6 +2,17 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import LanguageSelector from '../components/LanguageSelector.vue'
 import { useLocale } from '../lib/i18n'
+import { useAuthStore } from '../stores/auth'
+
+const auth = useAuthStore()
+
+function handleLogin() {
+  if (auth.isAuthenticated) {
+    window.location.href = '/dashboard'
+  } else {
+    auth.startLogin()
+  }
+}
 
 // Animated counter for hero stats
 function useAnimatedCounter(target: number, duration = 2000) {
@@ -216,10 +227,10 @@ function scrollTo(id: string) {
             <button @click="scrollTo('pricing')" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">{{ t('landing.pricingNav') }}</button>
             <button @click="scrollTo('trust')" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">{{ t('landing.securityNav') }}</button>
             <LanguageSelector tone="dark" />
-            <router-link to="/dashboard" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">{{ t('landing.login') }}</router-link>
-            <router-link to="/dashboard" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-midori-500 rounded-lg hover:bg-midori-600 transition-colors shadow-sm">
+            <button @click="handleLogin" class="text-sm font-medium text-gray-400 hover:text-white transition-colors cursor-pointer">{{ t('landing.login') }}</button>
+            <button @click="handleLogin" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-midori-500 rounded-lg hover:bg-midori-600 transition-colors shadow-sm cursor-pointer">
               {{ t('landing.getStarted') }}
-            </router-link>
+            </button>
           </div>
 
           <!-- Mobile menu button -->
@@ -246,8 +257,8 @@ function scrollTo(id: string) {
           <button @click="scrollTo('features')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">{{ t('landing.featuresNav') }}</button>
           <button @click="scrollTo('pricing')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">{{ t('landing.pricingNav') }}</button>
           <button @click="scrollTo('trust')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">{{ t('landing.securityNav') }}</button>
-          <router-link to="/dashboard" class="block px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">{{ t('landing.login') }}</router-link>
-          <router-link to="/dashboard" class="block text-center px-4 py-2 text-sm font-semibold text-white bg-midori-500 rounded-lg">{{ t('landing.getStarted') }}</router-link>
+          <button @click="handleLogin" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800 cursor-pointer">{{ t('landing.login') }}</button>
+          <button @click="handleLogin" class="block w-full text-center px-4 py-2 text-sm font-semibold text-white bg-midori-500 rounded-lg cursor-pointer">{{ t('landing.getStarted') }}</button>
         </div>
       </Transition>
     </nav>
@@ -279,10 +290,10 @@ function scrollTo(id: string) {
             </p>
 
             <div class="mt-8 flex flex-col sm:flex-row gap-3">
-              <router-link to="/dashboard" class="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-white bg-midori-500 rounded-xl hover:bg-midori-600 transition-all shadow-lg shadow-midori-500/25 hover:shadow-midori-500/40">
+              <button @click="handleLogin" class="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-white bg-midori-500 rounded-xl hover:bg-midori-600 transition-all shadow-lg shadow-midori-500/25 hover:shadow-midori-500/40 cursor-pointer">
                 {{ t('landing.heroPrimary') }}
                 <svg class="ml-2 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
-              </router-link>
+              </button>
               <button @click="scrollTo('features')" class="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-gray-300 bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-700 transition-all">
                 {{ t('landing.heroSecondary') }}
               </button>
@@ -484,15 +495,15 @@ function scrollTo(id: string) {
               </li>
             </ul>
 
-            <router-link
-              to="/dashboard"
-              class="mt-8 block text-center px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200"
+            <button
+              @click="handleLogin"
+              class="mt-8 block w-full text-center px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer"
               :class="plan.highlighted
                 ? 'bg-midori-500 text-white hover:bg-midori-600 shadow-lg shadow-midori-500/25'
                 : 'bg-gray-700 text-white hover:bg-gray-600'"
             >
               {{ plan.cta }}
-            </router-link>
+            </button>
           </div>
         </div>
       </div>
@@ -604,10 +615,10 @@ function scrollTo(id: string) {
           {{ t('landing.ctaSubtitle') }}
         </p>
         <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-          <router-link to="/dashboard" class="inline-flex items-center px-8 py-3.5 text-base font-semibold text-white bg-midori-500 rounded-xl hover:bg-midori-600 transition-all shadow-lg shadow-midori-500/25 hover:shadow-midori-500/40">
+          <button @click="handleLogin" class="inline-flex items-center px-8 py-3.5 text-base font-semibold text-white bg-midori-500 rounded-xl hover:bg-midori-600 transition-all shadow-lg shadow-midori-500/25 hover:shadow-midori-500/40 cursor-pointer">
             {{ t('landing.ctaPrimary') }}
             <svg class="ml-2 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
-          </router-link>
+          </button>
           <a href="https://github.com/goastian/midori-vpn-core" target="_blank" rel="noopener noreferrer" class="inline-flex items-center px-6 py-3.5 text-base font-semibold text-gray-300 bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-700 transition-all">
             <svg class="mr-2 w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
             {{ t('landing.ctaSecondary') }}

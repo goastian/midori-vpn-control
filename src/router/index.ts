@@ -13,7 +13,7 @@ const router = createRouter({
     {
       path: '/login',
       name: 'login',
-      redirect: '/dashboard',
+      component: () => import('../views/LandingView.vue'),
       meta: { public: true, fullPage: true },
     },
     {
