@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-midori-50: #f0fdf4;
   --color-midori-100: #dcfce7;
@@ -12,14 +14,12 @@
   --color-midori-700: #15803d;
   --color-midori-800: #166534;
   --color-midori-900: #14532d;
+  --color-midori-950: #052e16;
 }
 
 body {
   font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
-  background:
-    radial-gradient(1200px 600px at 100% -10%, rgba(34, 197, 94, 0.12), transparent 60%),
-    radial-gradient(1000px 500px at -10% 0%, rgba(6, 182, 212, 0.1), transparent 50%),
-    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 55%, #eef2f7 100%);
+  background-color: #0b132b;
   min-height: 100vh;
 }
 

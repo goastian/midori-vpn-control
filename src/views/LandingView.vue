@@ -318,16 +318,16 @@ function scrollTo(id: string) {
 
           <!-- Right: Dashboard mockup -->
           <div class="relative">
-            <div class="bg-white rounded-2xl shadow-2xl shadow-black/30 border border-gray-700/30 p-6 space-y-5">
+            <div class="bg-gray-800/90 rounded-2xl shadow-2xl shadow-black/50 border border-gray-700/80 backdrop-blur-xl p-6 space-y-5">
               <!-- Mock header -->
               <div class="flex items-center justify-between">
                 <div>
-                  <p class="text-sm font-semibold text-gray-900">{{ t('landing.networkTraffic') }}</p>
+                  <p class="text-sm font-semibold text-white">{{ t('landing.networkTraffic') }}</p>
                   <p class="text-xs text-gray-400 mt-0.5">{{ t('landing.last24h') }}</p>
                 </div>
-                <div class="flex items-center gap-1.5 px-2.5 py-1 bg-midori-50 rounded-lg">
+                <div class="flex items-center gap-1.5 px-2.5 py-1 bg-midori-900/40 border border-midori-700/30 rounded-lg">
                   <span class="w-1.5 h-1.5 rounded-full bg-midori-500 animate-pulse"></span>
-                  <span class="text-xs font-semibold text-midori-700">{{ t('landing.live') }}</span>
+                  <span class="text-xs font-semibold text-midori-400">{{ t('landing.live') }}</span>
                 </div>
               </div>
 
@@ -337,40 +337,40 @@ function scrollTo(id: string) {
                   v-for="(bar, i) in chartBars"
                   :key="i"
                   class="flex-1 rounded-t-sm transition-all duration-1000 ease-in-out"
-                  :class="i >= 20 ? 'bg-midori-400' : 'bg-midori-200'"
+                  :class="i >= 20 ? 'bg-midori-500 shadow-sm shadow-midori-500/50' : 'bg-gray-700'"
                   :style="{ height: bar + '%' }"
                 ></div>
               </div>
 
               <!-- Mock stats cards -->
               <div class="grid grid-cols-3 gap-3">
-                <div class="bg-gray-50 rounded-xl p-3">
+                <div class="bg-gray-900/70 border border-gray-700/50 rounded-xl p-3">
                   <p class="text-xs text-gray-400 font-medium">{{ t('landing.bandwidth') }}</p>
-                  <p class="text-lg font-bold text-gray-900 mt-1">{{ formatNumber(dataPoints) }}</p>
-                  <p class="text-xs text-midori-600 font-medium mt-0.5">+12.3%</p>
+                  <p class="text-lg font-bold text-white mt-1">{{ formatNumber(dataPoints) }}</p>
+                  <p class="text-xs text-midori-400 font-medium mt-0.5">+12.3%</p>
                 </div>
-                <div class="bg-gray-50 rounded-xl p-3">
+                <div class="bg-gray-900/70 border border-gray-700/50 rounded-xl p-3">
                   <p class="text-xs text-gray-400 font-medium">{{ t('landing.latency') }}</p>
-                  <p class="text-lg font-bold text-gray-900 mt-1">14ms</p>
-                  <p class="text-xs text-midori-600 font-medium mt-0.5">-8.1%</p>
+                  <p class="text-lg font-bold text-white mt-1">14ms</p>
+                  <p class="text-xs text-midori-400 font-medium mt-0.5">-8.1%</p>
                 </div>
-                <div class="bg-gray-50 rounded-xl p-3">
+                <div class="bg-gray-900/70 border border-gray-700/50 rounded-xl p-3">
                   <p class="text-xs text-gray-400 font-medium">{{ t('common.peers') }}</p>
-                  <p class="text-lg font-bold text-gray-900 mt-1">2,481</p>
-                  <p class="text-xs text-midori-600 font-medium mt-0.5">+5.7%</p>
+                  <p class="text-lg font-bold text-white mt-1">2,481</p>
+                  <p class="text-xs text-midori-400 font-medium mt-0.5">+5.7%</p>
                 </div>
               </div>
             </div>
 
             <!-- Floating card -->
-            <div class="absolute -bottom-4 -left-4 bg-white rounded-xl shadow-lg border border-gray-700/30 p-3 flex items-center gap-3">
-              <div class="w-9 h-9 rounded-lg bg-midori-100 flex items-center justify-center flex-shrink-0">
-                <svg class="w-5 h-5 text-midori-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <div class="absolute -bottom-4 -left-4 bg-gray-800/95 border border-gray-700 rounded-xl shadow-xl p-3 flex items-center gap-3 backdrop-blur-md">
+              <div class="w-9 h-9 rounded-lg bg-midori-900/40 border border-midori-700/30 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-midori-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
               </div>
               <div>
-                <p class="text-xs font-semibold text-gray-900">{{ t('landing.encrypted') }}</p>
+                <p class="text-xs font-semibold text-white">{{ t('landing.encrypted') }}</p>
                 <p class="text-[10px] text-gray-400">WireGuard / AES-256</p>
               </div>
             </div>
