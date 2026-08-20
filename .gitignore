@@ -1,23 +1,57 @@
+# Dependencias y compilación
 node_modules/
-**.env
+dist/
+dist-ssr/
+*.local
+
+# Configuración y variables de entorno
+.env
 .env.*
 !.env.example
-dist/
 
-# Projects documentation & task tracking
+# Caches y diagnósticos
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+.cache/
+.temp/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Cobertura de pruebas
+coverage/
+
+# Entornos de desarrollo y editores (IDE)
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Sistema Operativo
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+
+# Tareas y sincronización
 .projects/
 .projects*/
 .project
 .project/
-
-# Syncthing
 .stfolder/
 .stversions/
 *.syncthing*
 .syncthing.*
 .syncthing*.tmp
 
-# AI Assistants & LLM tools
+# Asistentes y herramientas locales
 .gemini/
 .agents/
 .opencode/
@@ -26,17 +60,4 @@ dist/
 .windsurf/
 *.prompt
 *.ai
-
-# IDE & OS
-.vscode/
-.idea/
-*.swp
-*.swo
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
 
