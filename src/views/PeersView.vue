@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import QRCode from 'qrcode'
 import { api } from '../lib/api'
 import { PRIVATE_KEYS_STORAGE_KEY } from '../lib/storage-keys'
@@ -17,16 +18,27 @@ type ServerPingResult = {
   available: boolean
 }
 
+const route = useRoute()
+const { t } = useLocale()
+
 const servers = ref<Server[]>([])
 const connections = ref<Connection[]>([])
 const serverPing = ref<Record<string, ServerPingResult>>({})
 const loading = ref(true)
 const connecting = ref(false)
-const generatingKeypair = ref(false)
-const lastConfig = ref<ConnectionConfig | null>(null)
-const generatedPrivateKey = ref('')
-const lastProvisionedDeviceName = ref('midori-client')
-const { t } = useLocale()
+
+// Form state
+const form = ref({
+  server_id: '',
+  device_name: '',
+})
+
+// Duplicate device name check
+const isDuplicateDeviceName = computed(() => {
+  const trimmed = form.value.device_name.trim().toLowerCase()
+  if (!trimmed) return false
+  return connections.value.some((c) => c.is_active && (c.device_name || '').trim().toLowerCase() === trimmed)
+})
 
 // Inline notification
 const notification = ref<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -38,36 +50,42 @@ function showNotification(type: 'success' | 'error', message: string) {
   notificationTimer = setTimeout(() => { notification.value = null }, 5000)
 }
 
-// QR for post-provision config
-const provisionQRUrl = ref('')
-const provisionQRLoading = ref(false)
-
-// QR modal state
-const qrModal = ref<{ open: boolean; url: string; loading: boolean; deviceName: string }>({
-  open: false, url: '', loading: false, deviceName: '',
+// Unified Device Detail / QR Modal
+const deviceModal = ref<{
+  open: boolean
+  loading: boolean
+  conn: Connection | null
+  configText: string
+  qrUrl: string
+  copied: boolean
+}>({
+  open: false,
+  loading: false,
+  conn: null,
+  configText: '',
+  qrUrl: '',
+  copied: false,
 })
 
-const form = ref({
-  server_id: '',
-  public_key: '',
-  device_name: '',
-})
+let clipboardTimer: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
   await loadData()
+  if (route.query.server_id) {
+    form.value.server_id = String(route.query.server_id)
+  }
   document.addEventListener('keydown', onEscapeKey)
 })
 
 onUnmounted(() => {
   if (clipboardTimer) clearTimeout(clipboardTimer)
   if (notificationTimer) clearTimeout(notificationTimer)
-  if (provisionQRUrl.value) URL.revokeObjectURL(provisionQRUrl.value)
-  if (qrModal.value.url) URL.revokeObjectURL(qrModal.value.url)
+  if (deviceModal.value.qrUrl) URL.revokeObjectURL(deviceModal.value.qrUrl)
   document.removeEventListener('keydown', onEscapeKey)
 })
 
 function onEscapeKey(e: KeyboardEvent) {
-  if (e.key === 'Escape') closeQRModal()
+  if (e.key === 'Escape') closeDeviceModal()
 }
 
 async function loadData() {
@@ -97,158 +115,6 @@ function selectedServerUnavailable(): boolean {
   return serverPing.value[form.value.server_id]?.available === false
 }
 
-function canProvision(): boolean {
-  if (!form.value.public_key) return false
-  if (selectedServerUnavailable()) return false
-  return availableServerCount() > 0
-}
-
-async function connect() {
-  if (!canProvision()) return
-  connecting.value = true
-  try {
-    const currentDeviceName = form.value.device_name || 'midori-client'
-    const config = await api.post<ConnectionConfig>('/api/v1/control/connections', form.value)
-    lastConfig.value = config
-    lastProvisionedDeviceName.value = currentDeviceName
-    if (generatedPrivateKey.value) {
-      savePrivateKeyForPeer(config.peer_id, generatedPrivateKey.value)
-    }
-    form.value = { server_id: '', public_key: '', device_name: '' }
-    await loadData()
-    // Fetch QR for the newly provisioned config
-    await nextTick()
-    await fetchProvisionQR(config.peer_id)
-  } catch (e: any) {
-    showNotification('error', e.message)
-  } finally {
-    connecting.value = false
-  }
-}
-
-async function fetchProvisionQR(_peerId: string) {
-  provisionQRLoading.value = true
-  provisionQRUrl.value = ''
-  try {
-    if (!lastConfig.value) return
-    const text = buildClientConfig(lastConfig.value)
-    provisionQRUrl.value = await QRCode.toDataURL(text, { errorCorrectionLevel: 'L', scale: 4 })
-  } catch {
-    // QR is optional — don't block the flow
-  } finally {
-    provisionQRLoading.value = false
-  }
-}
-
-async function generateKeypair() {
-  generatingKeypair.value = true
-  try {
-    const kp = await api.post<Keypair>('/api/v1/control/keypair')
-    generatedPrivateKey.value = kp.private_key
-    form.value.public_key = kp.public_key
-  } catch (e: any) {
-    showNotification('error', e.message)
-  } finally {
-    generatingKeypair.value = false
-  }
-}
-
-async function disconnect(id: string) {
-  if (!confirm(t('connectionsView.disconnectConfirm'))) return
-  try {
-    await api.delete(`/api/v1/control/connections/${id}`)
-    await loadData()
-  } catch (e: any) {
-    showNotification('error', e.message)
-  }
-}
-
-async function deleteConnection(id: string) {
-  if (!confirm(t('connectionsView.deleteConfirm'))) return
-  try {
-    await api.delete(`/api/v1/control/connections/${id}/device`)
-    await loadData()
-  } catch (e: any) {
-    showNotification('error', e.message)
-  }
-}
-
-function serverName(id: string): string {
-  return servers.value.find((s) => s.id === id)?.name || id.slice(0, 8)
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
-}
-
-let clipboardTimer: ReturnType<typeof setTimeout> | null = null
-
-function copyConfig() {
-  if (!lastConfig.value) return
-  const text = buildClientConfig(lastConfig.value)
-  navigator.clipboard.writeText(text)
-  showNotification('success', t('connectionsView.copied'))
-  if (clipboardTimer) clearTimeout(clipboardTimer)
-  clipboardTimer = setTimeout(() => {
-    navigator.clipboard.writeText('').catch(() => {})
-  }, 60_000)
-}
-
-function buildClientConfig(config: ConnectionConfig): string {
-  const privateKeyLine = generatedPrivateKey.value
-    ? `PrivateKey = ${generatedPrivateKey.value}`
-    : 'PrivateKey = <PEGA_AQUI_TU_PRIVATE_KEY>'
-
-  // peer_ip is a bare IP address; append /32 only if no mask is already present
-  const address = config.peer_ip.includes('/') ? config.peer_ip : `${config.peer_ip}/32`
-
-  return `[Interface]
-${privateKeyLine}
-Address = ${address}
-DNS = ${config.dns}
-
-[Peer]
-PublicKey = ${config.server_public_key}
-Endpoint = ${config.server_endpoint}
-AllowedIPs = ${config.allowed_ips}
-PersistentKeepalive = 25`
-}
-
-function downloadGeneratedConfig() {
-  if (!lastConfig.value) return
-  const text = buildClientConfig(lastConfig.value)
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `${lastProvisionedDeviceName.value || 'midori-client'}.conf`
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(url)
-}
-
-function downloadProvisionQR() {
-  if (!provisionQRUrl.value) return
-  const link = document.createElement('a')
-  link.href = provisionQRUrl.value
-  link.download = `${lastProvisionedDeviceName.value || 'midori-client'}-qr.png`
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-}
-
-function closeProvisionConfig() {
-  lastConfig.value = null
-  generatedPrivateKey.value = ''
-  if (provisionQRUrl.value) URL.revokeObjectURL(provisionQRUrl.value)
-  provisionQRUrl.value = ''
-}
-
 function readStoredPrivateKeys(): Record<string, string> {
   try {
     const raw = sessionStorage.getItem(PRIVATE_KEYS_STORAGE_KEY)
@@ -271,262 +137,360 @@ function getPrivateKeyForPeer(peerID: string): string {
   return map[peerID] || ''
 }
 
-async function downloadConfig(id: string, deviceName: string) {
+function buildClientConfigText(config: ConnectionConfig, privateKey?: string): string {
+  const privKey = privateKey || '<PEGA_AQUI_TU_PRIVATE_KEY>'
+  const address = config.peer_ip.includes('/') ? config.peer_ip : `${config.peer_ip}/32`
+  const pskLine = config.preshared_key ? `\nPresharedKey = ${config.preshared_key}` : ''
+
+  return `[Interface]
+PrivateKey = ${privKey}
+Address = ${address}
+DNS = ${config.dns}
+
+[Peer]
+PublicKey = ${config.server_public_key}
+Endpoint = ${config.server_endpoint}${pskLine}
+AllowedIPs = ${config.allowed_ips}
+PersistentKeepalive = 25`
+}
+
+async function handleCreateDevice() {
+  const name = form.value.device_name.trim()
+  if (!name) {
+    showNotification('error', 'Por favor, ingresa un nombre para el dispositivo')
+    return
+  }
+  if (isDuplicateDeviceName.value) {
+    showNotification('error', 'Ya tienes un dispositivo activo con este nombre')
+    return
+  }
+
+  connecting.value = true
   try {
-    const res = await api.fetchRaw(`/api/v1/control/connections/${id}/config`)
+    // 1. Generate cryptographic WireGuard keypair in background
+    const kp = await api.post<Keypair>('/api/v1/control/keypair')
+
+    // 2. Connect / Provision device
+    const config = await api.post<ConnectionConfig>('/api/v1/control/connections', {
+      server_id: form.value.server_id || undefined,
+      device_name: name,
+      public_key: kp.public_key,
+    })
+
+    savePrivateKeyForPeer(config.peer_id, kp.private_key)
+
+    // 3. Build text & QR and open modal
+    const text = buildClientConfigText(config, kp.private_key)
+    const qr = await QRCode.toDataURL(text, { errorCorrectionLevel: 'L', scale: 5 })
+
+    form.value.device_name = ''
+    await loadData()
+
+    const createdConn = connections.value.find((c) => c.id === config.peer_id) || {
+      id: config.peer_id,
+      user_id: '',
+      server_id: form.value.server_id || servers.value[0]?.id || '',
+      public_key: kp.public_key,
+      assigned_ip: config.peer_ip,
+      device_name: name,
+      is_active: true,
+      last_handshake: null,
+      bytes_sent: 0,
+      bytes_received: 0,
+      created_at: new Date().toISOString(),
+      expires_at: null,
+    }
+
+    deviceModal.value = {
+      open: true,
+      loading: false,
+      conn: createdConn,
+      configText: text,
+      qrUrl: qr,
+      copied: false,
+    }
+
+    showNotification('success', t('connectionsView.connectedSuccess'))
+  } catch (e: any) {
+    showNotification('error', e.message)
+  } finally {
+    connecting.value = false
+  }
+}
+
+async function openDeviceDetail(conn: Connection) {
+  deviceModal.value = {
+    open: true,
+    loading: true,
+    conn,
+    configText: '',
+    qrUrl: '',
+    copied: false,
+  }
+
+  try {
+    const res = await api.fetchRaw(`/api/v1/control/connections/${conn.id}/config`)
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: `Request failed: ${res.status}` }))
-      throw new Error(err.error || `Request failed: ${res.status}`)
+      throw new Error(`Error al obtener configuración: ${res.status}`)
     }
 
     let text = await res.text()
-    const privateKey = getPrivateKeyForPeer(id)
+    const privateKey = getPrivateKeyForPeer(conn.id)
     if (privateKey) {
       text = text.replace('PrivateKey = <YOUR_PRIVATE_KEY>', `PrivateKey = ${privateKey}`)
     }
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `wg-${deviceName || id.slice(0, 8)}.conf`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
-  } catch (e: any) {
-    showNotification('error', e.message)
-  }
-}
 
-// --- QR Modal ---
-
-async function openQRModal(id: string, deviceName: string) {
-  qrModal.value = { open: true, url: '', loading: true, deviceName: deviceName || id.slice(0, 8) }
-  try {
-    const res = await api.fetchRaw(`/api/v1/control/connections/${id}/qr`)
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: `Request failed: ${res.status}` }))
-      throw new Error(err.error || `Request failed: ${res.status}`)
-    }
-    const blob = await res.blob()
-    qrModal.value.url = URL.createObjectURL(blob)
+    deviceModal.value.configText = text
+    deviceModal.value.qrUrl = await QRCode.toDataURL(text, { errorCorrectionLevel: 'L', scale: 5 })
   } catch (e: any) {
-    showNotification('error', e.message)
-    qrModal.value.open = false
+    showNotification('error', e.message || 'Error al cargar detalles del dispositivo')
   } finally {
-    qrModal.value.loading = false
+    deviceModal.value.loading = false
   }
 }
 
-function closeQRModal() {
-  if (qrModal.value.url) URL.revokeObjectURL(qrModal.value.url)
-  qrModal.value = { open: false, url: '', loading: false, deviceName: '' }
+function closeDeviceModal() {
+  if (deviceModal.value.qrUrl) URL.revokeObjectURL(deviceModal.value.qrUrl)
+  deviceModal.value = {
+    open: false,
+    loading: false,
+    conn: null,
+    configText: '',
+    qrUrl: '',
+    copied: false,
+  }
 }
 
-function downloadModalQR() {
-  if (!qrModal.value.url) return
+function copyDeviceModalConfig() {
+  if (!deviceModal.value.configText) return
+  navigator.clipboard.writeText(deviceModal.value.configText)
+  deviceModal.value.copied = true
+  showNotification('success', t('connectionsView.copied'))
+  if (clipboardTimer) clearTimeout(clipboardTimer)
+  clipboardTimer = setTimeout(() => {
+    deviceModal.value.copied = false
+  }, 3000)
+}
+
+function downloadDeviceModalConfig() {
+  if (!deviceModal.value.configText || !deviceModal.value.conn) return
+  const blob = new Blob([deviceModal.value.configText], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
-  link.href = qrModal.value.url
-  link.download = `wg-${qrModal.value.deviceName}-qr.png`
+  link.href = url
+  link.download = `wg-${deviceModal.value.conn.device_name || deviceModal.value.conn.id.slice(0, 8)}.conf`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+function downloadDeviceModalQR() {
+  if (!deviceModal.value.qrUrl || !deviceModal.value.conn) return
+  const link = document.createElement('a')
+  link.href = deviceModal.value.qrUrl
+  link.download = `wg-${deviceModal.value.conn.device_name || deviceModal.value.conn.id.slice(0, 8)}-qr.png`
   document.body.appendChild(link)
   link.click()
   link.remove()
 }
+
+async function disconnect(id: string) {
+  if (!confirm(t('connectionsView.disconnectConfirm'))) return
+  try {
+    await api.delete(`/api/v1/control/connections/${id}`)
+    if (deviceModal.value.open && deviceModal.value.conn?.id === id) {
+      closeDeviceModal()
+    }
+    await loadData()
+    showNotification('success', 'Dispositivo desconectado correctamente')
+  } catch (e: any) {
+    showNotification('error', e.message)
+  }
+}
+
+async function deleteConnection(id: string) {
+  if (!confirm(t('connectionsView.deleteConfirm'))) return
+  try {
+    await api.delete(`/api/v1/control/connections/${id}/device`)
+    if (deviceModal.value.open && deviceModal.value.conn?.id === id) {
+      closeDeviceModal()
+    }
+    await loadData()
+    showNotification('success', 'Dispositivo eliminado')
+  } catch (e: any) {
+    showNotification('error', e.message)
+  }
+}
+
+function serverName(id: string): string {
+  return servers.value.find((s) => s.id === id)?.name || id.slice(0, 8)
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+}
 </script>
 
 <template>
-  <div>
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">{{ t('connectionsView.title') }}</h1>
+  <div class="space-y-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight text-white">{{ t('connectionsView.title') }}</h1>
+        <p class="text-sm text-slate-400 mt-1">Configura y administra tus perfiles y túneles de WireGuard</p>
+      </div>
+    </div>
 
     <!-- Inline notification -->
     <Transition name="fade">
       <div
         v-if="notification"
         :class="notification.type === 'success'
-          ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300'
-          : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'"
-        class="border rounded-lg px-4 py-3 mb-4 text-sm flex items-center justify-between"
+          ? 'bg-midori-950/50 border-midori-700/60 text-midori-200'
+          : 'bg-rose-950/50 border-rose-700/60 text-rose-200'"
+        class="border rounded-2xl px-5 py-4 text-sm flex items-center justify-between shadow-lg"
       >
         <span>{{ notification.message }}</span>
         <button @click="notification = null" class="ml-3 opacity-60 hover:opacity-100 text-lg leading-none">&times;</button>
       </div>
     </Transition>
 
-    <!-- Connect form -->
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-6">
-      <h2 class="text-lg font-semibold mb-4 dark:text-gray-100">{{ t('connectionsView.newConnection') }}</h2>
-      <form @submit.prevent="connect" class="space-y-4">
-        <p class="text-xs text-gray-500 dark:text-gray-400">
-          {{ t('connectionsView.provisionDescription') }}
-        </p>
+    <!-- Connect / Create device form -->
+    <div class="bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 p-6 md:p-8 backdrop-blur-xl">
+      <h2 class="text-xl font-bold text-white mb-2">{{ t('connectionsView.newConnection') }}</h2>
+      <p class="text-xs text-slate-400 mb-6">
+        Selecciona un servidor y asigna un nombre a tu dispositivo. Las claves WireGuard y el perfil se generarán automáticamente.
+      </p>
 
-        <!-- Server + device name -->
-        <div class="flex flex-col sm:flex-row gap-3">
-          <select
-            v-model="form.server_id"
-            class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm flex-1 bg-white dark:bg-gray-700 dark:text-gray-200"
-          >
-            <option value="">{{ t('connectionsView.autoServer') }}</option>
-            <option v-for="s in servers" :key="s.id" :value="s.id">
-              {{ s.name }} ({{ s.location }}) — {{ s.current_peers }}/{{ s.max_peers }}
-              {{ serverPing[s.id] ? (serverPing[s.id].available ? ` · ${serverPing[s.id].latency_ms}ms` : ` · ${t('connectionsView.unavailableLabel')}`) : '' }}
-            </option>
-          </select>
-          <input
-            v-model="form.device_name"
-            :placeholder="t('connectionsView.deviceNamePlaceholder')"
-            class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm flex-1 bg-white dark:bg-gray-700 dark:text-gray-200"
-          />
+      <form @submit.prevent="handleCreateDevice" class="space-y-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Server selection -->
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('common.server') }}</label>
+            <select
+              v-model="form.server_id"
+              class="w-full border border-slate-700/80 bg-slate-950/60 text-white rounded-xl px-4 py-2.5 text-sm outline-none focus:border-midori-500 transition-colors"
+            >
+              <option value="" class="bg-slate-900 text-slate-100">{{ t('connectionsView.autoServer') }}</option>
+              <option v-for="s in servers" :key="s.id" :value="s.id" class="bg-slate-900 text-slate-100">
+                {{ s.name }} ({{ s.location }}) — {{ s.current_peers }}/{{ s.max_peers }}
+                {{ serverPing[s.id] ? (serverPing[s.id].available ? ` · ${serverPing[s.id].latency_ms}ms` : ` · ${t('connectionsView.unavailableLabel')}`) : '' }}
+              </option>
+            </select>
+          </div>
+
+          <!-- Device name -->
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('common.device') }}</label>
+            <input
+              v-model="form.device_name"
+              :placeholder="t('connectionsView.deviceNamePlaceholder')"
+              required
+              class="w-full border bg-slate-950/60 text-white rounded-xl px-4 py-2.5 text-sm outline-none transition-colors"
+              :class="isDuplicateDeviceName ? 'border-rose-500/80 focus:border-rose-500' : 'border-slate-700/80 focus:border-midori-500'"
+            />
+            <p v-if="isDuplicateDeviceName" class="text-xs text-rose-400 mt-1 font-medium">
+              Ya tienes un dispositivo activo con este nombre. Elige otro nombre.
+            </p>
+          </div>
         </div>
 
         <!-- Warnings -->
-        <div v-if="servers.length === 0" class="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+        <div v-if="servers.length === 0" class="text-xs text-amber-300 bg-amber-950/30 border border-amber-800/40 rounded-xl px-4 py-3">
           {{ t('connectionsView.noActiveServers') }}
         </div>
-        <div v-else-if="availableServerCount() === 0" class="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+        <div v-else-if="availableServerCount() === 0" class="text-xs text-amber-300 bg-amber-950/30 border border-amber-800/40 rounded-xl px-4 py-3">
           {{ t('connectionsView.noRespondingServers') }}
         </div>
-        <div v-if="selectedServerUnavailable()" class="text-xs text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
+        <div v-if="selectedServerUnavailable()" class="text-xs text-rose-300 bg-rose-950/30 border border-rose-800/40 rounded-xl px-4 py-3">
           {{ t('connectionsView.serverUnavailable') }}
         </div>
 
-        <!-- Public key + generate + provision -->
-        <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-          <div class="relative flex-1">
-            <input
-              v-model="form.public_key"
-              :placeholder="t('connectionsView.publicKeyPlaceholder')"
-              required
-              class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm font-mono bg-white dark:bg-gray-700 dark:text-gray-200 pr-28"
-            />
-            <span
-              v-if="generatedPrivateKey"
-              class="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-0.5 rounded-full"
-            >
-              ✓ {{ t('connectionsView.keyGenerated') }}
-            </span>
-          </div>
-          <button
-            type="button"
-            :disabled="generatingKeypair"
-            @click="generateKeypair"
-            class="border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap text-sm"
-          >
-            {{ generatingKeypair ? t('connectionsView.generatingKeys') : t('connectionsView.generateKey') }}
-          </button>
+        <div class="flex justify-end pt-2">
           <button
             type="submit"
-            :disabled="connecting || !canProvision()"
-            class="bg-midori-600 hover:bg-midori-700 text-white font-medium px-6 py-2 rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap text-sm"
+            :disabled="connecting || isDuplicateDeviceName || !form.device_name.trim() || availableServerCount() === 0"
+            class="bg-midori-600 hover:bg-midori-500 text-white font-semibold px-8 py-2.5 rounded-xl transition-all disabled:opacity-50 text-sm shadow-lg shadow-midori-900/30 cursor-pointer inline-flex items-center gap-2"
           >
-            {{ connecting ? t('common.connecting') : t('connectionsView.provisionProfile') }}
+            <span v-if="connecting" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+            <span>{{ connecting ? 'Creando...' : 'Crear' }}</span>
           </button>
         </div>
       </form>
     </div>
 
-    <!-- WireGuard config result with QR -->
-    <div v-if="lastConfig" class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-6 mb-6">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="font-semibold text-green-800 dark:text-green-400">{{ t('connectionsView.configTitle') }}</h3>
-        <div class="flex items-center gap-3">
-          <button @click="copyConfig" class="text-sm text-green-700 dark:text-green-400 hover:text-green-900 dark:hover:text-green-200 font-medium">
-            {{ t('common.copy') }}
-          </button>
-          <button @click="downloadGeneratedConfig" class="text-sm text-green-700 dark:text-green-400 hover:text-green-900 dark:hover:text-green-200 font-medium">
-            {{ t('connectionsView.downloadConf') }}
-          </button>
-          <button v-if="provisionQRUrl" @click="downloadProvisionQR" class="text-sm text-green-700 dark:text-green-400 hover:text-green-900 dark:hover:text-green-200 font-medium">
-            {{ t('connectionsView.downloadQR') }}
-          </button>
-        </div>
-      </div>
-      <p class="text-xs text-green-800 dark:text-green-300 mb-3">
-        {{ t('connectionsView.configPrivateKeyHint') }}
-      </p>
-      <div class="flex flex-col md:flex-row gap-4">
-        <!-- Config text -->
-        <pre class="text-xs bg-white dark:bg-gray-800 rounded-lg p-4 font-mono text-gray-700 dark:text-gray-300 overflow-x-auto flex-1 min-w-0">{{ buildClientConfig(lastConfig) }}</pre>
-        <!-- QR code -->
-        <div class="flex-shrink-0 flex flex-col items-center justify-center">
-          <div v-if="provisionQRLoading" class="w-48 h-48 flex items-center justify-center">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-          </div>
-          <img
-            v-else-if="provisionQRUrl"
-            :src="provisionQRUrl"
-            alt="WireGuard QR Code"
-            class="w-48 h-48 rounded-lg border border-green-200 dark:border-green-700 bg-white"
-          />
-        </div>
-      </div>
-      <button @click="closeProvisionConfig" class="mt-4 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
-        {{ t('connectionsView.closeConfig') }}
-      </button>
-    </div>
-
     <!-- Loading -->
-    <div v-if="loading" class="flex justify-center py-12">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
+    <div v-if="loading" class="flex justify-center py-16">
+      <div class="animate-spin rounded-full h-9 w-9 border-b-2 border-midori-500"></div>
     </div>
 
     <!-- Empty state -->
-    <div v-else-if="connections.length === 0" class="text-center py-12 text-gray-400 dark:text-gray-500">
+    <div v-else-if="connections.length === 0" class="rounded-3xl border border-slate-800 bg-slate-900/60 p-12 text-center text-slate-400">
       {{ t('connectionsView.empty') }}
     </div>
 
-    <!-- Connections: responsive (mobile cards + desktop table) -->
-    <div v-else>
+    <!-- Connections: Responsive (Mobile cards + Desktop table) -->
+    <div v-else class="space-y-4">
+      <div class="flex items-center justify-between px-2">
+        <p class="text-xs text-slate-400">
+          Haz clic sobre cualquier dispositivo para ver su código QR y archivo de configuración.
+        </p>
+      </div>
+
       <!-- Mobile cards -->
       <div class="sm:hidden space-y-3">
         <div
           v-for="conn in connections"
           :key="conn.id"
-          class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4 shadow-sm"
+          @click="openDeviceDetail(conn)"
+          class="bg-slate-900/80 rounded-2xl border border-slate-800 p-5 shadow-lg hover:border-slate-700 hover:bg-slate-850/80 transition-all cursor-pointer"
         >
           <div class="flex items-start justify-between mb-2">
             <div>
-              <p class="font-semibold text-gray-900 dark:text-gray-100 text-sm">
+              <p class="font-bold text-white text-base flex items-center gap-2">
                 {{ conn.device_name || t('common.unnamed') }}
+                <svg class="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
               </p>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                {{ serverName(conn.server_id) }} · <span class="font-mono">{{ conn.assigned_ip.replace('/32','') }}</span>
+              <p class="text-xs text-slate-400 mt-0.5">
+                {{ serverName(conn.server_id) }} · <span class="font-mono text-midori-400">{{ conn.assigned_ip.replace('/32','') }}</span>
               </p>
             </div>
             <span
-              :class="conn.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'"
-              class="text-xs font-medium px-2 py-1 rounded-full ml-2 whitespace-nowrap"
+              :class="conn.is_active ? 'bg-midori-950/60 border-midori-700/50 text-midori-300' : 'bg-slate-800 border-slate-700 text-slate-400'"
+              class="text-xs font-semibold px-2.5 py-1 rounded-full border ml-2 whitespace-nowrap"
             >
               {{ conn.is_active ? t('common.active') : t('common.inactive') }}
             </span>
           </div>
-          <p class="text-xs text-gray-400 dark:text-gray-500 mb-3">
-            ↑{{ formatBytes(conn.bytes_sent) }} ↓{{ formatBytes(conn.bytes_received) }}
+
+          <p class="text-xs text-slate-400 mb-4 font-mono">
+            ↑{{ formatBytes(conn.bytes_sent) }} · ↓{{ formatBytes(conn.bytes_received) }}
           </p>
-          <div class="flex items-center gap-4 border-t border-gray-100 dark:border-gray-700 pt-3">
+
+          <div class="flex items-center gap-3 border-t border-slate-800 pt-3">
+            <button
+              @click.stop="openDeviceDetail(conn)"
+              class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-xs text-cyan-400 hover:text-white font-medium transition-colors"
+            >
+              Ver QR / .conf
+            </button>
             <template v-if="conn.is_active">
               <button
-                @click="downloadConfig(conn.id, conn.device_name)"
-                class="text-xs text-midori-600 hover:text-midori-700 dark:text-midori-400 dark:hover:text-midori-300 font-medium transition-colors"
-              >
-                .conf
-              </button>
-              <button
-                @click="openQRModal(conn.id, conn.device_name)"
-                class="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
-              >
-                QR
-              </button>
-              <button
-                @click="disconnect(conn.id)"
-                class="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-medium transition-colors"
+                @click.stop="disconnect(conn.id)"
+                class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-xs text-amber-400 hover:text-white font-medium transition-colors"
               >
                 {{ t('common.disconnect') }}
               </button>
             </template>
             <button
-              @click="deleteConnection(conn.id)"
-              class="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200 font-medium transition-colors ml-auto"
+              @click.stop="deleteConnection(conn.id)"
+              class="text-xs text-rose-400 hover:text-rose-300 font-medium transition-colors ml-auto"
             >
               {{ t('connectionsView.deleteDevice') }}
             </button>
@@ -535,62 +499,66 @@ function downloadModalQR() {
       </div>
 
       <!-- Desktop table -->
-      <div class="hidden sm:block bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+      <div class="hidden sm:block bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 overflow-hidden backdrop-blur-xl">
         <table class="w-full text-sm">
-          <thead class="bg-gray-50 dark:bg-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          <thead class="bg-slate-950/60 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
             <tr>
-              <th class="px-6 py-3">{{ t('common.device') }}</th>
-              <th class="px-6 py-3">{{ t('common.server') }}</th>
-              <th class="px-6 py-3">{{ t('common.ip') }}</th>
-              <th class="px-6 py-3 hidden md:table-cell">{{ t('connectionsView.trafficHeader') }}</th>
-              <th class="px-6 py-3">{{ t('common.status') }}</th>
-              <th class="px-6 py-3"></th>
+              <th class="px-6 py-4">{{ t('common.device') }}</th>
+              <th class="px-6 py-4">{{ t('common.server') }}</th>
+              <th class="px-6 py-4">{{ t('common.ip') }}</th>
+              <th class="px-6 py-4 hidden md:table-cell">{{ t('connectionsView.trafficHeader') }}</th>
+              <th class="px-6 py-4">{{ t('common.status') }}</th>
+              <th class="px-6 py-4 text-right"></th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
-            <tr v-for="conn in connections" :key="conn.id" class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-              <td class="px-6 py-4 text-gray-900 dark:text-gray-100">{{ conn.device_name || t('common.unnamed') }}</td>
-              <td class="px-6 py-4 font-medium text-gray-700 dark:text-gray-300">{{ serverName(conn.server_id) }}</td>
-              <td class="px-6 py-4 font-mono text-gray-600 dark:text-gray-400 text-xs">{{ conn.assigned_ip.replace('/32','') }}</td>
-              <td class="px-6 py-4 text-gray-500 dark:text-gray-400 hidden md:table-cell text-xs">
-                ↑{{ formatBytes(conn.bytes_sent) }} ↓{{ formatBytes(conn.bytes_received) }}
+          <tbody class="divide-y divide-slate-800/60">
+            <tr
+              v-for="conn in connections"
+              :key="conn.id"
+              @click="openDeviceDetail(conn)"
+              class="hover:bg-slate-800/60 transition-colors cursor-pointer group"
+            >
+              <td class="px-6 py-4 font-semibold text-white group-hover:text-midori-300 transition-colors flex items-center gap-2">
+                {{ conn.device_name || t('common.unnamed') }}
+                <svg class="w-3.5 h-3.5 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </td>
+              <td class="px-6 py-4 font-medium text-slate-300">{{ serverName(conn.server_id) }}</td>
+              <td class="px-6 py-4 font-mono text-midori-300 text-xs">{{ conn.assigned_ip.replace('/32','') }}</td>
+              <td class="px-6 py-4 text-slate-400 hidden md:table-cell text-xs font-mono">
+                ↑{{ formatBytes(conn.bytes_sent) }} · ↓{{ formatBytes(conn.bytes_received) }}
               </td>
               <td class="px-6 py-4">
                 <span
-                  :class="conn.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'"
-                  class="text-xs font-medium px-2 py-1 rounded-full"
+                  :class="conn.is_active ? 'bg-midori-950/60 border-midori-700/50 text-midori-300' : 'bg-slate-800 border-slate-700 text-slate-400'"
+                  class="text-xs font-semibold px-2.5 py-1 rounded-full border"
                 >
                   {{ conn.is_active ? t('common.active') : t('common.inactive') }}
                 </span>
               </td>
               <td class="px-6 py-4 text-right">
-                <div class="flex items-center justify-end gap-3">
+                <div class="flex items-center justify-end gap-2">
+                  <button
+                    @click.stop="openDeviceDetail(conn)"
+                    class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800/80 text-xs font-medium text-cyan-400 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer"
+                  >
+                    Ver QR / .conf
+                  </button>
                   <template v-if="conn.is_active">
                     <button
-                      @click="downloadConfig(conn.id, conn.device_name)"
-                      class="text-xs text-midori-600 hover:text-midori-700 dark:text-midori-400 dark:hover:text-midori-300 transition-colors"
-                    >
-                      .conf
-                    </button>
-                    <button
-                      @click="openQRModal(conn.id, conn.device_name)"
-                      class="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-                    >
-                      QR
-                    </button>
-                    <button
-                      @click="disconnect(conn.id)"
-                      class="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                      @click.stop="disconnect(conn.id)"
+                      class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800/80 text-xs font-medium text-amber-400 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer"
                     >
                       {{ t('common.disconnect') }}
                     </button>
                   </template>
                   <button
-                    @click="deleteConnection(conn.id)"
-                    class="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200 transition-colors"
+                    @click.stop="deleteConnection(conn.id)"
+                    class="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/30 transition-colors cursor-pointer"
                     :title="t('connectionsView.deleteDevice')"
                   >
-                    &#x1F5D1;
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                   </button>
                 </div>
               </td>
@@ -600,50 +568,117 @@ function downloadModalQR() {
       </div>
     </div>
 
-    <!-- QR Modal -->
+    <!-- Unified Device Card / Modal -->
     <Teleport to="body">
       <Transition name="fade">
         <div
-          v-if="qrModal.open"
-          class="fixed inset-0 z-50 flex items-center justify-center"
-          @click.self="closeQRModal"
+          v-if="deviceModal.open"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4"
+          @click.self="closeDeviceModal"
         >
-          <!-- Overlay -->
-          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
-          <!-- Modal content -->
-          <div class="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 flex flex-col items-center gap-4">
+          <!-- Backdrop -->
+          <div class="absolute inset-0 bg-slate-950/85 backdrop-blur-md"></div>
+
+          <!-- Modal Card Container -->
+          <div class="relative bg-slate-900 border border-slate-800/90 rounded-3xl shadow-2xl p-6 md:p-8 max-w-2xl w-full mx-4 flex flex-col gap-6 text-left max-h-[90vh] overflow-y-auto">
+            <!-- Close button -->
             <button
-              @click="closeQRModal"
-              class="absolute top-3 right-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none"
+              @click="closeDeviceModal"
+              class="absolute top-5 right-5 text-slate-400 hover:text-white text-2xl leading-none cursor-pointer"
             >
               &times;
             </button>
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {{ qrModal.deviceName }}
-            </h3>
-            <div v-if="qrModal.loading" class="w-64 h-64 flex items-center justify-center">
-              <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-midori-600"></div>
+
+            <!-- Header -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pr-8">
+              <div>
+                <div class="flex items-center gap-2.5">
+                  <h3 class="text-2xl font-bold text-white">
+                    {{ deviceModal.conn?.device_name || 'Dispositivo WireGuard' }}
+                  </h3>
+                  <span
+                    :class="deviceModal.conn?.is_active ? 'bg-midori-950/60 border-midori-700/50 text-midori-300' : 'bg-slate-800 border-slate-700 text-slate-400'"
+                    class="text-xs font-semibold px-2.5 py-0.5 rounded-full border"
+                  >
+                    {{ deviceModal.conn?.is_active ? 'Activo' : 'Inactivo' }}
+                  </span>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">
+                  Servidor: <span class="text-slate-200 font-medium">{{ serverName(deviceModal.conn?.server_id || '') }}</span> ·
+                  IP: <span class="font-mono text-midori-300">{{ deviceModal.conn?.assigned_ip.replace('/32','') }}</span>
+                </p>
+              </div>
+
+              <!-- Quick action buttons -->
+              <div class="flex items-center gap-2">
+                <button
+                  @click="copyDeviceModalConfig"
+                  class="px-3 py-1.5 rounded-xl border border-midori-700/50 bg-midori-900/40 text-xs font-semibold text-midori-300 hover:bg-midori-900/70 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                  {{ deviceModal.copied ? '¡Copiado!' : 'Copiar' }}
+                </button>
+                <button
+                  @click="downloadDeviceModalConfig"
+                  class="px-3 py-1.5 rounded-xl border border-midori-700/50 bg-midori-900/40 text-xs font-semibold text-midori-300 hover:bg-midori-900/70 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                  .conf
+                </button>
+                <button
+                  v-if="deviceModal.qrUrl"
+                  @click="downloadDeviceModalQR"
+                  class="px-3 py-1.5 rounded-xl border border-cyan-700/50 bg-cyan-950/40 text-xs font-semibold text-cyan-300 hover:bg-cyan-900/70 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  QR
+                </button>
+              </div>
             </div>
-            <img
-              v-else-if="qrModal.url"
-              :src="qrModal.url"
-              alt="WireGuard QR Code"
-              class="w-64 h-64 rounded-lg border border-gray-200 dark:border-gray-600 bg-white"
-            />
-            <div class="flex gap-3">
-              <button
-                v-if="qrModal.url"
-                @click="downloadModalQR"
-                class="bg-midori-600 hover:bg-midori-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-              >
-                {{ t('connectionsView.downloadQR') }}
-              </button>
-              <button
-                @click="closeQRModal"
-                class="border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-              >
-                {{ t('connectionsView.closeModal') }}
-              </button>
+
+            <!-- Modal Body (Config & QR) -->
+            <div v-if="deviceModal.loading" class="flex justify-center py-16">
+              <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-midori-500"></div>
+            </div>
+
+            <div v-else class="flex flex-col md:flex-row gap-6">
+              <!-- Config code block -->
+              <div class="flex-1 min-w-0 flex flex-col">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Configuración WireGuard</label>
+                <pre class="text-xs bg-slate-950 border border-slate-800/90 rounded-2xl p-4 font-mono text-midori-200 overflow-x-auto flex-1 shadow-inner leading-relaxed select-all">{{ deviceModal.configText }}</pre>
+              </div>
+
+              <!-- QR Code Card -->
+              <div class="flex-shrink-0 flex flex-col items-center justify-center p-4 bg-slate-950/80 border border-slate-800 rounded-2xl">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Escanear en Móvil</label>
+                <img
+                  v-if="deviceModal.qrUrl"
+                  :src="deviceModal.qrUrl"
+                  alt="WireGuard QR Code"
+                  class="w-44 h-44 rounded-xl border border-white/10 bg-white p-2 shadow-md"
+                />
+              </div>
+            </div>
+
+            <!-- Footer Stats & Management Actions -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-800/80 pt-4 text-xs text-slate-400">
+              <div class="font-mono">
+                Tráfico: ↑{{ formatBytes(deviceModal.conn?.bytes_sent || 0) }} · ↓{{ formatBytes(deviceModal.conn?.bytes_received || 0) }}
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  v-if="deviceModal.conn?.is_active"
+                  @click="disconnect(deviceModal.conn.id)"
+                  class="px-3 py-1.5 rounded-xl border border-amber-700/50 bg-amber-950/40 text-amber-300 hover:bg-amber-900/60 font-semibold transition-colors cursor-pointer"
+                >
+                  Desconectar
+                </button>
+                <button
+                  @click="deleteConnection(deviceModal.conn?.id || '')"
+                  class="px-3 py-1.5 rounded-xl border border-rose-800/50 bg-rose-950/40 text-rose-300 hover:bg-rose-900/60 font-semibold transition-colors cursor-pointer"
+                >
+                  Eliminar dispositivo
+                </button>
+              </div>
             </div>
           </div>
         </div>
