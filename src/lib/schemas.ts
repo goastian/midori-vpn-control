@@ -75,6 +75,7 @@ export const ConnectionConfigSchema = z.object({
   peer_ip: z.string(),
   server_public_key: z.string(),
   server_endpoint: z.string(),
+  preshared_key: z.string().optional(),
   dns: z.string(),
   allowed_ips: z.string(),
 })
