@@ -222,11 +222,13 @@ function scrollTo(id: string) {
           </div>
 
           <!-- Desktop links -->
-          <div class="hidden md:flex items-center gap-8">
+          <div class="hidden md:flex items-center gap-6">
             <button @click="scrollTo('features')" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">{{ t('landing.featuresNav') }}</button>
             <button @click="scrollTo('pricing')" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">{{ t('landing.pricingNav') }}</button>
             <button @click="scrollTo('trust')" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">{{ t('landing.securityNav') }}</button>
-            <LanguageSelector tone="dark" />
+            <div class="w-36">
+              <LanguageSelector tone="dark" />
+            </div>
             <button @click="handleLogin" class="text-sm font-medium text-gray-400 hover:text-white transition-colors cursor-pointer">{{ t('landing.login') }}</button>
             <button @click="handleLogin" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-midori-500 rounded-lg hover:bg-midori-600 transition-colors shadow-sm cursor-pointer">
               {{ t('landing.getStarted') }}
@@ -252,11 +254,13 @@ function scrollTo(id: string) {
         leave-from-class="opacity-100 translate-y-0"
         leave-to-class="opacity-0 -translate-y-2"
       >
-        <div v-if="mobileMenuOpen" class="md:hidden bg-gray-900 border-b border-gray-800 px-4 pb-4 space-y-2">
-          <LanguageSelector tone="dark" />
+        <div v-if="mobileMenuOpen" class="md:hidden border-t border-gray-800 bg-gray-900/95 backdrop-blur-lg px-4 py-4 space-y-3">
           <button @click="scrollTo('features')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">{{ t('landing.featuresNav') }}</button>
           <button @click="scrollTo('pricing')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">{{ t('landing.pricingNav') }}</button>
           <button @click="scrollTo('trust')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">{{ t('landing.securityNav') }}</button>
+          <div class="px-2 py-1">
+            <LanguageSelector tone="dark" />
+          </div>
           <button @click="handleLogin" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800 cursor-pointer">{{ t('landing.login') }}</button>
           <button @click="handleLogin" class="block w-full text-center px-4 py-2 text-sm font-semibold text-white bg-midori-500 rounded-lg cursor-pointer">{{ t('landing.getStarted') }}</button>
         </div>

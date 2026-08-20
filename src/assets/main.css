@@ -49,3 +49,36 @@ body {
     transform: translateY(0);
   }
 }
+
+/* ─── Consolidated Obsidian Dark & Glassmorphism Utilities ─── */
+.glass-panel {
+  @apply bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 backdrop-blur-xl;
+}
+
+.glass-card {
+  @apply bg-slate-900/80 rounded-2xl shadow-lg border border-slate-800/80 backdrop-blur-xl transition-all;
+}
+
+.glass-input {
+  @apply bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-midori-500 focus:ring-1 focus:ring-midori-500 transition-colors;
+}
+
+.btn-primary {
+  @apply bg-midori-600 hover:bg-midori-500 text-white font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-midori-950/40 transition-all cursor-pointer inline-flex items-center justify-center gap-2;
+}
+
+.btn-secondary {
+  @apply bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold px-5 py-2.5 rounded-xl border border-slate-700/80 transition-all cursor-pointer inline-flex items-center justify-center gap-2;
+}
+
+.badge-active {
+  @apply bg-midori-950/60 border border-midori-700/50 text-midori-300 font-semibold text-xs px-2.5 py-1 rounded-full inline-flex items-center gap-1.5;
+}
+
+.badge-inactive {
+  @apply bg-slate-800/80 border border-slate-700 text-slate-400 font-semibold text-xs px-2.5 py-1 rounded-full inline-flex items-center gap-1.5;
+}
+
+.badge-danger {
+  @apply bg-rose-950/60 border border-rose-800/50 text-rose-300 font-semibold text-xs px-2.5 py-1 rounded-full inline-flex items-center gap-1.5;
+}

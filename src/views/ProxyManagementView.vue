@@ -1,16 +1,16 @@
 <template>
-  <div class="max-w-5xl mx-auto p-6 space-y-6">
-    <div class="flex items-center justify-between">
+  <div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-slate-900 dark:text-white">Credenciales Proxy para Extensión</h1>
-        <p class="text-sm text-slate-500 dark:text-slate-400">
-          Gestiona tokens efímeros seguros (aud=vpn-proxy) y túneles HTTPS CONNECT para extensiones de navegador.
+        <h1 class="text-3xl font-bold tracking-tight text-white">Credenciales Proxy para Extensión</h1>
+        <p class="text-sm text-slate-400 mt-1">
+          Gestiona tokens efímeros seguros (<code class="text-midori-400 font-mono">aud=vpn-proxy</code>) y túneles HTTPS CONNECT para extensiones de navegador.
         </p>
       </div>
       <button
         @click="generateCredentials"
         :disabled="loading"
-        class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg shadow transition disabled:opacity-50 flex items-center space-x-2"
+        class="inline-flex items-center gap-2 px-5 py-2.5 bg-midori-600 hover:bg-midori-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-midori-900/30 transition-all disabled:opacity-50 cursor-pointer self-start sm:self-auto"
       >
         <span v-if="loading" class="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full"></span>
         <span>Generar Nueva Credencial</span>
@@ -18,54 +18,55 @@
     </div>
 
     <!-- Active Credential Card -->
-    <div v-if="credential" class="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+    <div v-if="credential" class="bg-slate-900/80 rounded-3xl p-6 md:p-8 border border-slate-800/80 shadow-xl shadow-black/30 backdrop-blur-xl space-y-6">
       <div class="flex items-center justify-between">
-        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-midori-950/60 border border-midori-700/50 text-midori-300">
+          <span class="w-1.5 h-1.5 rounded-full bg-midori-400 animate-pulse"></span>
           Token Activo (HTTPS CONNECT)
         </span>
-        <span class="text-xs text-slate-500">Expira en: {{ formatExpiresIn(credential.expires_in) }}</span>
+        <span class="text-xs text-slate-400 font-mono">Expira en: {{ formatExpiresIn(credential.expires_in) }}</span>
       </div>
 
-      <div class="space-y-1">
-        <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Proxy Token</label>
-        <div class="flex items-center space-x-2">
+      <div class="space-y-2">
+        <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Proxy Token</label>
+        <div class="flex items-center gap-3">
           <input
             type="password"
             readonly
             :value="credential.proxy_token"
-            class="flex-1 px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 font-mono"
+            class="flex-1 px-4 py-2.5 text-sm bg-slate-950/60 border border-slate-700/80 rounded-xl text-slate-200 font-mono outline-none"
           />
           <button
             @click="copyToken"
-            class="px-3 py-2 text-xs bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg font-medium transition"
+            class="px-4 py-2.5 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl font-semibold text-slate-200 transition cursor-pointer"
           >
-            {{ copied ? 'Copiado' : 'Copiar' }}
+            {{ copied ? '✓ Copiado' : 'Copiar' }}
           </button>
         </div>
       </div>
 
       <!-- Proxy Endpoints List -->
-      <div class="space-y-2">
-        <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Endpoints Disponibles</label>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div class="space-y-3 pt-2">
+        <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Endpoints Disponibles</label>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div
             v-for="ep in credential.proxy_endpoints"
             :key="ep.host"
-            class="p-3 bg-slate-50 dark:bg-slate-900/60 rounded-lg border border-slate-100 dark:border-slate-800 flex items-center justify-between text-sm"
+            class="p-4 bg-slate-950/60 rounded-2xl border border-slate-800 flex items-center justify-between text-sm hover:border-slate-700 transition-all"
           >
-            <div class="flex items-center space-x-2">
-              <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span class="font-medium text-slate-800 dark:text-slate-200">{{ ep.host }}:{{ ep.port }}</span>
+            <div class="flex items-center gap-3">
+              <span class="w-2 h-2 rounded-full bg-midori-400"></span>
+              <span class="font-mono text-xs text-white">{{ ep.host }}:{{ ep.port }}</span>
             </div>
-            <span class="text-xs text-slate-500 font-mono uppercase">{{ ep.country_code }}</span>
+            <span class="text-xs text-slate-400 font-mono font-semibold uppercase px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700">{{ ep.country_code }}</span>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="!loading" class="bg-white dark:bg-slate-800 rounded-xl p-12 text-center border border-slate-200 dark:border-slate-700">
-      <p class="text-slate-500 dark:text-slate-400 text-sm">No has generado credenciales de proxy recientes.</p>
+    <div v-else-if="!loading" class="bg-slate-900/60 rounded-3xl p-12 text-center border border-slate-800 text-slate-400 text-sm">
+      <p>No has generado credenciales de proxy recientes.</p>
     </div>
   </div>
 </template>

@@ -43,48 +43,51 @@ function formatBytes(bytes: number): string {
 </script>
 
 <template>
-  <div>
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">{{ t('adminPeers.title') }}</h1>
+  <div class="space-y-6">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight text-white">{{ t('adminPeers.title') }}</h1>
+      <p class="text-sm text-slate-400 mt-1">Monitoreo de todas las sesiones de clientes WireGuard conectadas</p>
+    </div>
 
-    <div v-if="loadError" class="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg text-sm text-red-700 dark:text-red-300 flex items-center justify-between">
+    <div v-if="loadError" class="p-4 bg-rose-950/40 border border-rose-800/50 rounded-2xl text-sm text-rose-300 flex items-center justify-between">
       <span>{{ loadError }}</span>
-      <button @click="loadPeers()" class="text-xs underline ml-3">{{ t('common.retry') }}</button>
+      <button @click="loadPeers()" class="text-xs underline ml-3 font-semibold">{{ t('common.retry') }}</button>
     </div>
 
-    <div v-if="loading" class="flex justify-center py-12">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
+    <div v-if="loading" class="flex justify-center py-16">
+      <div class="animate-spin rounded-full h-9 w-9 border-b-2 border-midori-500"></div>
     </div>
 
-    <div v-else-if="peers.length === 0" class="text-center py-12 text-gray-400 dark:text-gray-500">
+    <div v-else-if="peers.length === 0" class="rounded-3xl border border-slate-800 bg-slate-900/60 p-12 text-center text-slate-400">
       {{ t('adminPeers.empty') }}
     </div>
 
-    <div v-else class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+    <div v-else class="bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 overflow-hidden backdrop-blur-xl">
       <table class="w-full text-sm">
-        <thead class="bg-gray-50 dark:bg-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        <thead class="bg-slate-950/60 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
           <tr>
-            <th class="px-6 py-3">{{ t('common.device') }}</th>
-            <th class="px-6 py-3">{{ t('common.ip') }}</th>
-            <th class="px-6 py-3 hidden md:table-cell">{{ t('common.user') }}</th>
-            <th class="px-6 py-3 hidden md:table-cell">{{ t('common.traffic') }}</th>
-            <th class="px-6 py-3">{{ t('common.status') }}</th>
-            <th class="px-6 py-3"></th>
+            <th class="px-6 py-4">{{ t('common.device') }}</th>
+            <th class="px-6 py-4">{{ t('common.ip') }}</th>
+            <th class="px-6 py-4 hidden md:table-cell">{{ t('common.user') }}</th>
+            <th class="px-6 py-4 hidden md:table-cell">{{ t('common.traffic') }}</th>
+            <th class="px-6 py-4">{{ t('common.status') }}</th>
+            <th class="px-6 py-4 text-right">{{ t('common.actions') }}</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
-          <tr v-for="p in peers" :key="p.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
-            <td class="px-6 py-4 text-gray-900">{{ p.device_name || '—' }}</td>
-            <td class="px-6 py-4 font-mono text-xs text-gray-600 dark:text-gray-400">{{ p.assigned_ip }}</td>
-            <td class="px-6 py-4 hidden md:table-cell text-xs text-gray-500">
+        <tbody class="divide-y divide-slate-800/60">
+          <tr v-for="p in peers" :key="p.id" class="hover:bg-slate-800/50 transition-colors">
+            <td class="px-6 py-4 font-semibold text-white">{{ p.device_name || '—' }}</td>
+            <td class="px-6 py-4 font-mono text-xs text-midori-300">{{ p.assigned_ip }}</td>
+            <td class="px-6 py-4 hidden md:table-cell text-xs text-slate-300">
               {{ p.user_email || p.user_id.slice(0, 8) + '…' }}
             </td>
-            <td class="px-6 py-4 hidden md:table-cell text-xs text-gray-500">
-              ↑{{ formatBytes(p.bytes_sent) }} ↓{{ formatBytes(p.bytes_received) }}
+            <td class="px-6 py-4 hidden md:table-cell text-xs text-slate-400 font-mono">
+              ↑{{ formatBytes(p.bytes_sent) }} · ↓{{ formatBytes(p.bytes_received) }}
             </td>
             <td class="px-6 py-4">
               <span
-                :class="p.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
-                class="text-xs font-medium px-2 py-1 rounded-full"
+                :class="p.is_active ? 'bg-midori-950/60 border-midori-700/50 text-midori-300' : 'bg-slate-800 border-slate-700 text-slate-400'"
+                class="text-xs font-semibold px-2.5 py-1 rounded-full border"
               >
                 {{ p.is_active ? t('common.active') : t('common.inactive') }}
               </span>
@@ -93,7 +96,7 @@ function formatBytes(bytes: number): string {
               <button
                 v-if="p.is_active"
                 @click="forceDisconnect(p.id)"
-                class="text-xs text-red-500 hover:text-red-700"
+                class="px-2.5 py-1 rounded-lg border border-rose-900/40 bg-rose-950/20 text-xs font-medium text-rose-400 hover:bg-rose-900/40 transition cursor-pointer"
               >
                 {{ t('common.disconnect') }}
               </button>

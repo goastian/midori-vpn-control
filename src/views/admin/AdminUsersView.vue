@@ -134,119 +134,136 @@ defineExpose({ deleteUser })
 </script>
 
 <template>
-  <div>
+  <div class="space-y-6">
     <!-- Ban user modal -->
-    <div v-if="confirmBan" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">{{ t('adminUsers.ban') }}</h3>
-        <label class="block text-sm text-gray-700 dark:text-gray-300 mb-1">{{ t('adminUsers.banReasonPrompt') }}</label>
-        <input
-          v-model="banReason"
-          type="text"
-          maxlength="255"
-          class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 mb-2"
-          :class="actionError ? 'border-red-400' : ''"
-          @keyup.enter="executeBanUser"
-        />
-        <p v-if="actionError" class="text-xs text-red-500 mb-3">{{ actionError }}</p>
-        <div class="flex justify-end space-x-3">
-          <button @click="confirmBan = null" class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900">{{ t('common.cancel') }}</button>
-          <button @click="executeBanUser" class="px-4 py-2 text-sm font-medium bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg">{{ t('adminUsers.ban') }}</button>
+    <div v-if="confirmBan" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-slate-950/85 backdrop-blur-md" @click="confirmBan = null"></div>
+      <div class="relative bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl p-6 md:p-8 max-w-sm w-full mx-4 space-y-4">
+        <h3 class="text-xl font-bold text-white">{{ t('adminUsers.ban') }}</h3>
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('adminUsers.banReasonPrompt') }}</label>
+          <input
+            v-model="banReason"
+            type="text"
+            maxlength="255"
+            placeholder="Motivo de suspensión"
+            class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-950/60 text-white outline-none focus:border-amber-500 transition-colors"
+            :class="actionError ? 'border-rose-500' : ''"
+            @keyup.enter="executeBanUser"
+          />
+          <p v-if="actionError" class="text-xs text-rose-400 mt-1">{{ actionError }}</p>
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button @click="confirmBan = null" class="px-4 py-2.5 text-sm font-semibold border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl transition cursor-pointer">{{ t('common.cancel') }}</button>
+          <button @click="executeBanUser" class="px-4 py-2.5 text-sm font-semibold bg-amber-600 hover:bg-amber-500 text-white rounded-xl shadow-lg shadow-amber-900/30 transition cursor-pointer">{{ t('adminUsers.ban') }}</button>
         </div>
       </div>
     </div>
 
     <!-- Delete confirmation modal -->
-    <div v-if="confirmDelete" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">{{ t('adminUsers.deleteConfirm') }}</h3>
-        <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">This action cannot be undone.</p>
-        <div class="flex justify-end space-x-3">
-          <button @click="confirmDelete = null" class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900">{{ t('common.cancel') }}</button>
-          <button @click="executeDeleteUser" class="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg">{{ t('common.delete') }}</button>
+    <div v-if="confirmDelete" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-slate-950/85 backdrop-blur-md" @click="confirmDelete = null"></div>
+      <div class="relative bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl p-6 md:p-8 max-w-sm w-full mx-4 space-y-4">
+        <h3 class="text-xl font-bold text-white">{{ t('adminUsers.deleteConfirm') }}</h3>
+        <p class="text-sm text-slate-400">Esta acción no se puede deshacer y eliminará los peers del usuario.</p>
+        <div class="flex justify-end gap-3 pt-2">
+          <button @click="confirmDelete = null" class="px-4 py-2.5 text-sm font-semibold border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl transition cursor-pointer">{{ t('common.cancel') }}</button>
+          <button @click="executeDeleteUser" class="px-4 py-2.5 text-sm font-semibold bg-rose-600 hover:bg-rose-500 text-white rounded-xl shadow-lg shadow-rose-900/30 transition cursor-pointer">{{ t('common.delete') }}</button>
         </div>
       </div>
     </div>
 
-    <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('adminUsers.title') }}</h1>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight text-white">{{ t('adminUsers.title') }}</h1>
+        <p class="text-sm text-slate-400 mt-1">Directorio de cuentas sincronizadas con Authentik OIDC</p>
+      </div>
       <button
         @click="showCreate = !showCreate"
-        class="bg-midori-600 hover:bg-midori-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+        class="inline-flex items-center gap-2 px-5 py-2.5 bg-midori-600 hover:bg-midori-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-midori-900/30 transition-all cursor-pointer self-start sm:self-auto"
       >
         {{ showCreate ? t('common.cancel') : t('adminUsers.createUser') }}
       </button>
     </div>
 
-    <div v-if="showCreate" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-6">
-      <div v-if="formErrors.general" class="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg text-sm text-red-700 dark:text-red-300">
+    <!-- Create User Form -->
+    <div v-if="showCreate" class="bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 p-6 md:p-8 backdrop-blur-xl space-y-6">
+      <div v-if="formErrors.general" class="p-4 bg-rose-950/40 border border-rose-800/50 rounded-2xl text-sm text-rose-300">
         {{ formErrors.general }}
       </div>
-      <form @submit.prevent="createUser" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <form @submit.prevent="createUser" class="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div>
-          <input v-model="form.authentik_uid" placeholder="Authentik UID" required class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" :class="formErrors.authentik_uid ? 'border-red-400' : ''" />
-          <p v-if="formErrors.authentik_uid" class="text-xs text-red-500 mt-1">{{ formErrors.authentik_uid }}</p>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Authentik UID</label>
+          <input v-model="form.authentik_uid" placeholder="Authentik UID" required class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors" :class="formErrors.authentik_uid ? 'border-rose-500' : ''" />
+          <p v-if="formErrors.authentik_uid" class="text-xs text-rose-400 mt-1">{{ formErrors.authentik_uid }}</p>
         </div>
         <div>
-          <input v-model="form.email" type="email" placeholder="Email" required class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" :class="formErrors.email ? 'border-red-400' : ''" />
-          <p v-if="formErrors.email" class="text-xs text-red-500 mt-1">{{ formErrors.email }}</p>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Email</label>
+          <input v-model="form.email" type="email" placeholder="Email" required class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors" :class="formErrors.email ? 'border-rose-500' : ''" />
+          <p v-if="formErrors.email" class="text-xs text-rose-400 mt-1">{{ formErrors.email }}</p>
         </div>
-        <input v-model="form.display_name" :placeholder="t('adminUsers.namePlaceholder')" maxlength="128" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <input v-model="groupInput" :placeholder="t('adminUsers.groupsPlaceholder')" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <div class="md:col-span-2">
-          <button type="submit" class="bg-midori-600 hover:bg-midori-700 text-white font-medium px-6 py-2 rounded-lg">
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('adminUsers.namePlaceholder') }}</label>
+          <input v-model="form.display_name" :placeholder="t('adminUsers.namePlaceholder')" maxlength="128" class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('adminUsers.groupsPlaceholder') }}</label>
+          <input v-model="groupInput" :placeholder="t('adminUsers.groupsPlaceholder')" class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors" />
+        </div>
+        <div class="md:col-span-2 pt-2">
+          <button type="submit" class="bg-midori-600 hover:bg-midori-500 text-white font-semibold px-8 py-3 rounded-xl shadow-lg shadow-midori-900/30 transition-all cursor-pointer">
             {{ t('adminUsers.createSubmit') }}
           </button>
         </div>
       </form>
     </div>
 
-    <div v-if="loadError" class="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg text-sm text-red-700 dark:text-red-300 flex items-center justify-between">
+    <div v-if="loadError" class="p-4 bg-rose-950/40 border border-rose-800/50 rounded-2xl text-sm text-rose-300 flex items-center justify-between">
       <span>{{ loadError }}</span>
-      <button @click="loadUsers()" class="text-xs underline ml-3">{{ t('common.retry') }}</button>
+      <button @click="loadUsers()" class="text-xs underline ml-3 font-semibold">{{ t('common.retry') }}</button>
     </div>
 
-    <div v-if="loading && users.length === 0" class="flex justify-center py-12">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
+    <div v-if="loading && users.length === 0" class="flex justify-center py-16">
+      <div class="animate-spin rounded-full h-9 w-9 border-b-2 border-midori-500"></div>
     </div>
 
-    <div v-else class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+    <div v-else class="bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 overflow-hidden backdrop-blur-xl">
       <table class="w-full text-sm">
-        <thead class="bg-gray-50 dark:bg-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        <thead class="bg-slate-950/60 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
           <tr>
-            <th class="px-6 py-3">{{ t('common.email') }}</th>
-            <th class="px-6 py-3">{{ t('common.name') }}</th>
-            <th class="px-6 py-3 hidden md:table-cell">{{ t('common.groups') }}</th>
-            <th class="px-6 py-3">{{ t('common.status') }}</th>
-            <th class="px-6 py-3">{{ t('common.actions') }}</th>
+            <th class="px-6 py-4">{{ t('common.email') }}</th>
+            <th class="px-6 py-4">{{ t('common.name') }}</th>
+            <th class="px-6 py-4 hidden md:table-cell">{{ t('common.groups') }}</th>
+            <th class="px-6 py-4">{{ t('common.status') }}</th>
+            <th class="px-6 py-4 text-right">{{ t('common.actions') }}</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
-          <tr v-for="u in users" :key="u.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
-            <td class="px-6 py-4 text-gray-900 dark:text-gray-100">{{ u.email }}</td>
-            <td class="px-6 py-4 text-gray-600 dark:text-gray-400">{{ u.display_name || '—' }}</td>
+        <tbody class="divide-y divide-slate-800/60">
+          <tr v-for="u in users" :key="u.id" class="hover:bg-slate-800/50 transition-colors">
+            <td class="px-6 py-4 font-semibold text-white">{{ u.email }}</td>
+            <td class="px-6 py-4 text-slate-300">{{ u.display_name || '—' }}</td>
             <td class="px-6 py-4 hidden md:table-cell">
-              <span v-for="g in u.groups" :key="g" class="text-xs bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded mr-1">
+              <span v-for="g in u.groups" :key="g" class="text-xs bg-slate-800 border border-slate-700 text-slate-300 px-2.5 py-0.5 rounded-md mr-1.5 font-medium">
                 {{ g }}
               </span>
             </td>
             <td class="px-6 py-4">
-              <span v-if="u.is_banned" class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">{{ t('adminUsers.banned') }}</span>
-              <span v-else class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">{{ t('common.active') }}</span>
+              <span v-if="u.is_banned" class="text-xs bg-rose-950/60 border border-rose-700/50 text-rose-300 font-semibold px-2.5 py-1 rounded-full border">{{ t('adminUsers.banned') }}</span>
+              <span v-else class="text-xs bg-midori-950/60 border border-midori-700/50 text-midori-300 font-semibold px-2.5 py-1 rounded-full border">{{ t('common.active') }}</span>
             </td>
-            <td class="px-6 py-4 space-x-2">
-              <router-link :to="`/admin/users/${u.id}`" class="text-xs text-midori-600 hover:text-midori-700">{{ t('common.view') }}</router-link>
-              <button v-if="!u.is_banned" @click="promptBanUser(u.id)" class="text-xs text-yellow-600 hover:text-yellow-700">{{ t('adminUsers.ban') }}</button>
-              <button @click="promptDeleteUser(u.id)" class="text-xs text-red-500 hover:text-red-700">{{ t('common.delete') }}</button>
+            <td class="px-6 py-4 text-right space-x-2">
+              <router-link :to="`/admin/users/${u.id}`" class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-xs font-medium text-midori-400 hover:text-white transition">{{ t('common.view') }}</router-link>
+              <button v-if="!u.is_banned" @click="promptBanUser(u.id)" class="px-2.5 py-1 rounded-lg border border-amber-900/40 bg-amber-950/20 text-xs font-medium text-amber-400 hover:bg-amber-900/40 transition cursor-pointer">{{ t('adminUsers.ban') }}</button>
+              <button @click="promptDeleteUser(u.id)" class="px-2.5 py-1 rounded-lg border border-rose-900/40 bg-rose-950/20 text-xs font-medium text-rose-400 hover:bg-rose-900/40 transition cursor-pointer">{{ t('common.delete') }}</button>
             </td>
           </tr>
         </tbody>
       </table>
-      <div v-if="hasMore" class="px-6 py-3 border-t border-gray-100 dark:border-gray-700 text-center">
+      <div v-if="hasMore" class="px-6 py-4 border-t border-slate-800 text-center">
         <button
           @click="loadMoreUsers"
           :disabled="loading"
-          class="text-sm text-midori-600 hover:text-midori-700 disabled:opacity-50"
+          class="text-sm font-semibold text-midori-400 hover:text-midori-300 disabled:opacity-50 cursor-pointer"
         >
           {{ loading ? t('common.loading') : t('common.loadMore') }}
         </button>

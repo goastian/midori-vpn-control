@@ -136,66 +136,80 @@ async function executeDeleteServer() {
 </script>
 
 <template>
-  <div>
+  <div class="space-y-6">
     <!-- Delete confirmation modal -->
-    <div v-if="confirmDelete" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">{{ t('adminServers.deleteConfirm') }}</h3>
-        <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">This action cannot be undone.</p>
-        <div class="flex justify-end space-x-3">
-          <button @click="confirmDelete = null" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900">
+    <div v-if="confirmDelete" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-slate-950/85 backdrop-blur-md" @click="confirmDelete = null"></div>
+      <div class="relative bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl p-6 md:p-8 max-w-sm w-full mx-4 space-y-4">
+        <h3 class="text-xl font-bold text-white">{{ t('adminServers.deleteConfirm') }}</h3>
+        <p class="text-sm text-slate-400">Esta acción no se puede deshacer y desconectará los peers asociados.</p>
+        <div class="flex justify-end gap-3 pt-2">
+          <button @click="confirmDelete = null" class="px-4 py-2.5 text-sm font-semibold border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl transition cursor-pointer">
             {{ t('common.cancel') }}
           </button>
-          <button @click="executeDeleteServer" class="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg">
+          <button @click="executeDeleteServer" class="px-4 py-2.5 text-sm font-semibold bg-rose-600 hover:bg-rose-500 text-white rounded-xl shadow-lg shadow-rose-900/30 transition cursor-pointer">
             {{ t('common.delete') }}
           </button>
         </div>
       </div>
     </div>
 
-    <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('adminServers.title') }}</h1>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight text-white">{{ t('adminServers.title') }}</h1>
+        <p class="text-sm text-slate-400 mt-1">Administra los nodos de la infraestructura de túneles y proxies</p>
+      </div>
       <button
         @click="showForm ? cancelForm() : (showForm = true)"
-        class="bg-midori-600 hover:bg-midori-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
+        class="inline-flex items-center gap-2 px-5 py-2.5 bg-midori-600 hover:bg-midori-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-midori-900/30 transition-all cursor-pointer self-start sm:self-auto"
       >
         {{ showForm ? t('common.cancel') : t('adminServers.addServer') }}
       </button>
     </div>
 
-    <div v-if="showForm" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-6">
-      <h2 class="text-lg font-semibold mb-4 dark:text-gray-100">{{ editingId ? t('adminServers.editServer') : t('adminServers.newServer') }}</h2>
-      <div v-if="formErrors.general" class="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg text-sm text-red-700 dark:text-red-300">
+    <!-- Server Form -->
+    <div v-if="showForm" class="bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 p-6 md:p-8 backdrop-blur-xl space-y-6">
+      <h2 class="text-xl font-bold text-white">{{ editingId ? t('adminServers.editServer') : t('adminServers.newServer') }}</h2>
+      <div v-if="formErrors.general" class="p-4 bg-rose-950/40 border border-rose-800/50 rounded-2xl text-sm text-rose-300">
         {{ formErrors.general }}
       </div>
-      <form @submit.prevent="saveServer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <form @submit.prevent="saveServer" class="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div>
-          <input v-model="form.name" :placeholder="t('common.name')" required class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" :class="formErrors.name ? 'border-red-400' : ''" />
-          <p v-if="formErrors.name" class="text-xs text-red-500 mt-1">{{ formErrors.name }}</p>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('common.name') }}</label>
+          <input v-model="form.name" :placeholder="t('common.name')" required class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors" :class="formErrors.name ? 'border-rose-500' : ''" />
+          <p v-if="formErrors.name" class="text-xs text-rose-400 mt-1">{{ formErrors.name }}</p>
         </div>
         <div>
-          <input v-model="form.host" placeholder="Host (core API)" required class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" :class="formErrors.host ? 'border-red-400' : ''" />
-          <p v-if="formErrors.host" class="text-xs text-red-500 mt-1">{{ formErrors.host }}</p>
-        </div>
-        <input v-model="form.endpoint" :placeholder="t('adminServers.endpoint')" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <div>
-          <input v-model.number="form.port" type="number" min="1" max="65535" :placeholder="t('adminServers.apiPort')" class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" :class="formErrors.port ? 'border-red-400' : ''" />
-          <p v-if="formErrors.port" class="text-xs text-red-500 mt-1">{{ formErrors.port }}</p>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Host (core API)</label>
+          <input v-model="form.host" placeholder="Host (core API)" required class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors" :class="formErrors.host ? 'border-rose-500' : ''" />
+          <p v-if="formErrors.host" class="text-xs text-rose-400 mt-1">{{ formErrors.host }}</p>
         </div>
         <div>
-          <input v-model.number="form.wg_port" type="number" min="1" max="65535" :placeholder="t('adminServers.wgPort')" class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" :class="formErrors.wg_port ? 'border-red-400' : ''" />
-          <p v-if="formErrors.wg_port" class="text-xs text-red-500 mt-1">{{ formErrors.wg_port }}</p>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('adminServers.endpoint') }}</label>
+          <input v-model="form.endpoint" :placeholder="t('adminServers.endpoint')" class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors" />
         </div>
         <div>
-          <input v-model.number="form.proxy_port" type="number" min="0" max="65535" placeholder="Proxy port (0 = disabled)" class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" :class="formErrors.proxy_port ? 'border-red-400' : ''" />
-          <p v-if="formErrors.proxy_port" class="text-xs text-red-500 mt-1">{{ formErrors.proxy_port }}</p>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('adminServers.apiPort') }}</label>
+          <input v-model.number="form.port" type="number" min="1" max="65535" :placeholder="t('adminServers.apiPort')" class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors" :class="formErrors.port ? 'border-rose-500' : ''" />
+          <p v-if="formErrors.port" class="text-xs text-rose-400 mt-1">{{ formErrors.port }}</p>
         </div>
         <div>
-          <input v-model="form.public_key" :placeholder="t('adminServers.wgPublicKey')" required class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm font-mono bg-white dark:bg-gray-700 dark:text-gray-200" :class="formErrors.public_key ? 'border-red-400' : ''" />
-          <p v-if="formErrors.public_key" class="text-xs text-red-500 mt-1">{{ formErrors.public_key }}</p>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('adminServers.wgPort') }}</label>
+          <input v-model.number="form.wg_port" type="number" min="1" max="65535" :placeholder="t('adminServers.wgPort')" class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors" :class="formErrors.wg_port ? 'border-rose-500' : ''" />
+          <p v-if="formErrors.wg_port" class="text-xs text-rose-400 mt-1">{{ formErrors.wg_port }}</p>
         </div>
-        <!-- Core token — masked by default to prevent shoulder-surfing/screen recording exposure -->
         <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Proxy Port</label>
+          <input v-model.number="form.proxy_port" type="number" min="0" max="65535" placeholder="Proxy port (0 = disabled)" class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors" :class="formErrors.proxy_port ? 'border-rose-500' : ''" />
+          <p v-if="formErrors.proxy_port" class="text-xs text-rose-400 mt-1">{{ formErrors.proxy_port }}</p>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('adminServers.wgPublicKey') }}</label>
+          <input v-model="form.public_key" :placeholder="t('adminServers.wgPublicKey')" required class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm font-mono bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors" :class="formErrors.public_key ? 'border-rose-500' : ''" />
+          <p v-if="formErrors.public_key" class="text-xs text-rose-400 mt-1">{{ formErrors.public_key }}</p>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Core Token</label>
           <div class="relative">
             <input
               v-model="form.core_token"
@@ -203,77 +217,84 @@ async function executeDeleteServer() {
               placeholder="Core Token"
               :required="!editingId"
               autocomplete="new-password"
-              class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 pr-20 text-sm bg-white dark:bg-gray-700 dark:text-gray-200"
-              :class="formErrors.core_token ? 'border-red-400' : ''"
+              class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 pr-20 text-sm bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors"
+              :class="formErrors.core_token ? 'border-rose-500' : ''"
             />
             <button
               type="button"
               @click="showToken = !showToken"
-              class="absolute inset-y-0 right-2 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-1"
-            >{{ showToken ? 'Hide' : 'Show' }}</button>
+              class="absolute inset-y-0 right-3 text-xs text-slate-400 hover:text-white px-1"
+            >{{ showToken ? 'Ocultar' : 'Mostrar' }}</button>
           </div>
-          <p v-if="formErrors.core_token" class="text-xs text-red-500 mt-1">{{ formErrors.core_token }}</p>
-        </div>
-        <input v-model="form.location" :placeholder="t('adminServers.location')" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" />
-        <div>
-          <input v-model="form.country_code" :placeholder="t('adminServers.country')" maxlength="2" class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 uppercase" :class="formErrors.country_code ? 'border-red-400' : ''" />
-          <p v-if="formErrors.country_code" class="text-xs text-red-500 mt-1">{{ formErrors.country_code }}</p>
+          <p v-if="formErrors.core_token" class="text-xs text-rose-400 mt-1">{{ formErrors.core_token }}</p>
         </div>
         <div>
-          <input v-model.number="form.max_peers" type="number" min="1" :placeholder="t('adminServers.maxPeers')" class="w-full border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200" :class="formErrors.max_peers ? 'border-red-400' : ''" />
-          <p v-if="formErrors.max_peers" class="text-xs text-red-500 mt-1">{{ formErrors.max_peers }}</p>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('adminServers.location') }}</label>
+          <input v-model="form.location" :placeholder="t('adminServers.location')" class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors" />
         </div>
-        <label class="flex items-center space-x-2">
-          <input v-model="form.is_active" type="checkbox" class="rounded border-gray-300" />
-          <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('adminServers.activeToggle') }}</span>
-        </label>
-        <div class="md:col-span-2">
-          <button type="submit" class="bg-midori-600 hover:bg-midori-700 text-white font-medium px-6 py-2 rounded-lg">
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('adminServers.country') }}</label>
+          <input v-model="form.country_code" :placeholder="t('adminServers.country')" maxlength="2" class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-950/60 text-white uppercase outline-none focus:border-midori-500 transition-colors" :class="formErrors.country_code ? 'border-rose-500' : ''" />
+          <p v-if="formErrors.country_code" class="text-xs text-rose-400 mt-1">{{ formErrors.country_code }}</p>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('adminServers.maxPeers') }}</label>
+          <input v-model.number="form.max_peers" type="number" min="1" :placeholder="t('adminServers.maxPeers')" class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors" :class="formErrors.max_peers ? 'border-rose-500' : ''" />
+          <p v-if="formErrors.max_peers" class="text-xs text-rose-400 mt-1">{{ formErrors.max_peers }}</p>
+        </div>
+        <div class="flex items-center pt-6">
+          <label class="flex items-center gap-2.5 cursor-pointer">
+            <input v-model="form.is_active" type="checkbox" class="h-4 w-4 rounded bg-slate-950 border-slate-700 text-midori-500 focus:ring-midori-500" />
+            <span class="text-sm font-medium text-slate-200">{{ t('adminServers.activeToggle') }}</span>
+          </label>
+        </div>
+        <div class="md:col-span-2 pt-2">
+          <button type="submit" class="bg-midori-600 hover:bg-midori-500 text-white font-semibold px-8 py-3 rounded-xl shadow-lg shadow-midori-900/30 transition-all cursor-pointer">
             {{ editingId ? t('adminServers.saveEdit') : t('adminServers.saveNew') }}
           </button>
         </div>
       </form>
     </div>
 
-    <div v-if="loading" class="flex justify-center py-12">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
+    <div v-if="loading" class="flex justify-center py-16">
+      <div class="animate-spin rounded-full h-9 w-9 border-b-2 border-midori-500"></div>
     </div>
 
-    <div v-else class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+    <div v-else class="bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 overflow-hidden backdrop-blur-xl">
       <table class="w-full text-sm">
-        <thead class="bg-gray-50 dark:bg-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        <thead class="bg-slate-950/60 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
           <tr>
-            <th class="px-6 py-3">{{ t('common.name') }}</th>
-            <th class="px-6 py-3">Host</th>
-            <th class="px-6 py-3 hidden md:table-cell">{{ t('adminServers.location') }}</th>
-            <th class="px-6 py-3">{{ t('common.peers') }}</th>
-            <th class="px-6 py-3 hidden lg:table-cell">Capabilities</th>
-            <th class="px-6 py-3">{{ t('common.status') }}</th>
-            <th class="px-6 py-3">{{ t('common.actions') }}</th>
+            <th class="px-6 py-4">{{ t('common.name') }}</th>
+            <th class="px-6 py-4">Host</th>
+            <th class="px-6 py-4 hidden md:table-cell">{{ t('adminServers.location') }}</th>
+            <th class="px-6 py-4">{{ t('common.peers') }}</th>
+            <th class="px-6 py-4 hidden lg:table-cell">Capabilities</th>
+            <th class="px-6 py-4">{{ t('common.status') }}</th>
+            <th class="px-6 py-4 text-right">{{ t('common.actions') }}</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
-          <tr v-for="s in servers" :key="s.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
-            <td class="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">{{ s.name }}</td>
-            <td class="px-6 py-4 font-mono text-xs text-gray-600 dark:text-gray-400">{{ s.host }}:{{ s.port }}</td>
-            <td class="px-6 py-4 hidden md:table-cell text-gray-500 dark:text-gray-400">{{ s.location }} {{ s.country_code ? `(${s.country_code})` : '' }}</td>
-            <td class="px-6 py-4">{{ s.current_peers }}/{{ s.max_peers }}</td>
+        <tbody class="divide-y divide-slate-800/60">
+          <tr v-for="s in servers" :key="s.id" class="hover:bg-slate-800/50 transition-colors">
+            <td class="px-6 py-4 font-semibold text-white">{{ s.name }}</td>
+            <td class="px-6 py-4 font-mono text-xs text-midori-300">{{ s.host }}:{{ s.port }}</td>
+            <td class="px-6 py-4 hidden md:table-cell text-slate-300">{{ s.location }} {{ s.country_code ? `(${s.country_code})` : '' }}</td>
+            <td class="px-6 py-4 font-mono text-slate-300">{{ s.current_peers }} / {{ s.max_peers }}</td>
             <td class="px-6 py-4 hidden lg:table-cell">
-              <div class="flex flex-wrap gap-1">
-                <span v-if="s.supports_wireguard" class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">WG</span>
-                <span v-if="s.supports_proxy" class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">Proxy:{{ s.proxy_port }}</span>
-                <span v-if="s.supports_mesh_exit" class="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">Mesh exit</span>
-                <span v-if="!s.supports_wireguard && !s.supports_proxy && !s.supports_mesh_exit" class="text-xs text-gray-400">—</span>
+              <div class="flex flex-wrap gap-1.5">
+                <span v-if="s.supports_wireguard" class="text-xs bg-cyan-950/60 border border-cyan-800/40 text-cyan-300 font-semibold px-2 py-0.5 rounded-md">WG</span>
+                <span v-if="s.supports_proxy" class="text-xs bg-violet-950/60 border border-violet-800/40 text-violet-300 font-semibold px-2 py-0.5 rounded-md">Proxy:{{ s.proxy_port }}</span>
+                <span v-if="s.supports_mesh_exit" class="text-xs bg-midori-950/60 border border-midori-800/40 text-midori-300 font-semibold px-2 py-0.5 rounded-md">Mesh</span>
+                <span v-if="!s.supports_wireguard && !s.supports_proxy && !s.supports_mesh_exit" class="text-xs text-slate-500">—</span>
               </div>
             </td>
             <td class="px-6 py-4">
-              <span :class="isServerOnline(s) ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'" class="text-xs font-medium px-2 py-1 rounded-full">
+              <span :class="isServerOnline(s) ? 'bg-midori-950/60 border-midori-700/50 text-midori-300' : 'bg-rose-950/60 border-rose-700/50 text-rose-300'" class="text-xs font-semibold px-2.5 py-1 rounded-full border">
                 {{ isServerOnline(s) ? t('common.active') : t('common.inactive') }}
               </span>
             </td>
-            <td class="px-6 py-4 space-x-2">
-              <button @click="startEdit(s)" class="text-xs text-midori-600 hover:text-midori-700">{{ t('common.edit') }}</button>
-              <button @click="promptDeleteServer(s.id)" class="text-xs text-red-500 hover:text-red-700">{{ t('common.delete') }}</button>
+            <td class="px-6 py-4 text-right space-x-2">
+              <button @click="startEdit(s)" class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-xs font-medium text-midori-400 hover:text-white transition cursor-pointer">{{ t('common.edit') }}</button>
+              <button @click="promptDeleteServer(s.id)" class="px-2.5 py-1 rounded-lg border border-rose-900/40 bg-rose-950/20 text-xs font-medium text-rose-400 hover:bg-rose-900/40 transition cursor-pointer">{{ t('common.delete') }}</button>
             </td>
           </tr>
         </tbody>

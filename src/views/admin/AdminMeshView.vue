@@ -48,64 +48,68 @@ function connectedCount(net: AdminMeshNetwork) {
 </script>
 
 <template>
-  <div>
-    <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('adminMesh.title') }}</h1>
+  <div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight text-white">{{ t('adminMesh.title') }}</h1>
+        <p class="text-sm text-slate-400 mt-1">Topología de redes mesh peer-to-peer y subredes privadas</p>
+      </div>
       <button
         @click="load"
-        class="text-sm text-midori-600 hover:text-midori-700 font-medium transition-colors"
+        class="inline-flex items-center gap-2 px-4 py-2 border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold rounded-xl transition-all cursor-pointer self-start sm:self-auto"
       >
-        {{ t('adminMesh.refresh') }}
+        <svg class="w-4 h-4 text-midori-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+        <span>{{ t('adminMesh.refresh') }}</span>
       </button>
     </div>
 
-    <div v-if="loading" class="flex justify-center py-12">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
+    <div v-if="loading && meshNetworks.length === 0" class="flex justify-center py-16">
+      <div class="animate-spin rounded-full h-9 w-9 border-b-2 border-midori-500"></div>
     </div>
 
-    <div v-else-if="error" class="text-center py-12 text-red-500 dark:text-red-400">
+    <div v-else-if="error" class="p-4 bg-rose-950/40 border border-rose-800/50 rounded-2xl text-sm text-rose-300">
       {{ error }}
     </div>
 
-    <div v-else-if="meshNetworks.length === 0" class="text-center py-12 text-gray-400 dark:text-gray-500">
+    <div v-else-if="meshNetworks.length === 0" class="rounded-3xl border border-slate-800 bg-slate-900/60 p-12 text-center text-slate-400">
       {{ t('adminMesh.empty') }}
     </div>
 
-    <div v-else class="space-y-3">
+    <div v-else class="space-y-4">
       <div
         v-for="net in meshNetworks"
         :key="net.id"
-        class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden"
+        class="bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 overflow-hidden backdrop-blur-xl transition-all"
       >
         <!-- Network header row -->
         <button
           type="button"
-          class="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-left"
+          class="w-full flex items-center gap-4 px-6 py-5 hover:bg-slate-800/50 transition-colors text-left cursor-pointer"
           @click="toggle(net.id)"
         >
           <!-- Status dot -->
           <span
-            :class="net.is_active ? 'bg-green-400' : 'bg-gray-300 dark:bg-gray-600'"
-            class="h-2.5 w-2.5 rounded-full flex-shrink-0"
+            :class="net.is_active ? 'bg-midori-400 shadow-md shadow-midori-500/50 animate-pulse' : 'bg-slate-600'"
+            class="h-3 w-3 rounded-full flex-shrink-0"
           ></span>
 
           <!-- Name + subnet -->
           <div class="flex-1 min-w-0">
-            <p class="font-semibold text-gray-900 dark:text-gray-100 truncate">{{ net.name }}</p>
-            <p class="text-xs font-mono text-gray-400 dark:text-gray-500 mt-0.5">{{ net.subnet }}</p>
+            <p class="font-bold text-base text-white truncate">{{ net.name }}</p>
+            <p class="text-xs font-mono text-midori-400 mt-0.5">{{ net.subnet }}</p>
           </div>
 
           <!-- Connected badge -->
           <div class="flex items-center gap-2 flex-shrink-0">
-            <span class="text-xs text-gray-500 dark:text-gray-400">
-              {{ t('adminMesh.connected') }}: <span class="font-semibold text-midori-600">{{ connectedCount(net) }}</span>/{{ net.member_count }}
+            <span class="text-xs text-slate-300 font-medium px-3 py-1 bg-slate-800 border border-slate-700 rounded-full">
+              {{ t('adminMesh.connected') }}: <span class="font-bold text-midori-400">{{ connectedCount(net) }}</span> / {{ net.member_count }}
             </span>
           </div>
 
           <!-- Chevron -->
           <svg
-            class="h-4 w-4 text-gray-400 flex-shrink-0 transition-transform duration-200"
-            :class="expanded.has(net.id) ? 'rotate-180' : ''"
+            class="h-5 w-5 text-slate-400 flex-shrink-0 transition-transform duration-200"
+            :class="expanded.has(net.id) ? 'rotate-180 text-white' : ''"
             viewBox="0 0 20 20" fill="currentColor"
           >
             <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -114,29 +118,28 @@ function connectedCount(net: AdminMeshNetwork) {
 
         <!-- Members table (expanded) -->
         <div v-if="expanded.has(net.id)">
-          <div class="border-t border-gray-100 dark:border-gray-700">
-            <div v-if="net.members.length === 0" class="px-5 py-4 text-sm text-gray-400 dark:text-gray-500">
+          <div class="border-t border-slate-800">
+            <div v-if="net.members.length === 0" class="px-6 py-6 text-sm text-slate-400">
               {{ t('adminMesh.noMembers') }}
             </div>
             <table v-else class="w-full text-sm">
-              <thead class="bg-gray-50 dark:bg-gray-700/60 text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider text-left">
+              <thead class="bg-slate-950/60 text-xs font-semibold text-slate-400 uppercase tracking-wider text-left border-b border-slate-800">
                 <tr>
-                  <th class="px-5 py-2.5">{{ t('adminMesh.colIp') }}</th>
-                  <th class="px-5 py-2.5">{{ t('adminMesh.colPublicIp') }}</th>
-                  <th class="px-5 py-2.5 hidden sm:table-cell">{{ t('common.email') }}</th>
-                  <th class="px-5 py-2.5">{{ t('common.status') }}</th>
+                  <th class="px-6 py-3.5">{{ t('adminMesh.colIp') }}</th>
+                  <th class="px-6 py-3.5">{{ t('adminMesh.colPublicIp') }}</th>
+                  <th class="px-6 py-3.5 hidden sm:table-cell">{{ t('common.email') }}</th>
+                  <th class="px-6 py-3.5 text-right">{{ t('common.status') }}</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
+              <tbody class="divide-y divide-slate-800/60">
                 <tr
                   v-for="member in net.members"
                   :key="member.user_id"
-                  class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+                  class="hover:bg-slate-800/40 transition-colors"
                 >
                   <!-- Mesh IP -->
-                  <td class="px-5 py-3">
-                    <span class="inline-flex items-center gap-1.5 font-mono text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800 rounded px-2 py-0.5">
-                      <!-- shield icon -->
+                  <td class="px-6 py-4">
+                    <span class="inline-flex items-center gap-1.5 font-mono text-xs bg-cyan-950/60 text-cyan-300 border border-cyan-800/50 rounded-lg px-2.5 py-1">
                       <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clip-rule="evenodd" />
                       </svg>
@@ -145,28 +148,28 @@ function connectedCount(net: AdminMeshNetwork) {
                   </td>
 
                   <!-- Public IP (VPN tunnel IP) -->
-                  <td class="px-5 py-3">
-                    <span v-if="member.public_ip" class="font-mono text-xs text-gray-600 dark:text-gray-300">
+                  <td class="px-6 py-4">
+                    <span v-if="member.public_ip" class="font-mono text-xs text-slate-300">
                       {{ member.public_ip }}
                     </span>
-                    <span v-else class="text-gray-400">—</span>
+                    <span v-else class="text-slate-500">—</span>
                   </td>
 
                   <!-- Email -->
-                  <td class="px-5 py-3 hidden sm:table-cell text-gray-500 dark:text-gray-400 text-xs">
+                  <td class="px-6 py-4 hidden sm:table-cell text-slate-300 text-xs font-medium">
                     {{ member.email }}
                   </td>
 
                   <!-- Connected status -->
-                  <td class="px-5 py-3">
+                  <td class="px-6 py-4 text-right">
                     <span
                       :class="member.connected
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'
-                        : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'"
-                      class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                        ? 'bg-midori-950/60 border-midori-700/50 text-midori-300'
+                        : 'bg-slate-800 border-slate-700 text-slate-400'"
+                      class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border"
                     >
                       <span
-                        :class="member.connected ? 'bg-green-500' : 'bg-gray-400'"
+                        :class="member.connected ? 'bg-midori-400 animate-pulse' : 'bg-slate-500'"
                         class="h-1.5 w-1.5 rounded-full"
                       ></span>
                       {{ member.connected ? t('adminMesh.statusConnected') : t('adminMesh.statusOffline') }}
