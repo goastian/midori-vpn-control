@@ -36,9 +36,15 @@ function parseIssuerUrls(value: string | undefined) {
   }
 }
 
-const issuerUrls = parseIssuerUrls(import.meta.env.VITE_AUTHENTIK_ISSUER)
-const CLIENT_ID = import.meta.env.VITE_AUTHENTIK_CLIENT_ID
+const rawIssuer = import.meta.env.VITE_AUTHENTIK_ISSUER || ''
+const CLIENT_ID = import.meta.env.VITE_AUTHENTIK_CLIENT_ID || ''
 const REDIRECT_URI = import.meta.env.VITE_AUTHENTIK_REDIRECT_URI || `${window.location.origin}/auth/callback`
+
+if (!rawIssuer || !CLIENT_ID) {
+  console.warn('[MidoriVPN Auth] Missing VITE_AUTHENTIK_ISSUER or VITE_AUTHENTIK_CLIENT_ID in environment/.env')
+}
+
+const issuerUrls = parseIssuerUrls(rawIssuer)
 
 interface JWTPayload {
   sub?: string
