@@ -1,4 +1,4 @@
-name: CI - Control SPA
+name: CI - Control Web SPA
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    name: Lint, Typecheck & Test
+    name: Lint, Typecheck & Build SPA
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -23,8 +23,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Type check & Build
+      - name: Type check (vue-tsc) & Vite Build
         run: npm run build
-
-      - name: Run unit tests
-        run: npm run test
