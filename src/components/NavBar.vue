@@ -78,8 +78,8 @@ function closeMobile() {
       </router-link>
       <button
         class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700 bg-slate-800/80 text-slate-300 hover:text-white"
-        @click="mobileOpen = true"
         :aria-label="t('nav.openMenu')"
+        @click="mobileOpen = true"
       >
         <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
           <path d="M3 5.5a.75.75 0 01.75-.75h12.5a.75.75 0 010 1.5H3.75A.75.75 0 013 5.5zm0 4.5a.75.75 0 01.75-.75h12.5a.75.75 0 010 1.5H3.75A.75.75 0 013 10zm.75 3.75a.75.75 0 000 1.5h8.5a.75.75 0 000-1.5h-8.5z" />
@@ -126,8 +126,8 @@ function closeMobile() {
         <p class="truncate text-sm font-semibold text-slate-100">{{ auth.user?.email }}</p>
         <p class="mt-1 text-xs text-slate-400">{{ auth.isAdmin ? t('common.roleAdmin') : t('common.roleUser') }}</p>
         <button
-          @click="auth.logout()"
           class="mt-3 w-full rounded-xl border border-rose-700/60 bg-rose-950/20 px-3 py-2 text-sm font-medium text-rose-300 transition hover:bg-rose-900/40"
+          @click="auth.logout()"
         >
           {{ t('common.signOut') }}
         </button>
@@ -137,13 +137,13 @@ function closeMobile() {
 
   <transition name="fade">
     <div v-if="mobileOpen" class="fixed inset-0 z-50 lg:hidden">
-      <button class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" @click="closeMobile" aria-label="Cerrar menu"></button>
+      <button class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" aria-label="Cerrar menu" @click="closeMobile"></button>
       <aside class="absolute inset-y-0 left-0 w-72 border-r border-slate-800 bg-slate-900 p-5 text-slate-100 shadow-2xl">
         <div class="flex items-center justify-between px-2 pb-4 border-b border-slate-800">
           <router-link to="/dashboard" class="text-2xl font-bold text-midori-400" @click="closeMobile">
             {{ t('common.appName') }}
           </router-link>
-          <button class="rounded-xl p-2 text-slate-400 hover:text-white" @click="closeMobile" :aria-label="t('nav.closeMenu')">
+          <button class="rounded-xl p-2 text-slate-400 hover:text-white" :aria-label="t('nav.closeMenu')" @click="closeMobile">
             <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path d="M5.22 5.22a.75.75 0 011.06 0L10 8.94l3.72-3.72a.75.75 0 111.06 1.06L11.06 10l3.72 3.72a.75.75 0 11-1.06 1.06L10 11.06l-3.72 3.72a.75.75 0 11-1.06-1.06L8.94 10 5.22 6.28a.75.75 0 010-1.06z" />
             </svg>
@@ -173,8 +173,8 @@ function closeMobile() {
           </section>
 
           <button
-            @click="auth.logout()"
             class="w-full rounded-xl border border-rose-700/60 bg-rose-950/20 px-3 py-2 text-sm font-medium text-rose-300"
+            @click="auth.logout()"
           >
             {{ t('common.signOut') }}
           </button>

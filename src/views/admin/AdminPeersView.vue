@@ -51,7 +51,7 @@ function formatBytes(bytes: number): string {
 
     <div v-if="loadError" class="p-4 bg-rose-950/40 border border-rose-800/50 rounded-2xl text-sm text-rose-300 flex items-center justify-between">
       <span>{{ loadError }}</span>
-      <button @click="loadPeers()" class="text-xs underline ml-3 font-semibold">{{ t('common.retry') }}</button>
+      <button class="text-xs underline ml-3 font-semibold" @click="loadPeers()">{{ t('common.retry') }}</button>
     </div>
 
     <div v-if="loading" class="flex justify-center py-16">
@@ -95,8 +95,8 @@ function formatBytes(bytes: number): string {
             <td class="px-6 py-4 text-right">
               <button
                 v-if="p.is_active"
-                @click="forceDisconnect(p.id)"
                 class="px-2.5 py-1 rounded-lg border border-rose-900/40 bg-rose-950/20 text-xs font-medium text-rose-400 hover:bg-rose-900/40 transition cursor-pointer"
+                @click="forceDisconnect(p.id)"
               >
                 {{ t('common.disconnect') }}
               </button>

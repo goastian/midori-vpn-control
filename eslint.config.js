@@ -31,6 +31,7 @@ export default ts.config(
         setInterval: 'readonly',
         setTimeout: 'readonly',
         URL: 'readonly',
+        URLSearchParams: 'readonly',
         WebSocket: 'readonly',
         window: 'readonly',
       },

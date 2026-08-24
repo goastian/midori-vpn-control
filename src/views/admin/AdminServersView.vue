@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
-import type { Server } from '../../lib/schemas'
+import type { Server, TransportCapability } from '../../lib/schemas'
 
 type ServerPingResult = {
   server_id: string
@@ -15,17 +15,20 @@ const serverPing = ref<Record<string, ServerPingResult>>({})
 const loading = ref(true)
 const showForm = ref(false)
 const editingId = ref<string | null>(null)
-const showToken = ref(false)
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 const { t } = useLocale()
 
-const emptyForm = {
-  name: '', host: '', endpoint: '', port: 8080, wg_port: 51820,
-  public_key: '', core_token: '', location: '', country_code: '', max_peers: 250,
-  proxy_port: 8888,
-  is_active: true,
+type FormTransport = Pick<TransportCapability, 'protocol' | 'host' | 'port' | 'enabled' | 'priority'> & {
+  metadataText: string
 }
-const form = ref({ ...emptyForm })
+
+const createEmptyForm = () => ({
+  name: '', host: '', endpoint: '', port: 443, wg_port: 51820,
+  public_key: '', location: '', country_code: '', max_peers: 250,
+  is_active: true,
+  transports: [{ protocol: 'wireguard', host: '', port: 51820, enabled: true, priority: 100, metadataText: '{}' }] as FormTransport[],
+})
+const form = ref(createEmptyForm())
 const formErrors = ref<Record<string, string>>({})
 
 onMounted(async () => {
@@ -61,18 +64,21 @@ async function loadServers(options: { silent?: boolean } = {}) {
 }
 
 function isServerOnline(server: Server): boolean {
-  return serverPing.value[server.id]?.available === true
+	return serverPing.value[server.id]?.available === true
+}
+
+function serverTransports(server: Server): TransportCapability[] {
+	return server.transports ?? []
 }
 
 function startEdit(s: Server) {
   editingId.value = s.id
-  showToken.value = false
   form.value = {
     name: s.name, host: s.host, endpoint: s.endpoint ?? '', port: s.port, wg_port: s.wg_port,
-    public_key: s.public_key, core_token: s.core_token || '',
+    public_key: s.public_key,
     location: s.location, country_code: s.country_code, max_peers: s.max_peers,
-    proxy_port: s.proxy_port ?? 0,
     is_active: s.is_active,
+	transports: serverTransports(s).map(({ protocol, host, port, enabled, priority, metadata }) => ({ protocol, host, port, enabled, priority, metadataText: JSON.stringify(metadata ?? {}) })),
   }
   showForm.value = true
 }
@@ -80,8 +86,7 @@ function startEdit(s: Server) {
 function cancelForm() {
   showForm.value = false
   editingId.value = null
-  showToken.value = false
-  form.value = { ...emptyForm }
+  form.value = createEmptyForm()
   formErrors.value = {}
 }
 
@@ -91,9 +96,24 @@ function validateForm(): boolean {
   if (!form.value.host.trim()) errors.host = 'Host is required'
   if (form.value.port < 1 || form.value.port > 65535) errors.port = 'Port must be 1–65535'
   if (form.value.wg_port < 1 || form.value.wg_port > 65535) errors.wg_port = 'WireGuard port must be 1–65535'
-  if (form.value.proxy_port < 0 || form.value.proxy_port > 65535) errors.proxy_port = 'Proxy port must be 0 or 1–65535'
+  const seenProtocols = new Set<string>()
+  for (const [index, transport] of form.value.transports.entries()) {
+    if (seenProtocols.has(transport.protocol)) errors[`transport_${index}`] = 'Each protocol can only be configured once'
+    seenProtocols.add(transport.protocol)
+    if (!transport.host.trim()) errors[`transport_${index}`] = 'Transport host is required'
+    if (transport.port < 1 || transport.port > 65535) errors[`transport_${index}`] = 'Transport port must be 1–65535'
+    if (transport.priority < 0 || transport.priority > 1000) errors[`transport_${index}`] = 'Priority must be 0–1000'
+    try {
+      const metadata = JSON.parse(transport.metadataText)
+      if (metadata === null || Array.isArray(metadata) || typeof metadata !== 'object') {
+        errors[`transport_${index}`] = 'Metadata must be a JSON object'
+      }
+    } catch {
+      errors[`transport_${index}`] = 'Metadata must be valid JSON'
+    }
+  }
+  if (form.value.transports.length === 0) errors.transports = 'At least one transport is required'
   if (!form.value.public_key.trim()) errors.public_key = 'Public key is required'
-  if (!editingId.value && !form.value.core_token.trim()) errors.core_token = 'Core token is required for new servers'
   if (form.value.max_peers < 1) errors.max_peers = 'Max peers must be at least 1'
   if (form.value.country_code && !/^[A-Z]{2}$/.test(form.value.country_code))
     errors.country_code = 'Country code must be 2 uppercase letters'
@@ -104,16 +124,40 @@ function validateForm(): boolean {
 async function saveServer() {
   if (!validateForm()) return
   try {
+	const transports = form.value.transports.map(({ metadataText, ...transport }) => ({
+    ...transport,
+    protocol: transport.protocol.toLowerCase(),
+    metadata: JSON.parse(metadataText),
+  }))
+	const wireguard = transports.find((transport) => transport.protocol === 'wireguard')
+	const payload = {
+		...form.value,
+		transports,
+		wg_port: wireguard?.port ?? form.value.wg_port,
+		endpoint: wireguard?.host ?? form.value.endpoint,
+	}
     if (editingId.value) {
-      await api.put(`/api/v1/admin/servers/${editingId.value}`, form.value)
+		await api.put(`/api/v1/admin/servers/${editingId.value}`, payload)
     } else {
-      await api.post('/api/v1/admin/servers', form.value)
+		await api.post('/api/v1/admin/servers', payload)
     }
     cancelForm()
     await loadServers()
   } catch (e: any) {
     formErrors.value.general = e.message ?? 'An unexpected error occurred'
   }
+}
+
+const transportProtocols: FormTransport['protocol'][] = ['wireguard', 'wss', 'masque', 'openvpn', 'ikev2', 'proxy']
+
+function addTransport() {
+	const protocol = transportProtocols.find((candidate) => !form.value.transports.some((item) => item.protocol === candidate))
+	if (!protocol) return
+	form.value.transports.push({ protocol, host: form.value.host, port: protocol === 'wireguard' ? 51820 : 443, enabled: true, priority: 50, metadataText: '{}' })
+}
+
+function removeTransport(index: number) {
+	form.value.transports.splice(index, 1)
 }
 
 const confirmDelete = ref<string | null>(null)
@@ -144,10 +188,10 @@ async function executeDeleteServer() {
         <h3 class="text-xl font-bold text-white">{{ t('adminServers.deleteConfirm') }}</h3>
         <p class="text-sm text-slate-400">Esta acción no se puede deshacer y desconectará los peers asociados.</p>
         <div class="flex justify-end gap-3 pt-2">
-          <button @click="confirmDelete = null" class="px-4 py-2.5 text-sm font-semibold border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl transition cursor-pointer">
+          <button class="px-4 py-2.5 text-sm font-semibold border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl transition cursor-pointer" @click="confirmDelete = null">
             {{ t('common.cancel') }}
           </button>
-          <button @click="executeDeleteServer" class="px-4 py-2.5 text-sm font-semibold bg-rose-600 hover:bg-rose-500 text-white rounded-xl shadow-lg shadow-rose-900/30 transition cursor-pointer">
+          <button class="px-4 py-2.5 text-sm font-semibold bg-rose-600 hover:bg-rose-500 text-white rounded-xl shadow-lg shadow-rose-900/30 transition cursor-pointer" @click="executeDeleteServer">
             {{ t('common.delete') }}
           </button>
         </div>
@@ -160,8 +204,8 @@ async function executeDeleteServer() {
         <p class="text-sm text-slate-400 mt-1">Administra los nodos de la infraestructura de túneles y proxies</p>
       </div>
       <button
-        @click="showForm ? cancelForm() : (showForm = true)"
         class="inline-flex items-center gap-2 px-5 py-2.5 bg-midori-600 hover:bg-midori-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-midori-900/30 transition-all cursor-pointer self-start sm:self-auto"
+        @click="showForm ? cancelForm() : (showForm = true)"
       >
         {{ showForm ? t('common.cancel') : t('adminServers.addServer') }}
       </button>
@@ -173,7 +217,7 @@ async function executeDeleteServer() {
       <div v-if="formErrors.general" class="p-4 bg-rose-950/40 border border-rose-800/50 rounded-2xl text-sm text-rose-300">
         {{ formErrors.general }}
       </div>
-      <form @submit.prevent="saveServer" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <form class="grid grid-cols-1 md:grid-cols-2 gap-5" @submit.prevent="saveServer">
         <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('common.name') }}</label>
           <input v-model="form.name" :placeholder="t('common.name')" required class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors" :class="formErrors.name ? 'border-rose-500' : ''" />
@@ -199,34 +243,9 @@ async function executeDeleteServer() {
           <p v-if="formErrors.wg_port" class="text-xs text-rose-400 mt-1">{{ formErrors.wg_port }}</p>
         </div>
         <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Proxy Port</label>
-          <input v-model.number="form.proxy_port" type="number" min="0" max="65535" placeholder="Proxy port (0 = disabled)" class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors" :class="formErrors.proxy_port ? 'border-rose-500' : ''" />
-          <p v-if="formErrors.proxy_port" class="text-xs text-rose-400 mt-1">{{ formErrors.proxy_port }}</p>
-        </div>
-        <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('adminServers.wgPublicKey') }}</label>
           <input v-model="form.public_key" :placeholder="t('adminServers.wgPublicKey')" required class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm font-mono bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors" :class="formErrors.public_key ? 'border-rose-500' : ''" />
           <p v-if="formErrors.public_key" class="text-xs text-rose-400 mt-1">{{ formErrors.public_key }}</p>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Core Token</label>
-          <div class="relative">
-            <input
-              v-model="form.core_token"
-              :type="showToken ? 'text' : 'password'"
-              placeholder="Core Token"
-              :required="!editingId"
-              autocomplete="new-password"
-              class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 pr-20 text-sm bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors"
-              :class="formErrors.core_token ? 'border-rose-500' : ''"
-            />
-            <button
-              type="button"
-              @click="showToken = !showToken"
-              class="absolute inset-y-0 right-3 text-xs text-slate-400 hover:text-white px-1"
-            >{{ showToken ? 'Ocultar' : 'Mostrar' }}</button>
-          </div>
-          <p v-if="formErrors.core_token" class="text-xs text-rose-400 mt-1">{{ formErrors.core_token }}</p>
         </div>
         <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('adminServers.location') }}</label>
@@ -247,6 +266,40 @@ async function executeDeleteServer() {
             <input v-model="form.is_active" type="checkbox" class="h-4 w-4 rounded bg-slate-950 border-slate-700 text-midori-500 focus:ring-midori-500" />
             <span class="text-sm font-medium text-slate-200">{{ t('adminServers.activeToggle') }}</span>
           </label>
+        </div>
+        <div class="md:col-span-2 rounded-2xl border border-slate-800 bg-slate-950/40 p-4 space-y-3">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <h3 class="text-sm font-semibold text-white">Transportes publicados</h3>
+              <p class="text-xs text-slate-400 mt-1">Solo se anuncian después de que la comprobación del gateway los marque disponibles.</p>
+            </div>
+            <button type="button" class="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-xs font-semibold text-midori-300 disabled:opacity-40" :disabled="form.transports.length >= transportProtocols.length" @click="addTransport">Añadir transporte</button>
+          </div>
+          <p v-if="formErrors.transports" class="text-xs text-rose-400">{{ formErrors.transports }}</p>
+          <div v-for="(transport, index) in form.transports" :key="`${transport.protocol}-${index}`" class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end rounded-xl border border-slate-800 p-3">
+            <label class="sm:col-span-2 text-xs text-slate-400">Protocolo
+              <select v-model="transport.protocol" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-sm text-white">
+                <option v-for="protocol in transportProtocols" :key="protocol" :value="protocol">{{ protocol }}</option>
+              </select>
+            </label>
+            <label class="sm:col-span-4 text-xs text-slate-400">Host
+              <input v-model="transport.host" placeholder="vpn.example.org" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-sm text-white" />
+            </label>
+            <label class="sm:col-span-2 text-xs text-slate-400">Puerto
+              <input v-model.number="transport.port" type="number" min="1" max="65535" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-sm text-white" />
+            </label>
+            <label class="sm:col-span-2 text-xs text-slate-400">Prioridad
+              <input v-model.number="transport.priority" type="number" min="0" max="1000" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-sm text-white" />
+            </label>
+            <div class="sm:col-span-2 flex gap-2 items-center pb-1">
+              <label class="text-xs text-slate-300 flex items-center gap-1.5"><input v-model="transport.enabled" type="checkbox" class="rounded bg-slate-900 border-slate-700 text-midori-500" /> Activo</label>
+              <button type="button" class="ml-auto text-xs text-rose-400 hover:text-rose-300" @click="removeTransport(index)">Quitar</button>
+            </div>
+            <label class="sm:col-span-12 text-xs text-slate-400">Metadata JSON
+              <textarea v-model="transport.metadataText" rows="2" spellcheck="false" placeholder="{}" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 font-mono text-xs text-white"></textarea>
+            </label>
+            <p v-if="formErrors[`transport_${index}`]" class="sm:col-span-12 text-xs text-rose-400">{{ formErrors[`transport_${index}`] }}</p>
+          </div>
         </div>
         <div class="md:col-span-2 pt-2">
           <button type="submit" class="bg-midori-600 hover:bg-midori-500 text-white font-semibold px-8 py-3 rounded-xl shadow-lg shadow-midori-900/30 transition-all cursor-pointer">
@@ -281,10 +334,9 @@ async function executeDeleteServer() {
             <td class="px-6 py-4 font-mono text-slate-300">{{ s.current_peers }} / {{ s.max_peers }}</td>
             <td class="px-6 py-4 hidden lg:table-cell">
               <div class="flex flex-wrap gap-1.5">
-                <span v-if="s.supports_wireguard" class="text-xs bg-cyan-950/60 border border-cyan-800/40 text-cyan-300 font-semibold px-2 py-0.5 rounded-md">WG</span>
-                <span v-if="s.supports_proxy" class="text-xs bg-violet-950/60 border border-violet-800/40 text-violet-300 font-semibold px-2 py-0.5 rounded-md">Proxy:{{ s.proxy_port }}</span>
+				<span v-for="transport in serverTransports(s)" :key="transport.protocol" :class="transport.enabled && transport.health_status === 'healthy' ? 'bg-midori-950/60 border-midori-800/40 text-midori-300' : 'bg-slate-800 border-slate-700 text-slate-400'" class="text-xs border font-semibold px-2 py-0.5 rounded-md">{{ transport.protocol }}:{{ transport.port }}</span>
                 <span v-if="s.supports_mesh_exit" class="text-xs bg-midori-950/60 border border-midori-800/40 text-midori-300 font-semibold px-2 py-0.5 rounded-md">Mesh</span>
-                <span v-if="!s.supports_wireguard && !s.supports_proxy && !s.supports_mesh_exit" class="text-xs text-slate-500">—</span>
+				<span v-if="serverTransports(s).length === 0 && !s.supports_wireguard && !s.supports_proxy && !s.supports_mesh_exit" class="text-xs text-slate-500">—</span>
               </div>
             </td>
             <td class="px-6 py-4">
@@ -293,8 +345,8 @@ async function executeDeleteServer() {
               </span>
             </td>
             <td class="px-6 py-4 text-right space-x-2">
-              <button @click="startEdit(s)" class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-xs font-medium text-midori-400 hover:text-white transition cursor-pointer">{{ t('common.edit') }}</button>
-              <button @click="promptDeleteServer(s.id)" class="px-2.5 py-1 rounded-lg border border-rose-900/40 bg-rose-950/20 text-xs font-medium text-rose-400 hover:bg-rose-900/40 transition cursor-pointer">{{ t('common.delete') }}</button>
+              <button class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-xs font-medium text-midori-400 hover:text-white transition cursor-pointer" @click="startEdit(s)">{{ t('common.edit') }}</button>
+              <button class="px-2.5 py-1 rounded-lg border border-rose-900/40 bg-rose-950/20 text-xs font-medium text-rose-400 hover:bg-rose-900/40 transition cursor-pointer" @click="promptDeleteServer(s.id)">{{ t('common.delete') }}</button>
             </td>
           </tr>
         </tbody>

@@ -154,8 +154,8 @@ defineExpose({ deleteUser })
           <p v-if="actionError" class="text-xs text-rose-400 mt-1">{{ actionError }}</p>
         </div>
         <div class="flex justify-end gap-3 pt-2">
-          <button @click="confirmBan = null" class="px-4 py-2.5 text-sm font-semibold border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl transition cursor-pointer">{{ t('common.cancel') }}</button>
-          <button @click="executeBanUser" class="px-4 py-2.5 text-sm font-semibold bg-amber-600 hover:bg-amber-500 text-white rounded-xl shadow-lg shadow-amber-900/30 transition cursor-pointer">{{ t('adminUsers.ban') }}</button>
+          <button class="px-4 py-2.5 text-sm font-semibold border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl transition cursor-pointer" @click="confirmBan = null">{{ t('common.cancel') }}</button>
+          <button class="px-4 py-2.5 text-sm font-semibold bg-amber-600 hover:bg-amber-500 text-white rounded-xl shadow-lg shadow-amber-900/30 transition cursor-pointer" @click="executeBanUser">{{ t('adminUsers.ban') }}</button>
         </div>
       </div>
     </div>
@@ -167,8 +167,8 @@ defineExpose({ deleteUser })
         <h3 class="text-xl font-bold text-white">{{ t('adminUsers.deleteConfirm') }}</h3>
         <p class="text-sm text-slate-400">Esta acción no se puede deshacer y eliminará los peers del usuario.</p>
         <div class="flex justify-end gap-3 pt-2">
-          <button @click="confirmDelete = null" class="px-4 py-2.5 text-sm font-semibold border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl transition cursor-pointer">{{ t('common.cancel') }}</button>
-          <button @click="executeDeleteUser" class="px-4 py-2.5 text-sm font-semibold bg-rose-600 hover:bg-rose-500 text-white rounded-xl shadow-lg shadow-rose-900/30 transition cursor-pointer">{{ t('common.delete') }}</button>
+          <button class="px-4 py-2.5 text-sm font-semibold border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl transition cursor-pointer" @click="confirmDelete = null">{{ t('common.cancel') }}</button>
+          <button class="px-4 py-2.5 text-sm font-semibold bg-rose-600 hover:bg-rose-500 text-white rounded-xl shadow-lg shadow-rose-900/30 transition cursor-pointer" @click="executeDeleteUser">{{ t('common.delete') }}</button>
         </div>
       </div>
     </div>
@@ -179,8 +179,8 @@ defineExpose({ deleteUser })
         <p class="text-sm text-slate-400 mt-1">Directorio de cuentas sincronizadas con Authentik OIDC</p>
       </div>
       <button
-        @click="showCreate = !showCreate"
         class="inline-flex items-center gap-2 px-5 py-2.5 bg-midori-600 hover:bg-midori-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-midori-900/30 transition-all cursor-pointer self-start sm:self-auto"
+        @click="showCreate = !showCreate"
       >
         {{ showCreate ? t('common.cancel') : t('adminUsers.createUser') }}
       </button>
@@ -191,7 +191,7 @@ defineExpose({ deleteUser })
       <div v-if="formErrors.general" class="p-4 bg-rose-950/40 border border-rose-800/50 rounded-2xl text-sm text-rose-300">
         {{ formErrors.general }}
       </div>
-      <form @submit.prevent="createUser" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <form class="grid grid-cols-1 md:grid-cols-2 gap-5" @submit.prevent="createUser">
         <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Authentik UID</label>
           <input v-model="form.authentik_uid" placeholder="Authentik UID" required class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors" :class="formErrors.authentik_uid ? 'border-rose-500' : ''" />
@@ -220,7 +220,7 @@ defineExpose({ deleteUser })
 
     <div v-if="loadError" class="p-4 bg-rose-950/40 border border-rose-800/50 rounded-2xl text-sm text-rose-300 flex items-center justify-between">
       <span>{{ loadError }}</span>
-      <button @click="loadUsers()" class="text-xs underline ml-3 font-semibold">{{ t('common.retry') }}</button>
+      <button class="text-xs underline ml-3 font-semibold" @click="loadUsers()">{{ t('common.retry') }}</button>
     </div>
 
     <div v-if="loading && users.length === 0" class="flex justify-center py-16">
@@ -253,17 +253,17 @@ defineExpose({ deleteUser })
             </td>
             <td class="px-6 py-4 text-right space-x-2">
               <router-link :to="`/admin/users/${u.id}`" class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-xs font-medium text-midori-400 hover:text-white transition">{{ t('common.view') }}</router-link>
-              <button v-if="!u.is_banned" @click="promptBanUser(u.id)" class="px-2.5 py-1 rounded-lg border border-amber-900/40 bg-amber-950/20 text-xs font-medium text-amber-400 hover:bg-amber-900/40 transition cursor-pointer">{{ t('adminUsers.ban') }}</button>
-              <button @click="promptDeleteUser(u.id)" class="px-2.5 py-1 rounded-lg border border-rose-900/40 bg-rose-950/20 text-xs font-medium text-rose-400 hover:bg-rose-900/40 transition cursor-pointer">{{ t('common.delete') }}</button>
+              <button v-if="!u.is_banned" class="px-2.5 py-1 rounded-lg border border-amber-900/40 bg-amber-950/20 text-xs font-medium text-amber-400 hover:bg-amber-900/40 transition cursor-pointer" @click="promptBanUser(u.id)">{{ t('adminUsers.ban') }}</button>
+              <button class="px-2.5 py-1 rounded-lg border border-rose-900/40 bg-rose-950/20 text-xs font-medium text-rose-400 hover:bg-rose-900/40 transition cursor-pointer" @click="promptDeleteUser(u.id)">{{ t('common.delete') }}</button>
             </td>
           </tr>
         </tbody>
       </table>
       <div v-if="hasMore" class="px-6 py-4 border-t border-slate-800 text-center">
         <button
-          @click="loadMoreUsers"
           :disabled="loading"
           class="text-sm font-semibold text-midori-400 hover:text-midori-300 disabled:opacity-50 cursor-pointer"
+          @click="loadMoreUsers"
         >
           {{ loading ? t('common.loading') : t('common.loadMore') }}
         </button>

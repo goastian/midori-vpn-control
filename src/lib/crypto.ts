@@ -48,7 +48,7 @@ export async function generateClientKeypair(): Promise<Keypair> {
       publicKey: arrayBufferToBase64(rawPublicKey),
       privateKey: arrayBufferToBase64(rawPrivateKey.buffer),
     }
-  } catch (error) {
+  } catch (_error) {
     // Fallback: cryptographically secure random 32 bytes if X25519 SubtleCrypto isn't exposed
     const priv = new Uint8Array(32)
     window.crypto.getRandomValues(priv)

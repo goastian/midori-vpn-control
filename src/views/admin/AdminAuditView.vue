@@ -66,8 +66,8 @@ function actionColor(action: string): string {
       <div>
         <select
           v-model="actionFilter"
-          @change="loadLogs()"
           class="border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-900/80 text-white outline-none focus:border-midori-500 transition-colors cursor-pointer"
+          @change="loadLogs()"
         >
           <option value="" class="bg-slate-900 text-slate-100">{{ t('common.allActions') }}</option>
           <option value="peer.connect" class="bg-slate-900 text-slate-100">peer.connect</option>
@@ -85,7 +85,7 @@ function actionColor(action: string): string {
 
     <div v-if="loadError" class="p-4 bg-rose-950/40 border border-rose-800/50 rounded-2xl text-sm text-rose-300 flex items-center justify-between">
       <span>{{ loadError }}</span>
-      <button @click="loadLogs()" class="text-xs underline ml-3 font-semibold">{{ t('common.retry') }}</button>
+      <button class="text-xs underline ml-3 font-semibold" @click="loadLogs()">{{ t('common.retry') }}</button>
     </div>
 
     <div v-if="loading && logs.length === 0" class="flex justify-center py-16">
@@ -129,9 +129,9 @@ function actionColor(action: string): string {
       </table>
       <div v-if="hasMore" class="px-6 py-4 border-t border-slate-800 text-center">
         <button
-          @click="loadMoreLogs"
           :disabled="loading"
           class="text-sm font-semibold text-midori-400 hover:text-midori-300 disabled:opacity-50 cursor-pointer"
+          @click="loadMoreLogs"
         >
           {{ loading ? t('common.loading') : t('common.loadMore') }}
         </button>

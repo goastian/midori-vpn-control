@@ -1,13 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { createRouter, createWebHistory } from 'vue-router'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import NavBar from '@/components/NavBar.vue'
 
 function makeRouter() {
   return createRouter({
-    history: createWebHistory(),
+    history: createMemoryHistory(),
     routes: [
+      { path: '/', component: { template: '<div />' } },
       { path: '/dashboard', component: { template: '<div />' } },
       { path: '/servers', component: { template: '<div />' } },
       { path: '/connections', component: { template: '<div />' } },
@@ -16,6 +17,7 @@ function makeRouter() {
       { path: '/admin/servers', component: { template: '<div />' } },
       { path: '/admin/peers', component: { template: '<div />' } },
       { path: '/admin/audit', component: { template: '<div />' } },
+      { path: '/admin/mesh', component: { template: '<div />' } },
     ],
   })
 }

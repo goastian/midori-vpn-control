@@ -1,0 +1,7 @@
+FROM docker.io/library/node:24-alpine
+
+RUN apk add --no-cache bash git ca-certificates && \
+    npm install --global npm@12.0.2
+
+ENV npm_config_cache=/tmp/npm-cache
+WORKDIR /workspace

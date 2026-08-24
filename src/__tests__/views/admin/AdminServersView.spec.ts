@@ -27,7 +27,6 @@ const mockServers = [
     port: 8080,
     wg_port: 51820,
     public_key: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
-    core_token: 'tok',
     location: 'New York',
     country_code: 'US',
     max_peers: 250,
@@ -41,14 +40,18 @@ const mockServers = [
 const mockPings = [{ server_id: 's1', latency_ms: 42, available: true }]
 
 describe('AdminServersView', () => {
+  let consoleError: ReturnType<typeof vi.spyOn>
+
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
     vi.useFakeTimers()
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
   })
 
   afterEach(() => {
     vi.useRealTimers()
+    consoleError.mockRestore()
   })
 
   it('shows loading spinner while fetching', async () => {

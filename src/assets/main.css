@@ -1,7 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
-
-@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --color-midori-50: #f0fdf4;
@@ -15,6 +12,7 @@
   --color-midori-800: #166534;
   --color-midori-900: #14532d;
   --color-midori-950: #052e16;
+  --color-slate-850: #172033;
 }
 
 body {

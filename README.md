@@ -1,180 +1,51 @@
-# MidoriVPN Control — Frontend
+# MidoriVPN Control 2.0.0
 
-Web control panel for MidoriVPN. SPA application built with **Vue 3**, **TypeScript**, **Vite**, and **TailwindCSS**.
+Vue administration and user SPA for MidoriVPN Core. Runtime identity configuration is obtained from Core; release bundles do not embed staging or production Authentik identifiers.
 
-## Tech Stack
+## Stack
 
-| Technology | Version | Purpose |
-|---|---|---|
-| Vue 3 | ^3.4 | Reactive UI framework (Composition API + `<script setup>`) |
-| TypeScript | ^5.5 | Static typing |
-| Vite | ^5.3 | Bundler and development server |
-| Pinia | ^2.1 | State management |
-| Vue Router | ^4.4 | SPA routing |
-| TailwindCSS | ^3.4 | Utility-first styling |
-| VueUse | ^10.11 | Utility composables |
+- Node.js 24 LTS and npm 12.
+- Vue 3, Pinia 4 and Vue Router 5.
+- TypeScript 6.0.3 and vue-tsc 3.
+- Vite 8, Vitest 4, ESLint 10 and Zod 4.
 
-## Project Structure
+TypeScript 7 is intentionally not installed while `typescript-eslint` declares a `<6.1` peer range.
 
-```
-control/
-├── .env                    → Environment variables (Vite)
-├── index.html              → HTML entry point
-├── package.json            → Dependencies and scripts
-├── vite.config.ts          → Vite config + API proxy
-├── tailwind.config.js      → Tailwind configuration (midori palette)
-├── postcss.config.js       → PostCSS plugins
-├── tsconfig.json           → TypeScript config
-├── tsconfig.node.json      → TypeScript config (Node)
-├── env.d.ts                → Environment variable types
-└── src/
-├── main.ts             → Bootstrap: Vue + Pinia + Router
-├── App.vue             → Main layout with conditional NavBar
-├── assets/
-│   └── main.css        → Tailwind base imports
-├── components/
-│   └── NavBar.vue      → Navigation bar (Dashboard, Servers, Peers, Audit)
-├── lib/
-│   ├── api.ts          → HTTP client with automatic Bearer token
-│   └── pkce.ts         → PKCE utilities (code_verifier, code_challenge SHA-256)
-├── router/
-│   └── index.ts        → Routes + navigation guard (auth required)
-├── stores/
-│   └── auth.ts         → Authentication store (login, callback, logout, profile)
-└── views/
-├── LoginView.vue       → Login screen with OAuth button
-├── AuthCallback.vue    → Processes Authentik redirect (code → token)
-├── DashboardView.vue   → Overview: active servers, peers, account
-├── ServersView.vue     → VPN server CRUD (admin)
-├── PeersView.vue       → User VPN connection management
-└── AuditView.vue       → Audit log
-```
+## Rootless workflow
 
-## Requirements
-
-- **Node.js 20+** and **npm 10+**
-- `vpn-core` backend running at `localhost:8080` (or configure `VITE_API_URL`)
-
-## Installation
+From this directory:
 
 ```bash
-cd control
-npm install
+bash ../scripts/pod.sh npm ci
+bash ../scripts/pod.sh npm run check
+bash ../scripts/pod.sh npm audit --audit-level=high
+bash ../scripts/pod.sh npm run dev
 ```
 
-## Development
+`npm run check` runs lint with zero warnings, 82 unit/component tests, type checking and a production build.
+
+## Authentication
+
+The SPA uses OAuth 2.0/OIDC Authorization Code + PKCE. It reads the public provider configuration from `/api/v1/auth/config`, stores the verifier only for the callback transaction and sends protected API requests with the access token. Refresh handling and origin validation are implemented through Core.
+
+Do not add `VITE_AUTHENTIK_*` production constants or secrets to the build. The same static bundle must be environment-neutral.
+
+## Administration
+
+The server editor writes one normalized `transports` array. Every item includes protocol, host, port, enabled state, priority and a JSON metadata object. Health status is read-only and produced by Core probes.
+
+Supported contract names are `wireguard`, `wss`, `masque`, `openvpn`, `ikev2` and `proxy`; an entry is not a client capability until Core reports it healthy. There are no parallel `proxy_port` or `wss_*` server fields.
+
+Other views cover users and quotas, peers, audit events, mesh networks, proxy state, billing entitlement and cluster health.
+
+## Production
 
 ```bash
-npm run dev
+bash ../scripts/pod.sh npm run build
 ```
 
-Open `http://localhost:5173`. Vite’s proxy forwards `/api/*` and `/health` to the backend at `:8080`.
+Serve `dist/` behind the host HTTPS virtual host. The Nginx image/config provides SPA fallback and forwards `/api/` and WSS to Core over the internal pod network. No container HTTP port is public.
 
-## Production Build
+## License
 
-```bash
-npm run build
-```
-
-Static files are generated in `control/dist/`. They can be served with Nginx, Caddy, or any static web server.
-
-## Environment Variables
-
-`.env` file at the root of `control/`:
-
-| Variable                      | Example                                               | Description                               |
-| ----------------------------- | ----------------------------------------------------- | ----------------------------------------- |
-| `VITE_API_URL`                | `http://localhost:8080`                               | Backend API URL                           |
-| `VITE_AUTHENTIK_ISSUER`       | `https://accounts.astian.org/application/o/midori-vpn` | Authentik OAuth2 app URL                  |
-| `VITE_AUTHENTIK_CLIENT_ID`    | `60mBgw8BHTvK...`                                     | OAuth2 application Client ID in Authentik |
-| `VITE_AUTHENTIK_REDIRECT_URI` | `http://localhost:5173/auth/callback`                 | Post-login redirect URI                   |
-
-## Authentication Flow (OAuth2/OIDC + PKCE)
-
-```
-┌──────────┐     1. startLogin()      ┌──────────────────┐
-│  Browser │ ──────────────────────→  │  accounts.astian │
-│ (Vue SPA)│                          │   .org (Authentik)│
-│          │  ← 2. redirect with code │                  │
-│          │ ──────────────────────→  │                  │
-└─────┬────┘                          └──────────────────┘
-      │
-      │ 3. POST /api/v1/auth/callback
-      │    { code, redirect_uri, code_verifier }
-      ▼
-┌──────────┐     4. Token exchange     ┌──────────────────┐
-│ vpn-core │ ──────────────────────→  │    Authentik     │
-│ (Go API) │  ← access_token, id_tok  │    Token endpoint│
-│          │                          └──────────────────┘
-└─────┬────┘
-      │ 5. Returns tokens to frontend
-      ▼
-┌──────────┐
-│  Browser │  → Stores access_token in localStorage
-│          │  → GET /api/v1/control/me (profile)
-│          │  → Redirects to Dashboard
-└──────────┘
-```
-
-### Detailed Steps
-
-1. **`startLogin()`** — Generates `code_verifier` (128 random chars), computes `code_challenge` (SHA-256 + base64url), stores the verifier in `sessionStorage`, and redirects to Authentik’s authorization endpoint with PKCE parameters.
-
-2. **Authentik** — Displays login, the user authenticates, and is redirected to `/auth/callback?code=...`
-
-3. **`AuthCallback.vue`** — Reads the `code` from the URL, retrieves the `code_verifier` from `sessionStorage`, and sends both to the backend.
-
-4. **Backend** (`POST /api/v1/auth/callback`) — Exchanges the code + verifier with Authentik and returns the tokens to the frontend.
-
-5. **Frontend** — Stores `access_token` in `localStorage`, loads the user profile, and redirects to the Dashboard.
-
-## Routes
-
-| Route            | View            | Auth      | Description                    |
-| ---------------- | --------------- | --------- | ------------------------------ |
-| `/login`         | `LoginView`     | Public    | Login button with Astian       |
-| `/auth/callback` | `AuthCallback`  | Public    | Processes Authentik redirect   |
-| `/`              | `DashboardView` | Protected | General overview               |
-| `/servers`       | `ServersView`   | Protected | Server management (admin CRUD) |
-| `/peers`         | `PeersView`     | Protected | User VPN connections           |
-| `/audit`         | `AuditView`     | Protected | Audit logs                     |
-
-## Consumed API
-
-All protected endpoints automatically send `Authorization: Bearer <token>` via `lib/api.ts`.
-
-| Method   | Endpoint                      | Purpose                  |
-| -------- | ----------------------------- | ------------------------ |
-| `GET`    | `/api/v1/auth/config`         | OIDC configuration       |
-| `POST`   | `/api/v1/auth/callback`       | Exchange code → tokens   |
-| `GET`    | `/api/v1/control/me`          | Current user profile     |
-| `GET`    | `/api/v1/control/servers`     | List active VPN servers  |
-| `POST`   | `/api/v1/control/servers`     | Create server (admin)    |
-| `DELETE` | `/api/v1/control/servers/:id` | Delete server (admin)    |
-| `GET`    | `/api/v1/control/peers`       | List my VPN connections  |
-| `POST`   | `/api/v1/control/peers`       | Connect to a server      |
-| `DELETE` | `/api/v1/control/peers/:id`   | Disconnect from a server |
-| `GET`    | `/api/v1/control/audit`       | My audit logs            |
-
-## Color Palette
-
-Defined in `tailwind.config.js` under the `midori` key:
-
-| Name         | Hex       | Usage                    |
-| ------------ | --------- | ------------------------ |
-| `midori-50`  | `#f0fdf4` | Light backgrounds, hover |
-| `midori-100` | `#dcfce7` | Login gradients          |
-| `midori-500` | `#22c55e` | Accents                  |
-| `midori-600` | `#16a34a` | Primary buttons          |
-| `midori-700` | `#15803d` | Button hover             |
-
-## Backend Relationship
-
-This frontend **does not contain backend logic**. All business logic, JWT authentication, database management, and WireGuard handling reside in the `vpn-core` (Go) service running at the repository root.
-
-The two backend middlewares are complementary:
-
-* **`internal/api/middleware.go`** — Validates `X-Core-Token` (shared secret for the WireGuard core API)
-* **`internal/auth/middleware.go`** — Validates Authentik JWT Bearer (for the Control API consumed by this frontend)
-
-
+AGPL-3.0-or-later; see the workspace `LICENSE`.

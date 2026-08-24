@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { shallowMount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { createRouter, createWebHistory } from 'vue-router'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import AdminUsersView from '@/views/admin/AdminUsersView.vue'
 
 vi.mock('@/lib/api', () => ({
@@ -44,8 +44,9 @@ const mockUsers = [
 
 function makeRouter() {
   return createRouter({
-    history: createWebHistory(),
+    history: createMemoryHistory(),
     routes: [
+      { path: '/', component: { template: '<div />' } },
       { path: '/admin/users', component: { template: '<div />' } },
       { path: '/admin/users/:id', component: { template: '<div />' } },
     ],

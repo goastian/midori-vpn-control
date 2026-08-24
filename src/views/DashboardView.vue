@@ -47,11 +47,14 @@ const activePercent = computed(() => {
 })
 
 const dashboardCards = computed(() => {
+  const quota = auth.userQuota
   const cards = [
     {
-      title: t('dashboard.cards.activeConnections'),
-      value: String(connectionTotals.value.active),
-      subtitle: t('common.totalConnections', { count: connectionTotals.value.total }),
+      title: 'Dispositivos Conectados',
+      value: quota ? `${quota.connected_devices} / ${quota.max_devices}` : String(connectionTotals.value.active),
+      subtitle: quota
+        ? `${quota.available_devices} cupos libres · Plan ${quota.plan_name}`
+        : t('common.totalConnections', { count: connectionTotals.value.total }),
       tone: 'emerald',
     },
     {
@@ -300,6 +303,7 @@ onMounted(async () => {
   try {
     const promises: Promise<any>[] = [
       api.get<Connection[]>('/api/v1/control/connections'),
+      auth.fetchQuota(),
     ]
     if (auth.isAdmin) {
       promises.push(api.get<AdminStats>('/api/v1/admin/dashboard/stats'))

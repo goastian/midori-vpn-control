@@ -67,6 +67,17 @@ describe('Zod API schemas', () => {
       max_peers: 100,
       current_peers: 42,
       is_active: true,
+      transports: [
+        {
+          protocol: 'wireguard',
+          host: 'vpn.example.test',
+          port: 51820,
+          enabled: true,
+          priority: 100,
+          health_status: 'healthy',
+          metadata: {},
+        },
+      ],
     }
 
     it('parses a valid server', () => {

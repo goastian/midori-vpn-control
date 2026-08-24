@@ -5,6 +5,7 @@ import QRCode from 'qrcode'
 import { api } from '../lib/api'
 import { PRIVATE_KEYS_STORAGE_KEY } from '../lib/storage-keys'
 import { useLocale } from '../lib/i18n'
+import { useAuthStore } from '../stores/auth'
 import type { Server, Connection, ConnectionConfig } from '../lib/schemas'
 
 type Keypair = {
@@ -19,6 +20,7 @@ type ServerPingResult = {
 }
 
 const route = useRoute()
+const auth = useAuthStore()
 const { t } = useLocale()
 
 const servers = ref<Server[]>([])
@@ -26,6 +28,20 @@ const connections = ref<Connection[]>([])
 const serverPing = ref<Record<string, ServerPingResult>>({})
 const loading = ref(true)
 const connecting = ref(false)
+
+const userQuota = computed(() => auth.userQuota)
+const isQuotaReached = computed(() => Boolean(userQuota.value && userQuota.value.available_devices === 0))
+
+function getDeviceBadge(deviceName: string = '') {
+  const lower = deviceName.toLowerCase()
+  if (lower.includes('desktop') || lower.includes('app') || lower.includes('linux') || lower.includes('windows') || lower.includes('mac')) {
+    return { icon: '🖥️', label: 'Desktop App', tone: 'text-cyan-400 bg-cyan-950/60 border-cyan-800/50' }
+  }
+  if (lower.includes('extension') || lower.includes('ext') || lower.includes('browser') || lower.includes('chrome') || lower.includes('firefox')) {
+    return { icon: '🧩', label: 'Extensión', tone: 'text-amber-400 bg-amber-950/60 border-amber-800/50' }
+  }
+  return { icon: '📱', label: 'WireGuard', tone: 'text-midori-400 bg-midori-950/60 border-midori-800/50' }
+}
 
 // Form state
 const form = ref({
@@ -191,6 +207,7 @@ async function handleCreateDevice() {
       user_id: '',
       server_id: form.value.server_id || servers.value[0]?.id || '',
       public_key: kp.public_key,
+      preshared_key: config.preshared_key || '',
       assigned_ip: config.peer_ip,
       device_name: name,
       is_active: true,
@@ -345,6 +362,36 @@ function formatBytes(bytes: number): string {
       </div>
     </div>
 
+    <!-- Global User Quota Bar -->
+    <div v-if="userQuota" class="rounded-3xl border border-slate-800/80 bg-slate-900/60 backdrop-blur-xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+      <div class="space-y-1">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold uppercase tracking-wider text-midori-400">Plan {{ userQuota.plan_name }}</span>
+          <span v-if="userQuota.available_devices > 0" class="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-700/50 text-emerald-300">
+            {{ userQuota.available_devices }} cupos libres
+          </span>
+          <span v-else class="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-950/60 border border-rose-700/50 text-rose-300">
+            Límite de cuota alcanzado
+          </span>
+        </div>
+        <p class="text-xl font-bold text-white">
+          {{ userQuota.connected_devices }} <span class="text-slate-400 text-sm font-normal">/ {{ userQuota.max_devices }} dispositivos conectados</span>
+        </p>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs px-3 py-1 rounded-full border bg-slate-950/60 border-slate-800 text-cyan-300 font-medium">
+          🖥️ {{ userQuota.devices_by_type.desktop }} Desktop
+        </span>
+        <span class="text-xs px-3 py-1 rounded-full border bg-slate-950/60 border-slate-800 text-amber-300 font-medium">
+          🧩 {{ userQuota.devices_by_type.extension }} Extensión
+        </span>
+        <span class="text-xs px-3 py-1 rounded-full border bg-slate-950/60 border-slate-800 text-midori-300 font-medium">
+          📱 {{ userQuota.devices_by_type.wireguard }} WireGuard
+        </span>
+      </div>
+    </div>
+
     <!-- Inline notification -->
     <Transition name="fade">
       <div
@@ -355,7 +402,7 @@ function formatBytes(bytes: number): string {
         class="border rounded-2xl px-5 py-4 text-sm flex items-center justify-between shadow-lg"
       >
         <span>{{ notification.message }}</span>
-        <button @click="notification = null" class="ml-3 opacity-60 hover:opacity-100 text-lg leading-none">&times;</button>
+        <button class="ml-3 opacity-60 hover:opacity-100 text-lg leading-none" @click="notification = null">&times;</button>
       </div>
     </Transition>
 
@@ -366,7 +413,7 @@ function formatBytes(bytes: number): string {
         Selecciona un servidor y asigna un nombre a tu dispositivo. Las claves WireGuard y el perfil se generarán automáticamente.
       </p>
 
-      <form @submit.prevent="handleCreateDevice" class="space-y-5">
+      <form class="space-y-5" @submit.prevent="handleCreateDevice">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <!-- Server selection -->
           <div>
@@ -377,7 +424,7 @@ function formatBytes(bytes: number): string {
             >
               <option value="" class="bg-slate-900 text-slate-100">{{ t('connectionsView.autoServer') }}</option>
               <option v-for="s in servers" :key="s.id" :value="s.id" class="bg-slate-900 text-slate-100">
-                {{ s.name }} ({{ s.location }}) — {{ s.current_peers }}/{{ s.max_peers }}
+                {{ s.name }} ({{ s.location }})
                 {{ serverPing[s.id] ? (serverPing[s.id].available ? ` · ${serverPing[s.id].latency_ms}ms` : ` · ${t('connectionsView.unavailableLabel')}`) : '' }}
               </option>
             </select>
@@ -400,6 +447,9 @@ function formatBytes(bytes: number): string {
         </div>
 
         <!-- Warnings -->
+        <div v-if="userQuota && userQuota.available_devices === 0" class="text-xs text-rose-300 bg-rose-950/40 border border-rose-800/60 rounded-xl px-4 py-3 font-medium">
+          Has alcanzado el límite de tu plan ({{ userQuota.max_devices }} dispositivos). Desconecta o elimina un dispositivo para conectar uno nuevo.
+        </div>
         <div v-if="servers.length === 0" class="text-xs text-amber-300 bg-amber-950/30 border border-amber-800/40 rounded-xl px-4 py-3">
           {{ t('connectionsView.noActiveServers') }}
         </div>
@@ -413,7 +463,7 @@ function formatBytes(bytes: number): string {
         <div class="flex justify-end pt-2">
           <button
             type="submit"
-            :disabled="connecting || isDuplicateDeviceName || !form.device_name.trim() || availableServerCount() === 0"
+            :disabled="connecting || isDuplicateDeviceName || !form.device_name.trim() || availableServerCount() === 0 || isQuotaReached"
             class="bg-midori-600 hover:bg-midori-500 text-white font-semibold px-8 py-2.5 rounded-xl transition-all disabled:opacity-50 text-sm shadow-lg shadow-midori-900/30 cursor-pointer inline-flex items-center gap-2"
           >
             <span v-if="connecting" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
@@ -446,12 +496,18 @@ function formatBytes(bytes: number): string {
         <div
           v-for="conn in connections"
           :key="conn.id"
-          @click="openDeviceDetail(conn)"
           class="bg-slate-900/80 rounded-2xl border border-slate-800 p-5 shadow-lg hover:border-slate-700 hover:bg-slate-850/80 transition-all cursor-pointer"
+          @click="openDeviceDetail(conn)"
         >
           <div class="flex items-start justify-between mb-2">
             <div>
-              <p class="font-bold text-white text-base flex items-center gap-2">
+              <div class="flex items-center gap-2">
+                <span class="text-xs px-2 py-0.5 rounded-md border font-medium inline-flex items-center gap-1" :class="getDeviceBadge(conn.device_name).tone">
+                  <span>{{ getDeviceBadge(conn.device_name).icon }}</span>
+                  <span>{{ getDeviceBadge(conn.device_name).label }}</span>
+                </span>
+              </div>
+              <p class="font-bold text-white text-base flex items-center gap-2 mt-1.5">
                 {{ conn.device_name || t('common.unnamed') }}
                 <svg class="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -475,22 +531,22 @@ function formatBytes(bytes: number): string {
 
           <div class="flex items-center gap-3 border-t border-slate-800 pt-3">
             <button
-              @click.stop="openDeviceDetail(conn)"
               class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-xs text-cyan-400 hover:text-white font-medium transition-colors"
+              @click.stop="openDeviceDetail(conn)"
             >
               Ver QR / .conf
             </button>
             <template v-if="conn.is_active">
               <button
-                @click.stop="disconnect(conn.id)"
                 class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-xs text-amber-400 hover:text-white font-medium transition-colors"
+                @click.stop="disconnect(conn.id)"
               >
                 {{ t('common.disconnect') }}
               </button>
             </template>
             <button
-              @click.stop="deleteConnection(conn.id)"
               class="text-xs text-rose-400 hover:text-rose-300 font-medium transition-colors ml-auto"
+              @click.stop="deleteConnection(conn.id)"
             >
               {{ t('connectionsView.deleteDevice') }}
             </button>
@@ -504,6 +560,7 @@ function formatBytes(bytes: number): string {
           <thead class="bg-slate-950/60 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
             <tr>
               <th class="px-6 py-4">{{ t('common.device') }}</th>
+              <th class="px-6 py-4">Tipo</th>
               <th class="px-6 py-4">{{ t('common.server') }}</th>
               <th class="px-6 py-4">{{ t('common.ip') }}</th>
               <th class="px-6 py-4 hidden md:table-cell">{{ t('connectionsView.trafficHeader') }}</th>
@@ -515,14 +572,20 @@ function formatBytes(bytes: number): string {
             <tr
               v-for="conn in connections"
               :key="conn.id"
-              @click="openDeviceDetail(conn)"
               class="hover:bg-slate-800/60 transition-colors cursor-pointer group"
+              @click="openDeviceDetail(conn)"
             >
               <td class="px-6 py-4 font-semibold text-white group-hover:text-midori-300 transition-colors flex items-center gap-2">
                 {{ conn.device_name || t('common.unnamed') }}
                 <svg class="w-3.5 h-3.5 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
+              </td>
+              <td class="px-6 py-4">
+                <span class="text-xs px-2.5 py-1 rounded-lg border font-medium inline-flex items-center gap-1.5" :class="getDeviceBadge(conn.device_name).tone">
+                  <span>{{ getDeviceBadge(conn.device_name).icon }}</span>
+                  <span>{{ getDeviceBadge(conn.device_name).label }}</span>
+                </span>
               </td>
               <td class="px-6 py-4 font-medium text-slate-300">{{ serverName(conn.server_id) }}</td>
               <td class="px-6 py-4 font-mono text-midori-300 text-xs">{{ conn.assigned_ip.replace('/32','') }}</td>
@@ -540,23 +603,23 @@ function formatBytes(bytes: number): string {
               <td class="px-6 py-4 text-right">
                 <div class="flex items-center justify-end gap-2">
                   <button
-                    @click.stop="openDeviceDetail(conn)"
                     class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800/80 text-xs font-medium text-cyan-400 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer"
+                    @click.stop="openDeviceDetail(conn)"
                   >
                     Ver QR / .conf
                   </button>
                   <template v-if="conn.is_active">
                     <button
-                      @click.stop="disconnect(conn.id)"
                       class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800/80 text-xs font-medium text-amber-400 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer"
+                      @click.stop="disconnect(conn.id)"
                     >
                       {{ t('common.disconnect') }}
                     </button>
                   </template>
                   <button
-                    @click.stop="deleteConnection(conn.id)"
                     class="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/30 transition-colors cursor-pointer"
                     :title="t('connectionsView.deleteDevice')"
+                    @click.stop="deleteConnection(conn.id)"
                   >
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                   </button>
@@ -583,8 +646,8 @@ function formatBytes(bytes: number): string {
           <div class="relative bg-slate-900 border border-slate-800/90 rounded-3xl shadow-2xl p-6 md:p-8 max-w-2xl w-full mx-4 flex flex-col gap-6 text-left max-h-[90vh] overflow-y-auto">
             <!-- Close button -->
             <button
-              @click="closeDeviceModal"
               class="absolute top-5 right-5 text-slate-400 hover:text-white text-2xl leading-none cursor-pointer"
+              @click="closeDeviceModal"
             >
               &times;
             </button>
@@ -612,23 +675,23 @@ function formatBytes(bytes: number): string {
               <!-- Quick action buttons -->
               <div class="flex items-center gap-2">
                 <button
-                  @click="copyDeviceModalConfig"
                   class="px-3 py-1.5 rounded-xl border border-midori-700/50 bg-midori-900/40 text-xs font-semibold text-midori-300 hover:bg-midori-900/70 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                  @click="copyDeviceModalConfig"
                 >
                   <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                   {{ deviceModal.copied ? '¡Copiado!' : 'Copiar' }}
                 </button>
                 <button
-                  @click="downloadDeviceModalConfig"
                   class="px-3 py-1.5 rounded-xl border border-midori-700/50 bg-midori-900/40 text-xs font-semibold text-midori-300 hover:bg-midori-900/70 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                  @click="downloadDeviceModalConfig"
                 >
                   <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                   .conf
                 </button>
                 <button
                   v-if="deviceModal.qrUrl"
-                  @click="downloadDeviceModalQR"
                   class="px-3 py-1.5 rounded-xl border border-cyan-700/50 bg-cyan-950/40 text-xs font-semibold text-cyan-300 hover:bg-cyan-900/70 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                  @click="downloadDeviceModalQR"
                 >
                   QR
                 </button>
@@ -667,14 +730,14 @@ function formatBytes(bytes: number): string {
               <div class="flex items-center gap-2">
                 <button
                   v-if="deviceModal.conn?.is_active"
-                  @click="disconnect(deviceModal.conn.id)"
                   class="px-3 py-1.5 rounded-xl border border-amber-700/50 bg-amber-950/40 text-amber-300 hover:bg-amber-900/60 font-semibold transition-colors cursor-pointer"
+                  @click="disconnect(deviceModal.conn.id)"
                 >
                   Desconectar
                 </button>
                 <button
-                  @click="deleteConnection(deviceModal.conn?.id || '')"
                   class="px-3 py-1.5 rounded-xl border border-rose-800/50 bg-rose-950/40 text-rose-300 hover:bg-rose-900/60 font-semibold transition-colors cursor-pointer"
+                  @click="deleteConnection(deviceModal.conn?.id || '')"
                 >
                   Eliminar dispositivo
                 </button>

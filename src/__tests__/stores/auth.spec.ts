@@ -1,8 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-
-// Mock import.meta.env before importing the store
-vi.stubGlobal('import', { meta: { env: {} } })
 
 // We test the pure helper functions by extracting their logic.
 // Since they are module-private, we test them indirectly via known JWT tokens.

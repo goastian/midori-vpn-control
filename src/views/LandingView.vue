@@ -223,20 +223,19 @@ function scrollTo(id: string) {
 
           <!-- Desktop links -->
           <div class="hidden md:flex items-center gap-6">
-            <button @click="scrollTo('features')" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">{{ t('landing.featuresNav') }}</button>
-            <button @click="scrollTo('pricing')" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">{{ t('landing.pricingNav') }}</button>
-            <button @click="scrollTo('trust')" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">{{ t('landing.securityNav') }}</button>
+            <button class="text-sm font-medium text-gray-400 hover:text-white transition-colors" @click="scrollTo('features')">{{ t('landing.featuresNav') }}</button>
+            <button class="text-sm font-medium text-gray-400 hover:text-white transition-colors" @click="scrollTo('pricing')">{{ t('landing.pricingNav') }}</button>
+            <button class="text-sm font-medium text-gray-400 hover:text-white transition-colors" @click="scrollTo('trust')">{{ t('landing.securityNav') }}</button>
             <div class="w-36">
               <LanguageSelector tone="dark" />
             </div>
-            <button @click="handleLogin" class="text-sm font-medium text-gray-400 hover:text-white transition-colors cursor-pointer">{{ t('landing.login') }}</button>
-            <button @click="handleLogin" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-midori-500 rounded-lg hover:bg-midori-600 transition-colors shadow-sm cursor-pointer">
+            <button class="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-midori-500 rounded-lg hover:bg-midori-600 transition-colors shadow-sm cursor-pointer" @click="handleLogin">
               {{ t('landing.getStarted') }}
             </button>
           </div>
 
           <!-- Mobile menu button -->
-          <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden p-2 rounded-lg hover:bg-gray-800 text-gray-300">
+          <button class="md:hidden p-2 rounded-lg hover:bg-gray-800 text-gray-300" @click="mobileMenuOpen = !mobileMenuOpen">
             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path v-if="!mobileMenuOpen" stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
               <path v-else stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -255,14 +254,13 @@ function scrollTo(id: string) {
         leave-to-class="opacity-0 -translate-y-2"
       >
         <div v-if="mobileMenuOpen" class="md:hidden border-t border-gray-800 bg-gray-900/95 backdrop-blur-lg px-4 py-4 space-y-3">
-          <button @click="scrollTo('features')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">{{ t('landing.featuresNav') }}</button>
-          <button @click="scrollTo('pricing')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">{{ t('landing.pricingNav') }}</button>
-          <button @click="scrollTo('trust')" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800">{{ t('landing.securityNav') }}</button>
+          <button class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800" @click="scrollTo('features')">{{ t('landing.featuresNav') }}</button>
+          <button class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800" @click="scrollTo('pricing')">{{ t('landing.pricingNav') }}</button>
+          <button class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800" @click="scrollTo('trust')">{{ t('landing.securityNav') }}</button>
           <div class="px-2 py-1">
             <LanguageSelector tone="dark" />
           </div>
-          <button @click="handleLogin" class="block w-full text-left px-3 py-2 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800 cursor-pointer">{{ t('landing.login') }}</button>
-          <button @click="handleLogin" class="block w-full text-center px-4 py-2 text-sm font-semibold text-white bg-midori-500 rounded-lg cursor-pointer">{{ t('landing.getStarted') }}</button>
+          <button class="block w-full text-center px-4 py-2 text-sm font-semibold text-white bg-midori-500 rounded-lg cursor-pointer" @click="handleLogin">{{ t('landing.getStarted') }}</button>
         </div>
       </Transition>
     </nav>
@@ -294,11 +292,11 @@ function scrollTo(id: string) {
             </p>
 
             <div class="mt-8 flex flex-col sm:flex-row gap-3">
-              <button @click="handleLogin" class="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-white bg-midori-500 rounded-xl hover:bg-midori-600 transition-all shadow-lg shadow-midori-500/25 hover:shadow-midori-500/40 cursor-pointer">
+              <button class="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-white bg-midori-500 rounded-xl hover:bg-midori-600 transition-all shadow-lg shadow-midori-500/25 hover:shadow-midori-500/40 cursor-pointer" @click="handleLogin">
                 {{ t('landing.heroPrimary') }}
                 <svg class="ml-2 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
               </button>
-              <button @click="scrollTo('features')" class="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-gray-300 bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-700 transition-all">
+              <button class="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-gray-300 bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-700 transition-all" @click="scrollTo('features')">
                 {{ t('landing.heroSecondary') }}
               </button>
             </div>
@@ -399,7 +397,8 @@ function scrollTo(id: string) {
             class="group bg-gray-800 rounded-2xl border border-gray-700 p-6 hover:shadow-lg hover:shadow-black/30 hover:border-midori-700 transition-all duration-300"
           >
             <!-- Icon -->
-            <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4 transition-colors duration-300"
+            <div
+class="w-11 h-11 rounded-xl flex items-center justify-center mb-4 transition-colors duration-300"
               :class="'bg-midori-900/40 text-midori-400 group-hover:bg-midori-500 group-hover:text-white'"
             >
               <!-- Shield -->
@@ -446,14 +445,14 @@ function scrollTo(id: string) {
           <!-- Annual/Monthly toggle -->
           <div class="mt-8 inline-flex items-center gap-3 bg-gray-800 rounded-full p-1">
             <button
-              @click="annual = false"
               :class="!annual ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400'"
               class="px-4 py-1.5 rounded-full text-sm font-medium transition-all"
+              @click="annual = false"
             >{{ t('landing.monthly') }}</button>
             <button
-              @click="annual = true"
               :class="annual ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400'"
               class="px-4 py-1.5 rounded-full text-sm font-medium transition-all"
+              @click="annual = true"
             >
               {{ t('landing.annual') }}
               <span class="ml-1 text-xs font-semibold text-midori-600">-33%</span>
@@ -500,11 +499,11 @@ function scrollTo(id: string) {
             </ul>
 
             <button
-              @click="handleLogin"
               class="mt-8 block w-full text-center px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer"
               :class="plan.highlighted
                 ? 'bg-midori-500 text-white hover:bg-midori-600 shadow-lg shadow-midori-500/25'
                 : 'bg-gray-700 text-white hover:bg-gray-600'"
+              @click="handleLogin"
             >
               {{ plan.cta }}
             </button>
@@ -562,11 +561,11 @@ function scrollTo(id: string) {
                 :key="tab.key"
                 role="tab"
                 :aria-selected="selectedOS === tab.key"
-                @click="selectedOS = tab.key"
                 class="px-4 py-2 text-sm font-semibold rounded-lg transition-colors"
                 :class="selectedOS === tab.key
                   ? 'bg-midori-500 text-white shadow'
                   : 'text-gray-300 hover:text-white hover:bg-gray-700/60'"
+                @click="selectedOS = tab.key"
               >
                 <span class="inline-flex items-center gap-2">
                   <svg v-if="tab.key === 'linux'" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -619,7 +618,7 @@ function scrollTo(id: string) {
           {{ t('landing.ctaSubtitle') }}
         </p>
         <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-          <button @click="handleLogin" class="inline-flex items-center px-8 py-3.5 text-base font-semibold text-white bg-midori-500 rounded-xl hover:bg-midori-600 transition-all shadow-lg shadow-midori-500/25 hover:shadow-midori-500/40 cursor-pointer">
+          <button class="inline-flex items-center px-8 py-3.5 text-base font-semibold text-white bg-midori-500 rounded-xl hover:bg-midori-600 transition-all shadow-lg shadow-midori-500/25 hover:shadow-midori-500/40 cursor-pointer" @click="handleLogin">
             {{ t('landing.ctaPrimary') }}
             <svg class="ml-2 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
           </button>
@@ -652,8 +651,8 @@ function scrollTo(id: string) {
           <div>
             <h4 class="text-xs font-semibold text-gray-100 uppercase tracking-wider mb-4">{{ t('landing.footerProduct') }}</h4>
             <ul class="space-y-2.5">
-              <li><button @click="scrollTo('features')" class="text-sm text-gray-400 hover:text-white transition-colors">{{ t('landing.featuresNav') }}</button></li>
-              <li><button @click="scrollTo('pricing')" class="text-sm text-gray-400 hover:text-white transition-colors">{{ t('landing.pricingNav') }}</button></li>
+              <li><button class="text-sm text-gray-400 hover:text-white transition-colors" @click="scrollTo('features')">{{ t('landing.featuresNav') }}</button></li>
+              <li><button class="text-sm text-gray-400 hover:text-white transition-colors" @click="scrollTo('pricing')">{{ t('landing.pricingNav') }}</button></li>
               <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">{{ t('landing.footerDownload') }}</a></li>
               <li><a href="#" class="text-sm text-gray-400 hover:text-white transition-colors">{{ t('landing.footerChangelog') }}</a></li>
             </ul>

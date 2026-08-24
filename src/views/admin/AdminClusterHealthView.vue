@@ -8,9 +8,9 @@
         </p>
       </div>
       <button
-        @click="fetchHealth"
         :disabled="loading"
         class="inline-flex items-center gap-2 px-5 py-2.5 bg-midori-600 hover:bg-midori-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-midori-900/30 transition-all cursor-pointer self-start sm:self-auto disabled:opacity-50"
+        @click="fetchHealth"
       >
         <span v-if="loading" class="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full"></span>
         <span>Actualizar Estado</span>

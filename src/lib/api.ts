@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || ''
+const API_URL = window.location.origin
 
 import type { ZodType } from 'zod'
 

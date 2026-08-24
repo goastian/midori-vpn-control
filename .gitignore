@@ -51,13 +51,4 @@ ehthumbs.db
 .syncthing.*
 .syncthing*.tmp
 
-# Asistentes y herramientas locales
-.gemini/
-.agents/
-.opencode/
-.claude/
-.cursor/
-.windsurf/
-*.prompt
-*.ai
-
+# Asistentes y herramientas locales se excluyen manualmente al preparar commits.

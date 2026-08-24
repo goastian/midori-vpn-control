@@ -8,9 +8,9 @@
         </p>
       </div>
       <button
-        @click="generateCredentials"
         :disabled="loading"
         class="inline-flex items-center gap-2 px-5 py-2.5 bg-midori-600 hover:bg-midori-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-midori-900/30 transition-all disabled:opacity-50 cursor-pointer self-start sm:self-auto"
+        @click="generateCredentials"
       >
         <span v-if="loading" class="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full"></span>
         <span>Generar Nueva Credencial</span>
@@ -37,8 +37,8 @@
             class="flex-1 px-4 py-2.5 text-sm bg-slate-950/60 border border-slate-700/80 rounded-xl text-slate-200 font-mono outline-none"
           />
           <button
-            @click="copyToken"
             class="px-4 py-2.5 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl font-semibold text-slate-200 transition cursor-pointer"
+            @click="copyToken"
           >
             {{ copied ? '✓ Copiado' : 'Copiar' }}
           </button>

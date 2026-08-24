@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { generateCodeVerifier, generateCodeChallenge } from '../lib/pkce'
 import { exchangeCode, api, setAccessToken, clearAccessToken, onAccessTokenRefreshed, initFromStoredRefreshToken } from '../lib/api'
-import { UserSchema, type User } from '../lib/schemas'
+import { UserSchema, type User, type UserQuota } from '../lib/schemas'
 import { SENSITIVE_SESSION_KEYS } from '../lib/storage-keys'
 
 /** Event name dispatched on `window` right before the logout redirect.
@@ -10,41 +10,51 @@ import { SENSITIVE_SESSION_KEYS } from '../lib/storage-keys'
  *  synchronously or within ~50ms — see `logout()` below. */
 export const AUTH_LOGOUT_EVENT = 'auth:logout'
 
-function normalizeIssuer(value: string | undefined): string {
-  return (value || '').replace(/\/+$/, '')
+interface OIDCConfigData {
+  issuer: string
+  authorization_endpoint: string
+  token_endpoint: string
+  userinfo_endpoint: string
+  end_session_endpoint: string
+  jwks_uri: string
+  client_id: string
+  redirect_uri: string
 }
 
-function parseIssuerUrls(value: string | undefined) {
-  const appUrl = normalizeIssuer(value)
+let cachedOIDCConfig: OIDCConfigData | null = null
 
-  try {
-    const url = new URL(appUrl)
-    const origin = url.origin
-    return {
-      appUrl,
-      expectedTokenIssuer: `${origin}/`,
-      authorizationUrl: `${origin}/application/o/authorize/`,
-      endSessionUrl: `${appUrl}/end-session/`,
+async function getOIDCConfig() {
+  if (!cachedOIDCConfig) {
+    const res = await fetch('/api/v1/auth/config', {
+      headers: { Accept: 'application/json' },
+      credentials: 'same-origin',
+    })
+    if (!res.ok) {
+      throw new Error(`OIDC discovery failed with HTTP ${res.status}`)
     }
-  } catch {
-    return {
-      appUrl,
-      expectedTokenIssuer: appUrl,
-      authorizationUrl: `${appUrl}/authorize/`,
-      endSessionUrl: `${appUrl}/end-session/`,
+    const json: { ok?: boolean; data?: OIDCConfigData } = await res.json()
+    const data = json.data
+    if (
+      !json.ok ||
+      !data?.issuer ||
+      !data.authorization_endpoint ||
+      !data.end_session_endpoint ||
+      !data.client_id ||
+      !data.redirect_uri
+    ) {
+      throw new Error('OIDC discovery returned an incomplete configuration')
     }
+    cachedOIDCConfig = data
+  }
+
+  return {
+    authorizationUrl: cachedOIDCConfig.authorization_endpoint,
+    clientId: cachedOIDCConfig.client_id,
+    redirectUri: cachedOIDCConfig.redirect_uri,
+    endSessionUrl: cachedOIDCConfig.end_session_endpoint,
+    expectedTokenIssuer: cachedOIDCConfig.issuer,
   }
 }
-
-const rawIssuer = import.meta.env.VITE_AUTHENTIK_ISSUER || ''
-const CLIENT_ID = import.meta.env.VITE_AUTHENTIK_CLIENT_ID || ''
-const REDIRECT_URI = import.meta.env.VITE_AUTHENTIK_REDIRECT_URI || `${window.location.origin}/auth/callback`
-
-if (!rawIssuer || !CLIENT_ID) {
-  console.warn('[MidoriVPN Auth] Missing VITE_AUTHENTIK_ISSUER or VITE_AUTHENTIK_CLIENT_ID in environment/.env')
-}
-
-const issuerUrls = parseIssuerUrls(rawIssuer)
 
 interface JWTPayload {
   sub?: string
@@ -98,6 +108,7 @@ export const useAuthStore = defineStore('auth', () => {
   )
 
   async function startLogin() {
+    const oidc = await getOIDCConfig()
     const verifier = generateCodeVerifier()
     const challenge = await generateCodeChallenge(verifier)
 
@@ -108,15 +119,15 @@ export const useAuthStore = defineStore('auth', () => {
 
     const params = new URLSearchParams({
       response_type: 'code',
-      client_id: CLIENT_ID,
-      redirect_uri: REDIRECT_URI,
+      client_id: oidc.clientId,
+      redirect_uri: oidc.redirectUri,
       scope: 'openid email profile offline_access',
       code_challenge: challenge,
       code_challenge_method: 'S256',
       state,
     })
 
-    const loginUrl = `${issuerUrls.authorizationUrl}?${params.toString()}`
+    const loginUrl = `${oidc.authorizationUrl}?${params.toString()}`
     window.location.href = loginUrl
   }
 
@@ -125,10 +136,11 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = ''
 
     try {
+      const oidc = await getOIDCConfig()
       const verifier = sessionStorage.getItem('pkce_verifier') || ''
       sessionStorage.removeItem('pkce_verifier')
 
-      const tokens = await exchangeCode(code, REDIRECT_URI, verifier)
+      const tokens = await exchangeCode(code, oidc.redirectUri, verifier)
 
       // Validate issuer: prefer id_token (guaranteed JWT per OIDC), fall back to access_token
       const accessPayload = decodeJWTPayload(tokens.access_token)
@@ -136,7 +148,7 @@ export const useAuthStore = defineStore('auth', () => {
       const issuerPayload = idPayload ?? accessPayload
       if (issuerPayload?.iss) {
         const tokenIss = issuerPayload.iss.replace(/\/+$/, '')
-        const expectedIss = issuerUrls.expectedTokenIssuer.replace(/\/+$/, '')
+        const expectedIss = oidc.expectedTokenIssuer.replace(/\/+$/, '')
         if (tokenIss !== expectedIss) {
           throw new Error('Token issuer mismatch')
         }
@@ -198,9 +210,8 @@ export const useAuthStore = defineStore('auth', () => {
     try { window.dispatchEvent(new Event(AUTH_LOGOUT_EVENT)) } catch { /* ignore */ }
     // Yield one tick so listeners have a chance to call ws.close() before
     // the navigation tears down the page.
-    await new Promise((resolve) => setTimeout(resolve, 50))
-
-    const logoutUrl = `${issuerUrls.endSessionUrl}?post_logout_redirect_uri=${encodeURIComponent(window.location.origin + '/')}`
+    const oidc = await getOIDCConfig()
+    const logoutUrl = `${oidc.endSessionUrl}?post_logout_redirect_uri=${encodeURIComponent(window.location.origin + '/')}`
     window.location.href = logoutUrl
   }
 
@@ -277,12 +288,27 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  const userQuota = computed(() => user.value?.quota ?? null)
+
+  async function fetchQuota() {
+    try {
+      const quota = await api.get<UserQuota>('/api/v1/control/quota')
+      if (quota && user.value) {
+        user.value.quota = quota
+      }
+      return quota
+    } catch {
+      return userQuota.value
+    }
+  }
+
   void restoreSession()
 
   return {
     accessToken,
     refreshToken,
     user,
+    userQuota,
     loading,
     error,
     initialized,
@@ -293,6 +319,7 @@ export const useAuthStore = defineStore('auth', () => {
     startLogin,
     handleCallback,
     fetchProfile,
+    fetchQuota,
     logout,
     startSessionCheck,
     stopSessionCheck,

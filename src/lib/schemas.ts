@@ -12,6 +12,21 @@ export const TokenResponseSchema = z.object({
 
 export type TokenResponse = z.infer<typeof TokenResponseSchema>
 
+export const UserQuotaSchema = z.object({
+  connected_devices: z.number(),
+  max_devices: z.number(),
+  available_devices: z.number(),
+  plan_slug: z.string(),
+  plan_name: z.string(),
+  devices_by_type: z.object({
+    desktop: z.number(),
+    extension: z.number(),
+    wireguard: z.number(),
+  }),
+})
+
+export type UserQuota = z.infer<typeof UserQuotaSchema>
+
 // ─── User ─────────────────────────────────────────────────
 
 export const UserSchema = z.object({
@@ -25,11 +40,25 @@ export const UserSchema = z.object({
   ban_reason: z.string().optional(),
   created_at: z.string(),
   updated_at: z.string().optional(),
+  quota: UserQuotaSchema.optional(),
 })
 
 export type User = z.infer<typeof UserSchema>
 
 // ─── Server ───────────────────────────────────────────────
+
+export const TransportCapabilitySchema = z.object({
+  protocol: z.enum(['wireguard', 'wss', 'masque', 'openvpn', 'ikev2', 'proxy']),
+  host: z.string(),
+  port: z.number().int().min(1).max(65535),
+  enabled: z.boolean(),
+  priority: z.number().int().min(0).max(1000),
+  health_status: z.enum(['unknown', 'healthy', 'degraded', 'disabled']),
+  last_checked_at: z.string().nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+})
+
+export type TransportCapability = z.infer<typeof TransportCapabilitySchema>
 
 export const ServerSchema = z.object({
   id: z.string(),
@@ -39,16 +68,15 @@ export const ServerSchema = z.object({
   port: z.number(),
   wg_port: z.number(),
   public_key: z.string(),
-  core_token: z.string().optional(),
   location: z.string(),
   country_code: z.string(),
   max_peers: z.number(),
   current_peers: z.number(),
   is_active: z.boolean(),
-  proxy_port: z.number().optional().default(0),
   supports_wireguard: z.boolean().optional().default(false),
   supports_proxy: z.boolean().optional().default(false),
   supports_mesh_exit: z.boolean().optional().default(false),
+  transports: z.array(TransportCapabilitySchema),
 })
 
 export type Server = z.infer<typeof ServerSchema>
@@ -59,6 +87,7 @@ export const ConnectionSchema = z.object({
   id: z.string(),
   server_id: z.string(),
   public_key: z.string(),
+  preshared_key: z.string().optional().default(''),
   assigned_ip: z.string(),
   device_name: z.string(),
   is_active: z.boolean(),
