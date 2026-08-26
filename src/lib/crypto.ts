@@ -48,18 +48,8 @@ export async function generateClientKeypair(): Promise<Keypair> {
       publicKey: arrayBufferToBase64(rawPublicKey),
       privateKey: arrayBufferToBase64(rawPrivateKey.buffer),
     }
-  } catch (_error) {
-    // Fallback: cryptographically secure random 32 bytes if X25519 SubtleCrypto isn't exposed
-    const priv = new Uint8Array(32)
-    window.crypto.getRandomValues(priv)
-    // Clamp curve25519 private key bits according to RFC 7748
-    priv[0] &= 248
-    priv[31] &= 127
-    priv[31] |= 64
-
-    return {
-      publicKey: '', // Will be derived or provided by fallback
-      privateKey: arrayBufferToBase64(priv.buffer),
-    }
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'unknown error'
+    throw new Error(`WebCrypto X25519 key generation failed: ${detail}`)
   }
 }

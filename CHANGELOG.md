@@ -12,6 +12,7 @@ All notable changes to Midori VPN Control are documented here.
 - Server administration now edits the normalized transport contract exclusively, including validated JSON metadata required by MASQUE, without sending retired proxy/WSS columns.
 - Runtime schemas and their tests now require the normalized `transports` array, preventing an older server payload from being accepted silently.
 - Release builds no longer embed production Authentik identifiers or environment-specific Vite build arguments.
+- WireGuard client key pairs are generated locally with WebCrypto X25519; the private key never crosses the Control API boundary, and clients fail closed when that capability is unavailable.
 
 ### Security
 

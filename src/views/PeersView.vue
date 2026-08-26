@@ -3,15 +3,11 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import QRCode from 'qrcode'
 import { api } from '../lib/api'
+import { generateClientKeypair } from '../lib/crypto'
 import { PRIVATE_KEYS_STORAGE_KEY } from '../lib/storage-keys'
 import { useLocale } from '../lib/i18n'
 import { useAuthStore } from '../stores/auth'
 import type { Server, Connection, ConnectionConfig } from '../lib/schemas'
-
-type Keypair = {
-  private_key: string
-  public_key: string
-}
 
 type ServerPingResult = {
   server_id: string
@@ -183,20 +179,21 @@ async function handleCreateDevice() {
 
   connecting.value = true
   try {
-    // 1. Generate cryptographic WireGuard keypair in background
-    const kp = await api.post<Keypair>('/api/v1/control/keypair')
+    // 1. Generate the WireGuard keypair locally. The private key must never
+    // cross the control API boundary.
+    const kp = await generateClientKeypair()
 
     // 2. Connect / Provision device
     const config = await api.post<ConnectionConfig>('/api/v1/control/connections', {
       server_id: form.value.server_id || undefined,
       device_name: name,
-      public_key: kp.public_key,
+      public_key: kp.publicKey,
     })
 
-    savePrivateKeyForPeer(config.peer_id, kp.private_key)
+    savePrivateKeyForPeer(config.peer_id, kp.privateKey)
 
     // 3. Build text & QR and open modal
-    const text = buildClientConfigText(config, kp.private_key)
+    const text = buildClientConfigText(config, kp.privateKey)
     const qr = await QRCode.toDataURL(text, { errorCorrectionLevel: 'L', scale: 5 })
 
     form.value.device_name = ''
@@ -206,7 +203,7 @@ async function handleCreateDevice() {
       id: config.peer_id,
       user_id: '',
       server_id: form.value.server_id || servers.value[0]?.id || '',
-      public_key: kp.public_key,
+      public_key: kp.publicKey,
       preshared_key: config.preshared_key || '',
       assigned_ip: config.peer_ip,
       device_name: name,
