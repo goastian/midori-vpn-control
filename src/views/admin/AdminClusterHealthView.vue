@@ -2,7 +2,7 @@
   <div class="space-y-6">
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
-        <h1 class="text-3xl font-bold tracking-tight text-white">Estado de Salud del Clúster (/readyz)</h1>
+        <h1 class="text-3xl font-bold tracking-tight text-white">Estado de Salud del Clúster</h1>
         <p class="text-sm text-slate-400 mt-1">
           Monitoreo en tiempo real de nodos de base de datos, Redis, interfaces WireGuard y sondas de disponibilidad.
         </p>
@@ -84,6 +84,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { api } from '../../lib/api'
 
 interface HealthResponse {
   status: string
@@ -101,11 +102,10 @@ const lastChecked = ref('')
 async function fetchHealth() {
   loading.value = true
   try {
-    const res = await fetch('/readyz')
-    healthData.value = await res.json()
+    healthData.value = await api.get<HealthResponse>('/api/v1/admin/health')
     lastChecked.value = new Date().toLocaleTimeString()
   } catch (err) {
-    console.error('Failed to query /readyz', err)
+    console.error('Failed to query protected cluster health', err)
   } finally {
     loading.value = false
   }
