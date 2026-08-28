@@ -1,0 +1,170 @@
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import { api } from '../../lib/api'
+import { useLocale } from '../../lib/i18n'
+
+interface ExtensionOrigin {
+  id: string
+  origin: string
+  revoked: boolean
+  created_at: string
+  updated_at: string
+}
+
+const origins = ref<ExtensionOrigin[]>([])
+const loading = ref(true)
+const loadError = ref('')
+const updatingID = ref('')
+const { t, formatDateTime } = useLocale()
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback
+}
+
+function browserName(origin: string): string {
+  return origin.startsWith('moz-extension://')
+    ? t('adminExtensions.firefox')
+    : t('adminExtensions.chromium')
+}
+
+async function loadOrigins() {
+  loading.value = true
+  loadError.value = ''
+  try {
+    origins.value =
+      (await api.get<ExtensionOrigin[]>('/api/v1/admin/trusted-extension-origins')) || []
+  } catch (error: unknown) {
+    loadError.value = errorMessage(error, t('adminExtensions.loadError'))
+  } finally {
+    loading.value = false
+  }
+}
+
+async function toggleOrigin(origin: ExtensionOrigin) {
+  const nextRevoked = !origin.revoked
+  if (
+    !window.confirm(
+      t(nextRevoked ? 'adminExtensions.revokeConfirm' : 'adminExtensions.restoreConfirm'),
+    )
+  )
+    return
+
+  updatingID.value = origin.id
+  try {
+    await api.put(`/api/v1/admin/trusted-extension-origins/${origin.id}`, { revoked: nextRevoked })
+    origin.revoked = nextRevoked
+    origin.updated_at = new Date().toISOString()
+  } catch (error: unknown) {
+    window.alert(errorMessage(error, t('adminExtensions.updateError')))
+  } finally {
+    updatingID.value = ''
+  }
+}
+
+onMounted(loadOrigins)
+</script>
+
+<template>
+  <div class="space-y-6">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight text-white">
+          {{ t('adminExtensions.title') }}
+        </h1>
+        <p class="mt-1 max-w-3xl text-sm text-slate-400">{{ t('adminExtensions.subtitle') }}</p>
+      </div>
+      <button
+        class="rounded-xl bg-midori-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-midori-500 disabled:opacity-50"
+        :disabled="loading"
+        @click="loadOrigins"
+      >
+        {{ t('adminExtensions.refresh') }}
+      </button>
+    </div>
+
+    <div
+      v-if="loadError"
+      class="flex items-center justify-between rounded-2xl border border-rose-800/50 bg-rose-950/40 p-4 text-sm text-rose-300"
+    >
+      <span>{{ loadError }}</span>
+      <button class="ml-3 font-semibold underline" @click="loadOrigins">
+        {{ t('common.retry') }}
+      </button>
+    </div>
+
+    <div v-if="loading" class="flex justify-center py-16">
+      <div class="h-9 w-9 animate-spin rounded-full border-b-2 border-midori-500"></div>
+    </div>
+
+    <div
+      v-else-if="origins.length === 0"
+      class="rounded-3xl border border-slate-800 bg-slate-900/60 p-12 text-center text-slate-400"
+    >
+      {{ t('adminExtensions.empty') }}
+    </div>
+
+    <div
+      v-else
+      class="overflow-x-auto rounded-3xl border border-slate-800/80 bg-slate-900/80 shadow-xl shadow-black/30"
+    >
+      <table class="w-full text-sm">
+        <thead
+          class="border-b border-slate-800 bg-slate-950/60 text-left text-xs font-semibold uppercase tracking-wider text-slate-400"
+        >
+          <tr>
+            <th class="px-6 py-4">{{ t('adminExtensions.origin') }}</th>
+            <th class="px-6 py-4">{{ t('adminExtensions.browser') }}</th>
+            <th class="hidden px-6 py-4 lg:table-cell">{{ t('adminExtensions.firstSeen') }}</th>
+            <th class="hidden px-6 py-4 md:table-cell">{{ t('adminExtensions.lastSeen') }}</th>
+            <th class="px-6 py-4">{{ t('common.status') }}</th>
+            <th class="px-6 py-4 text-right">{{ t('common.actions') }}</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800/60">
+          <tr
+            v-for="origin in origins"
+            :key="origin.id"
+            class="transition-colors hover:bg-slate-800/50"
+          >
+            <td class="max-w-sm break-all px-6 py-4 font-mono text-xs text-midori-300">
+              {{ origin.origin }}
+            </td>
+            <td class="px-6 py-4 text-slate-300">{{ browserName(origin.origin) }}</td>
+            <td class="hidden whitespace-nowrap px-6 py-4 text-xs text-slate-400 lg:table-cell">
+              {{ formatDateTime(origin.created_at) }}
+            </td>
+            <td class="hidden whitespace-nowrap px-6 py-4 text-xs text-slate-400 md:table-cell">
+              {{ formatDateTime(origin.updated_at) }}
+            </td>
+            <td class="px-6 py-4">
+              <span
+                class="rounded-full border px-2.5 py-1 text-xs font-semibold"
+                :class="
+                  origin.revoked
+                    ? 'border-rose-700/50 bg-rose-950/60 text-rose-300'
+                    : 'border-midori-700/50 bg-midori-950/60 text-midori-300'
+                "
+              >
+                {{ t(origin.revoked ? 'adminExtensions.revoked' : 'adminExtensions.trusted') }}
+              </span>
+            </td>
+            <td class="px-6 py-4 text-right">
+              <button
+                class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition disabled:cursor-wait disabled:opacity-50"
+                :class="
+                  origin.revoked
+                    ? 'border-midori-700/50 text-midori-300 hover:bg-midori-950/50'
+                    : 'border-rose-700/50 text-rose-300 hover:bg-rose-950/50'
+                "
+                :disabled="updatingID === origin.id"
+                @click="toggleOrigin(origin)"
+              >
+                {{ t(origin.revoked ? 'adminExtensions.restore' : 'adminExtensions.revoke') }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</template>

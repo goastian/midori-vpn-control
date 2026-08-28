@@ -30,6 +30,7 @@ const navGroups = computed(() => {
         { name: t('nav.adminServers'), path: '/admin/servers', icon: 'shield' },
         { name: t('nav.adminPeers'), path: '/admin/peers', icon: 'pulse' },
         { name: t('nav.adminMesh'), path: '/admin/mesh', icon: 'mesh' },
+        { name: t('nav.adminExtensions'), path: '/admin/extensions', icon: 'extension' },
         { name: t('nav.adminLogs'), path: '/admin/audit', icon: 'log' },
       ],
     })
@@ -60,6 +61,8 @@ function iconPath(icon: string) {
       return 'M5 2.5A1.5 1.5 0 003.5 4v12A1.5 1.5 0 005 17.5h10a1.5 1.5 0 001.5-1.5V4A1.5 1.5 0 0015 2.5H5zm2.25 4a.75.75 0 000 1.5h5.5a.75.75 0 100-1.5h-5.5zm0 3a.75.75 0 000 1.5h5.5a.75.75 0 100-1.5h-5.5zm0 3a.75.75 0 000 1.5H11a.75.75 0 100-1.5H7.25z'
     case 'mesh':
       return 'M5 3a2 2 0 100 4 2 2 0 000-4zm8 0a2 2 0 100 4 2 2 0 000-4zM3 10a2 2 0 114 0 2 2 0 01-4 0zm8 0a2 2 0 114 0 2 2 0 01-4 0zM5 14.5a2 2 0 100 4 2 2 0 000-4zm8 0a2 2 0 100 4 2 2 0 000-4zM7 5h6M7 12h6M5 8v4m10-4v4M7 16.5h6'
+    case 'extension':
+      return 'M7.5 2a1 1 0 00-1 1v2.5H4a2 2 0 00-2 2v2a1 1 0 001 1h1a1.5 1.5 0 010 3H3a1 1 0 00-1 1v2a2 2 0 002 2h4a1 1 0 001-1v-1a1.5 1.5 0 013 0v1a1 1 0 001 1h3a2 2 0 002-2v-3a1 1 0 00-1-1h-1a1.5 1.5 0 010-3h1a1 1 0 001-1v-1a2 2 0 00-2-2h-3.5V3a1 1 0 00-1-1h-3z'
     default:
       return 'M10 2a8 8 0 100 16 8 8 0 000-16z'
   }
@@ -71,7 +74,9 @@ function closeMobile() {
 </script>
 
 <template>
-  <header class="sticky top-0 z-30 border-b border-slate-800 bg-slate-900/90 px-4 py-3 backdrop-blur lg:hidden text-slate-100">
+  <header
+    class="sticky top-0 z-30 border-b border-slate-800 bg-slate-900/90 px-4 py-3 backdrop-blur lg:hidden text-slate-100"
+  >
     <div class="flex items-center justify-between">
       <router-link to="/dashboard" class="text-xl font-bold tracking-tight text-midori-400">
         MidoriVPN
@@ -82,16 +87,23 @@ function closeMobile() {
         @click="mobileOpen = true"
       >
         <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-          <path d="M3 5.5a.75.75 0 01.75-.75h12.5a.75.75 0 010 1.5H3.75A.75.75 0 013 5.5zm0 4.5a.75.75 0 01.75-.75h12.5a.75.75 0 010 1.5H3.75A.75.75 0 013 10zm.75 3.75a.75.75 0 000 1.5h8.5a.75.75 0 000-1.5h-8.5z" />
+          <path
+            d="M3 5.5a.75.75 0 01.75-.75h12.5a.75.75 0 010 1.5H3.75A.75.75 0 013 5.5zm0 4.5a.75.75 0 01.75-.75h12.5a.75.75 0 010 1.5H3.75A.75.75 0 013 10zm.75 3.75a.75.75 0 000 1.5h8.5a.75.75 0 000-1.5h-8.5z"
+          />
         </svg>
       </button>
     </div>
   </header>
 
-  <aside class="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-slate-800 bg-slate-900/95 p-5 backdrop-blur-xl lg:flex lg:flex-col text-slate-100 shadow-2xl">
+  <aside
+    class="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-slate-800 bg-slate-900/95 p-5 backdrop-blur-xl lg:flex lg:flex-col text-slate-100 shadow-2xl"
+  >
     <!-- Brand Title & Language Selector with Clean Separation -->
     <div class="px-2 pb-5 mb-4 border-b border-slate-800/80 space-y-4">
-      <router-link to="/dashboard" class="block text-2xl font-bold tracking-tight text-midori-400 hover:text-midori-300 transition-colors">
+      <router-link
+        to="/dashboard"
+        class="block text-2xl font-bold tracking-tight text-midori-400 hover:text-midori-300 transition-colors"
+      >
         {{ t('common.appName') }}
       </router-link>
       <div class="pt-1">
@@ -110,9 +122,11 @@ function closeMobile() {
             :key="item.path"
             :to="item.path"
             class="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all"
-            :class="isItemActive(item.path)
-              ? 'bg-midori-600 text-white shadow-lg shadow-midori-900/30 font-semibold'
-              : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'"
+            :class="
+              isItemActive(item.path)
+                ? 'bg-midori-600 text-white shadow-lg shadow-midori-900/30 font-semibold'
+                : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+            "
           >
             <svg class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
               <path :d="iconPath(item.icon)" />
@@ -124,7 +138,9 @@ function closeMobile() {
 
       <div class="rounded-2xl border border-slate-700/60 bg-slate-800/80 p-4 shadow-sm">
         <p class="truncate text-sm font-semibold text-slate-100">{{ auth.user?.email }}</p>
-        <p class="mt-1 text-xs text-slate-400">{{ auth.isAdmin ? t('common.roleAdmin') : t('common.roleUser') }}</p>
+        <p class="mt-1 text-xs text-slate-400">
+          {{ auth.isAdmin ? t('common.roleAdmin') : t('common.roleUser') }}
+        </p>
         <button
           class="mt-3 w-full rounded-xl border border-rose-700/60 bg-rose-950/20 px-3 py-2 text-sm font-medium text-rose-300 transition hover:bg-rose-900/40"
           @click="auth.logout()"
@@ -137,15 +153,31 @@ function closeMobile() {
 
   <transition name="fade">
     <div v-if="mobileOpen" class="fixed inset-0 z-50 lg:hidden">
-      <button class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" aria-label="Cerrar menu" @click="closeMobile"></button>
-      <aside class="absolute inset-y-0 left-0 w-72 border-r border-slate-800 bg-slate-900 p-5 text-slate-100 shadow-2xl">
+      <button
+        class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+        aria-label="Cerrar menu"
+        @click="closeMobile"
+      ></button>
+      <aside
+        class="absolute inset-y-0 left-0 w-72 border-r border-slate-800 bg-slate-900 p-5 text-slate-100 shadow-2xl"
+      >
         <div class="flex items-center justify-between px-2 pb-4 border-b border-slate-800">
-          <router-link to="/dashboard" class="text-2xl font-bold text-midori-400" @click="closeMobile">
+          <router-link
+            to="/dashboard"
+            class="text-2xl font-bold text-midori-400"
+            @click="closeMobile"
+          >
             {{ t('common.appName') }}
           </router-link>
-          <button class="rounded-xl p-2 text-slate-400 hover:text-white" :aria-label="t('nav.closeMenu')" @click="closeMobile">
+          <button
+            class="rounded-xl p-2 text-slate-400 hover:text-white"
+            :aria-label="t('nav.closeMenu')"
+            @click="closeMobile"
+          >
             <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M5.22 5.22a.75.75 0 011.06 0L10 8.94l3.72-3.72a.75.75 0 111.06 1.06L11.06 10l3.72 3.72a.75.75 0 11-1.06 1.06L10 11.06l-3.72 3.72a.75.75 0 11-1.06-1.06L8.94 10 5.22 6.28a.75.75 0 010-1.06z" />
+              <path
+                d="M5.22 5.22a.75.75 0 011.06 0L10 8.94l3.72-3.72a.75.75 0 111.06 1.06L11.06 10l3.72 3.72a.75.75 0 11-1.06 1.06L10 11.06l-3.72 3.72a.75.75 0 11-1.06-1.06L8.94 10 5.22 6.28a.75.75 0 010-1.06z"
+              />
             </svg>
           </button>
         </div>
@@ -154,19 +186,25 @@ function closeMobile() {
           <LanguageSelector tone="dark" />
 
           <section v-for="group in navGroups" :key="group.title">
-            <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ group.title }}</p>
+            <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+              {{ group.title }}
+            </p>
             <div class="space-y-1">
               <router-link
                 v-for="item in group.items"
                 :key="item.path"
                 :to="item.path"
                 class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition"
-                :class="isItemActive(item.path)
-                  ? 'bg-midori-600 text-white font-semibold'
-                  : 'text-slate-300 hover:bg-slate-800'"
+                :class="
+                  isItemActive(item.path)
+                    ? 'bg-midori-600 text-white font-semibold'
+                    : 'text-slate-300 hover:bg-slate-800'
+                "
                 @click="closeMobile"
               >
-                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path :d="iconPath(item.icon)" /></svg>
+                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path :d="iconPath(item.icon)" />
+                </svg>
                 {{ item.name }}
               </router-link>
             </div>

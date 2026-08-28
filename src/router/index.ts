@@ -89,6 +89,12 @@ const router = createRouter({
       meta: { admin: true },
     },
     {
+      path: '/admin/extensions',
+      name: 'admin-extensions',
+      component: () => import('../views/admin/AdminExtensionOriginsView.vue'),
+      meta: { admin: true },
+    },
+    {
       path: '/admin/mesh',
       name: 'admin-mesh',
       component: () => import('../views/admin/AdminMeshView.vue'),

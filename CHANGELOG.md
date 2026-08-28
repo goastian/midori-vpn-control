@@ -6,6 +6,7 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Changed
 
+- Added an administrator view for registered Firefox, Midori and Chromium extension origins, including explicit revoke and restore actions with localized status and timestamps.
 - Added a mandatory `npm run check` quality gate and cleaned test-router diagnostics so successful tests do not emit framework warnings.
 - Reworked the Control panel release line to 2.0.0.
 - Updated the JavaScript toolchain and direct dependencies to current compatible major versions, including Vite 8, Vitest 4, Vue Router 5, Pinia 4 and Zod 4.

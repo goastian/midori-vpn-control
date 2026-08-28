@@ -18,6 +18,7 @@ function makeRouter() {
       { path: '/admin/peers', component: { template: '<div />' } },
       { path: '/admin/audit', component: { template: '<div />' } },
       { path: '/admin/mesh', component: { template: '<div />' } },
+      { path: '/admin/extensions', component: { template: '<div />' } },
     ],
   })
 }
@@ -74,6 +75,7 @@ describe('NavBar', () => {
 
     expect(wrapper.text()).toContain('Admin Servers')
     expect(wrapper.text()).toContain('Usuarios')
+    expect(wrapper.text()).toContain('Extensiones')
   })
 
   it('shows user email', async () => {
