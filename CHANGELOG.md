@@ -6,6 +6,7 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Changed
 
+- Pinned Node 24.20.0 and Nginx 1.31.4 build/runtime images to exact Alpine 3.24 digests so clean Control builds do not depend on mutable container tags.
 - Added an administrator view for registered Firefox, Midori and Chromium extension origins, including explicit revoke and restore actions with localized status and timestamps.
 - Added a mandatory `npm run check` quality gate and cleaned test-router diagnostics so successful tests do not emit framework warnings.
 - Reworked the Control panel release line to 2.0.0.
