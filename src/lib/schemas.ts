@@ -87,7 +87,6 @@ export const ConnectionSchema = z.object({
   id: z.string(),
   server_id: z.string(),
   public_key: z.string(),
-  preshared_key: z.string().optional().default(''),
   assigned_ip: z.string(),
   device_name: z.string(),
   is_active: z.boolean(),

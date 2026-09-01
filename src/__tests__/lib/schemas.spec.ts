@@ -121,6 +121,24 @@ describe('Zod API schemas', () => {
       }
       expect(() => ConnectionSchema.parse(conn)).not.toThrow()
     })
+
+    it('does not expose a preshared key from connection listings', () => {
+      const parsed = ConnectionSchema.parse({
+        id: 'uuid-3',
+        server_id: 'uuid-2',
+        public_key: 'pk',
+        preshared_key: 'must-not-reach-the-view',
+        assigned_ip: '10.8.0.2/32',
+        device_name: 'laptop',
+        is_active: true,
+        bytes_sent: 0,
+        bytes_received: 0,
+        last_handshake: null,
+        created_at: '2024-01-01T00:00:00Z',
+      })
+
+      expect(parsed).not.toHaveProperty('preshared_key')
+    })
   })
 
   describe('ConnectionConfigSchema', () => {

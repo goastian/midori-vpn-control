@@ -2,10 +2,51 @@ const API_URL = window.location.origin
 
 import type { ZodType } from 'zod'
 
-interface ApiResponse<T = any> {
-  ok: boolean
+interface ApiSuccess<T> {
+  ok: true
   data: T
-  error?: string
+}
+
+interface ApiFailure {
+  ok: false
+  error: string
+  code: string
+}
+
+type ApiResponse<T> = ApiSuccess<T> | ApiFailure
+
+export class APIError extends Error {
+  readonly status: number
+  readonly code: string
+  readonly retryAfter?: number
+
+  constructor(status: number, code: string, message: string, retryAfter?: number) {
+    super(message)
+    this.name = 'APIError'
+    this.status = status
+    this.code = code
+    this.retryAfter = retryAfter
+  }
+}
+
+async function responseError(res: Response, fallback: string): Promise<APIError> {
+  let payload: Partial<ApiFailure> = {}
+  try {
+    payload = await res.json() as Partial<ApiFailure>
+  } catch {
+    // The fallback remains safe for non-JSON gateway failures.
+  }
+  const retryAfterHeader = res.headers.get('Retry-After')
+  const parsedRetryAfter = retryAfterHeader ? Number.parseInt(retryAfterHeader, 10) : Number.NaN
+  const retryAfter = res.status === 429
+    ? (Number.isNaN(parsedRetryAfter) ? 60 : Math.min(parsedRetryAfter, 120))
+    : undefined
+  return new APIError(
+    res.status,
+    typeof payload.code === 'string' && payload.code ? payload.code : 'request_failed',
+    typeof payload.error === 'string' && payload.error ? payload.error : fallback,
+    retryAfter,
+  )
 }
 
 let isRefreshing = false
@@ -70,7 +111,7 @@ async function tryRefreshToken(): Promise<string> {
   })
 
   if (!res.ok) {
-    throw new Error('Token refresh failed')
+    throw await responseError(res, 'Token refresh failed')
   }
 
   const json: ApiResponse<{ access_token: string; refresh_token?: string }> = await res.json()
@@ -122,7 +163,7 @@ async function request<T>(path: string, options: RequestInit = {}, _isRetry = fa
         clearAccessToken()
         localStorage.removeItem('refresh_token')
         window.location.href = '/dashboard'
-        throw new Error('Unauthorized')
+        throw new APIError(401, 'unauthorized', 'Unauthorized')
       }
     } else {
       // Another refresh is in progress — wait for it
@@ -139,25 +180,15 @@ async function request<T>(path: string, options: RequestInit = {}, _isRetry = fa
     clearAccessToken()
     localStorage.removeItem('refresh_token')
     window.location.href = '/dashboard'
-    throw new Error('Unauthorized')
+    throw new APIError(401, 'unauthorized', 'Unauthorized')
   }
 
-  if (res.status === 429) {
-    const retryAfter = res.headers.get('Retry-After')
-    const seconds = retryAfter ? parseInt(retryAfter, 10) : 60
-    const waitSecs = isNaN(seconds) ? 60 : Math.min(seconds, 120)
-    throw Object.assign(new Error(`Too many requests. Please wait ${waitSecs} seconds.`), {
-      status: 429,
-      retryAfter: waitSecs,
-    })
+  if (!res.ok) {
+    throw await responseError(res, `Request failed: ${res.status}`)
   }
 
   const json: ApiResponse<T> = await res.json()
-
-  if (!res.ok || json.error) {
-    throw new Error(json.error || `Request failed: ${res.status}`)
-  }
-
+  if (!json.ok) throw new APIError(res.status, json.code, json.error)
   return json.data
 }
 
@@ -196,7 +227,7 @@ async function requestRaw(path: string, options: RequestInit = {}, _isRetry = fa
         clearAccessToken()
         localStorage.removeItem('refresh_token')
         window.location.href = '/dashboard'
-        throw new Error('Unauthorized')
+        throw new APIError(401, 'unauthorized', 'Unauthorized')
       }
     } else {
       return new Promise<Response>((resolve, reject) => {
@@ -212,17 +243,14 @@ async function requestRaw(path: string, options: RequestInit = {}, _isRetry = fa
     clearAccessToken()
     localStorage.removeItem('refresh_token')
     window.location.href = '/dashboard'
-    throw new Error('Unauthorized')
+    throw new APIError(401, 'unauthorized', 'Unauthorized')
   }
 
   if (res.status === 429) {
     const retryAfter = res.headers.get('Retry-After')
     const seconds = retryAfter ? parseInt(retryAfter, 10) : 60
     const waitSecs = isNaN(seconds) ? 60 : Math.min(seconds, 120)
-    throw Object.assign(new Error(`Too many requests. Please wait ${waitSecs} seconds.`), {
-      status: 429,
-      retryAfter: waitSecs,
-    })
+    throw new APIError(429, 'rate_limited', `Too many requests. Please wait ${waitSecs} seconds.`, waitSecs)
   }
 
   return res
@@ -260,8 +288,7 @@ export async function exchangeCode(code: string, redirectUri: string, codeVerifi
   })
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'token exchange failed' }))
-    throw new Error(err.error || 'token exchange failed')
+    throw await responseError(res, 'token exchange failed')
   }
 
   const json = await res.json()
