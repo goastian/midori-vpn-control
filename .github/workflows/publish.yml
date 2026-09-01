@@ -1,0 +1,162 @@
+name: Publish - approved Control OCI release
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_publish:
+        description: Type publish-v2.0.0 to enter the protected release gate
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: midorivpn-control-v2.0.0-publication
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: ghcr.io/goastian/midori-vpn-control
+  RELEASE_TAG: v2.0.0
+  RELEASE_VERSION: 2.0.0
+
+jobs:
+  validate-release-ref:
+    name: Validate the immutable release ref
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the selected ref
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Require the approved tag and explicit confirmation
+        env:
+          CONFIRM_PUBLISH: ${{ inputs.confirm_publish }}
+        run: |
+          set -Eeuo pipefail
+          test "$GITHUB_REF" = "refs/tags/${RELEASE_TAG}"
+          test "$CONFIRM_PUBLISH" = "publish-${RELEASE_VERSION}"
+          test "$(node -p "require('./package.json').version")" = "$RELEASE_VERSION"
+          git tag --points-at HEAD | grep -Fx "$RELEASE_TAG"
+          test "$(git cat-file -t "refs/tags/${RELEASE_TAG}")" = "tag"
+
+  publish-signed-image:
+    name: Publish, attest and sign Control by digest
+    needs: validate-release-ref
+    runs-on: ubuntu-latest
+    environment:
+      name: release-production
+    permissions:
+      artifact-metadata: write
+      attestations: write
+      contents: read
+      id-token: write
+      packages: write
+    steps:
+      - name: Checkout the approved tag
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Require the environment release switch
+        env:
+          RELEASE_SIGNING_ENABLED: ${{ vars.RELEASE_SIGNING_ENABLED }}
+        run: test "$RELEASE_SIGNING_ENABLED" = "true"
+
+      - name: Define the reproducible build epoch
+        run: echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Refuse to replace an existing release tag
+        run: |
+          if docker buildx imagetools inspect "${IMAGE_NAME}:${RELEASE_VERSION}" >/dev/null 2>&1; then
+            echo "error: ${IMAGE_NAME}:${RELEASE_VERSION} already exists and will not be overwritten" >&2
+            exit 1
+          fi
+
+      - name: Build and push the immutable image
+        id: push
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:${{ env.RELEASE_VERSION }}
+          labels: |
+            org.opencontainers.image.version=${{ env.RELEASE_VERSION }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/goastian/midori-vpn-control
+          build-args: |
+            SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
+          provenance: mode=max
+          sbom: true
+
+      - name: Generate an independent SPDX SBOM from the pushed digest
+        env:
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          set -Eeuo pipefail
+          mkdir -p dist-release
+          docker run --rm \
+            -e SYFT_CACHE_DIR=/tmp/syft-cache \
+            -v "${HOME}/.docker/config.json:/root/.docker/config.json:ro" \
+            -v "${PWD}/dist-release:/artifacts" \
+            ghcr.io/anchore/syft@sha256:41f8289664101d6ebab30a97ac8df6b6f86b92d8343285ca90f428e2bc353106 \
+            scan "registry:${IMAGE_NAME}@${IMAGE_DIGEST}" \
+            -o spdx-json=/artifacts/midorivpn-control-2.0.0.spdx.json
+
+      - name: Attest build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest the SPDX SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          sbom-path: dist-release/midorivpn-control-2.0.0.spdx.json
+          push-to-registry: true
+
+      - name: Install the pinned Cosign release
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.2
+
+      - name: Sign the image digest with the workflow OIDC identity
+        env:
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+        run: cosign sign --yes "${IMAGE_NAME}@${IMAGE_DIGEST}"
+
+      - name: Verify signature and GitHub attestations
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          set -Eeuo pipefail
+          image_ref="${IMAGE_NAME}@${IMAGE_DIGEST}"
+          identity="https://github.com/goastian/midori-vpn-control/.github/workflows/publish.yml@refs/tags/v2.0.0"
+          cosign verify \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$image_ref"
+          gh attestation verify "oci://${image_ref}" \
+            --repo goastian/midori-vpn-control \
+            --predicate-type https://slsa.dev/provenance/v1
+          gh attestation verify "oci://${image_ref}" \
+            --repo goastian/midori-vpn-control \
+            --predicate-type https://spdx.dev/Document/v2.3
+          printf 'Published Control digest: %s\n' "$image_ref" >> "$GITHUB_STEP_SUMMARY"

@@ -6,6 +6,9 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Changed
 
+- Added a separate protected publication workflow that refuses tag replacement
+  and binds the Control digest to GitHub provenance, SPDX attestation and an
+  immediately verified keyless Cosign workflow identity.
 - Replaced direct container publication with a read-only build evidence job
   that produces an OCI archive, embedded and independent SBOMs, provenance and
   checksums using immutable workflow dependencies.
