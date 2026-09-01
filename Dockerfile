@@ -1,3 +1,5 @@
+ARG SOURCE_DATE_EPOCH=0
+
 # ── Stage 1: Build ──
 FROM docker.io/library/node:24.20.0-alpine3.24@sha256:4caaaf42195bcd6f6f3559a413b20cb8f8ad089e231ee874cf7701643966689f AS builder
 

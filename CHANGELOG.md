@@ -6,6 +6,9 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Changed
 
+- Replaced direct container publication with a read-only build evidence job
+  that produces an OCI archive, embedded and independent SBOMs, provenance and
+  checksums using immutable workflow dependencies.
 - API failures retain their stable machine-readable code, HTTP status and
   retry metadata, and connection-list schemas no longer admit preshared keys.
 - Pinned Node 24.20.0 and Nginx 1.31.4 build/runtime images to exact Alpine 3.24 digests so clean Control builds do not depend on mutable container tags.
