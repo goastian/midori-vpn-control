@@ -18,6 +18,7 @@ const navGroups = computed(() => {
         { name: t('nav.dashboard'), path: '/dashboard', icon: 'home' },
         { name: t('nav.servers'), path: '/servers', icon: 'server' },
         { name: t('nav.connections'), path: '/connections', icon: 'link' },
+        { name: t('nav.proxy'), path: '/proxy', icon: 'extension' },
       ],
     },
   ]

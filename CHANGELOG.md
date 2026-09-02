@@ -9,6 +9,10 @@ All notable changes to Midori VPN Control are documented here.
 - Responsive navigation now reports its open state to assistive technology,
   closes on Escape or route changes, localizes every close action, and exposes
   the existing cluster-health view to administrators.
+- Proxy credentials now require an explicit authenticated action instead of
+  being issued when their view opens. Proxy and cluster-health screens use
+  localized accessible loading, empty and retryable error states, and degraded
+  health reports preserve the real PostgreSQL, WireGuard and Redis results.
 - Added a separate protected publication workflow that refuses tag replacement
   and binds the Control digest to GitHub provenance, SPDX attestation and an
   immediately verified keyless Cosign workflow identity.

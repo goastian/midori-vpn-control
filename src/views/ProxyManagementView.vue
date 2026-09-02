@@ -1,78 +1,8 @@
-<template>
-  <div class="space-y-6">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-      <div>
-        <h1 class="text-3xl font-bold tracking-tight text-white">Credenciales Proxy para Extensión</h1>
-        <p class="text-sm text-slate-400 mt-1">
-          Gestiona tokens efímeros seguros (<code class="text-midori-400 font-mono">aud=vpn-proxy</code>) y túneles HTTPS CONNECT para extensiones de navegador.
-        </p>
-      </div>
-      <button
-        :disabled="loading"
-        class="inline-flex items-center gap-2 px-5 py-2.5 bg-midori-600 hover:bg-midori-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-midori-900/30 transition-all disabled:opacity-50 cursor-pointer self-start sm:self-auto"
-        @click="generateCredentials"
-      >
-        <span v-if="loading" class="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full"></span>
-        <span>Generar Nueva Credencial</span>
-      </button>
-    </div>
-
-    <!-- Active Credential Card -->
-    <div v-if="credential" class="bg-slate-900/80 rounded-3xl p-6 md:p-8 border border-slate-800/80 shadow-xl shadow-black/30 backdrop-blur-xl space-y-6">
-      <div class="flex items-center justify-between">
-        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-midori-950/60 border border-midori-700/50 text-midori-300">
-          <span class="w-1.5 h-1.5 rounded-full bg-midori-400 animate-pulse"></span>
-          Token Activo (HTTPS CONNECT)
-        </span>
-        <span class="text-xs text-slate-400 font-mono">Expira en: {{ formatExpiresIn(credential.expires_in) }}</span>
-      </div>
-
-      <div class="space-y-2">
-        <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Proxy Token</label>
-        <div class="flex items-center gap-3">
-          <input
-            type="password"
-            readonly
-            :value="credential.proxy_token"
-            class="flex-1 px-4 py-2.5 text-sm bg-slate-950/60 border border-slate-700/80 rounded-xl text-slate-200 font-mono outline-none"
-          />
-          <button
-            class="px-4 py-2.5 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl font-semibold text-slate-200 transition cursor-pointer"
-            @click="copyToken"
-          >
-            {{ copied ? '✓ Copiado' : 'Copiar' }}
-          </button>
-        </div>
-      </div>
-
-      <!-- Proxy Endpoints List -->
-      <div class="space-y-3 pt-2">
-        <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Endpoints Disponibles</label>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div
-            v-for="ep in credential.proxy_endpoints"
-            :key="ep.host"
-            class="p-4 bg-slate-950/60 rounded-2xl border border-slate-800 flex items-center justify-between text-sm hover:border-slate-700 transition-all"
-          >
-            <div class="flex items-center gap-3">
-              <span class="w-2 h-2 rounded-full bg-midori-400"></span>
-              <span class="font-mono text-xs text-white">{{ ep.host }}:{{ ep.port }}</span>
-            </div>
-            <span class="text-xs text-slate-400 font-mono font-semibold uppercase px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700">{{ ep.country_code }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Empty State -->
-    <div v-else-if="!loading" class="bg-slate-900/60 rounded-3xl p-12 text-center border border-slate-800 text-slate-400 text-sm">
-      <p>No has generado credenciales de proxy recientes.</p>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
+import AsyncState from '../components/AsyncState.vue'
+import { api } from '../lib/api'
+import { useLocale } from '../lib/i18n'
 
 interface ProxyEndpoint {
   host: string
@@ -87,43 +17,119 @@ interface ProxyCredentialResponse {
   proxy_endpoints: ProxyEndpoint[]
 }
 
+const { t } = useLocale()
 const credential = ref<ProxyCredentialResponse | null>(null)
 const loading = ref(false)
 const copied = ref(false)
+const failed = ref(false)
 
 async function generateCredentials() {
+  if (loading.value) return
   loading.value = true
+  failed.value = false
+  copied.value = false
   try {
-    const res = await fetch('/api/v1/control/proxy-credentials', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-    if (res.ok) {
-      credential.value = await res.json()
-    }
-  } catch (err) {
-    console.error('Failed to request proxy credentials', err)
+    credential.value = await api.post<ProxyCredentialResponse>('/api/v1/control/proxy-credentials')
+  } catch {
+    failed.value = true
   } finally {
     loading.value = false
   }
 }
 
-function copyToken() {
-  if (credential.value?.proxy_token) {
-    navigator.clipboard.writeText(credential.value.proxy_token)
+async function copyToken() {
+  if (!credential.value?.proxy_token) return
+  try {
+    await navigator.clipboard.writeText(credential.value.proxy_token)
     copied.value = true
-    setTimeout(() => (copied.value = false), 2000)
+    window.setTimeout(() => (copied.value = false), 2000)
+  } catch {
+    failed.value = true
   }
 }
 
 function formatExpiresIn(seconds: number) {
-  const mins = Math.floor(seconds / 60)
-  return `${mins} minutos`
+  return t('proxyView.expiresMinutes', { count: Math.max(0, Math.floor(seconds / 60)) })
 }
-
-onMounted(() => {
-  generateCredentials()
-})
 </script>
+
+<template>
+  <div class="space-y-6">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight text-white">{{ t('proxyView.title') }}</h1>
+        <p class="mt-1 text-sm text-slate-400">
+          {{ t('proxyView.subtitle') }}
+          <code class="font-mono text-midori-400">aud=vpn-proxy</code>.
+        </p>
+      </div>
+      <button
+        type="button"
+        :disabled="loading"
+        :aria-busy="loading"
+        class="btn-primary self-start disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
+        @click="generateCredentials"
+      >
+        <span v-if="loading" class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>
+        {{ loading ? t('proxyView.generating') : t('proxyView.generate') }}
+      </button>
+    </div>
+
+    <AsyncState
+      v-if="failed"
+      kind="error"
+      :title="t('proxyView.errorTitle')"
+      :detail="t('proxyView.errorDetail')"
+      :retry-label="t('common.retry')"
+      @retry="generateCredentials"
+    />
+
+    <AsyncState
+      v-if="loading && !credential"
+      kind="loading"
+      :title="t('proxyView.loadingTitle')"
+    />
+
+    <div v-else-if="credential" class="space-y-6 rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl md:p-8">
+      <div class="flex items-center justify-between gap-3">
+        <span class="badge-active">
+          <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-midori-400" aria-hidden="true"></span>
+          {{ t('proxyView.activeToken') }}
+        </span>
+        <span class="font-mono text-xs text-slate-400">{{ t('proxyView.expiresIn', { duration: formatExpiresIn(credential.expires_in) }) }}</span>
+      </div>
+
+      <div class="space-y-2">
+        <label for="proxy-token" class="text-xs font-semibold uppercase tracking-wider text-slate-400">{{ t('proxyView.tokenLabel') }}</label>
+        <div class="flex items-center gap-3">
+          <input id="proxy-token" type="password" readonly :value="credential.proxy_token" class="glass-input flex-1 font-mono text-sm" />
+          <button type="button" class="btn-secondary text-xs" @click="copyToken">
+            {{ copied ? t('proxyView.copied') : t('common.copy') }}
+          </button>
+        </div>
+        <span class="sr-only" aria-live="polite">{{ copied ? t('proxyView.copied') : '' }}</span>
+      </div>
+
+      <div class="space-y-3 pt-2">
+        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">{{ t('proxyView.endpoints') }}</p>
+        <AsyncState v-if="credential.proxy_endpoints.length === 0" kind="empty" :title="t('proxyView.noEndpoints')" />
+        <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div v-for="endpoint in credential.proxy_endpoints" :key="`${endpoint.host}:${endpoint.port}`" class="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-sm">
+            <div class="flex items-center gap-3">
+              <span class="h-2 w-2 rounded-full bg-midori-400" aria-hidden="true"></span>
+              <span class="font-mono text-xs text-white">{{ endpoint.host }}:{{ endpoint.port }}</span>
+            </div>
+            <span class="rounded-md border border-slate-700 bg-slate-800 px-2 py-0.5 font-mono text-xs font-semibold uppercase text-slate-400">{{ endpoint.country_code }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <AsyncState
+      v-else-if="!loading && !failed"
+      kind="empty"
+      :title="t('proxyView.emptyTitle')"
+      :detail="t('proxyView.emptyDetail')"
+    />
+  </div>
+</template>

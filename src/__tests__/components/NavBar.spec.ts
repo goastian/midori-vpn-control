@@ -12,6 +12,7 @@ function makeRouter() {
       { path: '/dashboard', component: { template: '<div />' } },
       { path: '/servers', component: { template: '<div />' } },
       { path: '/connections', component: { template: '<div />' } },
+      { path: '/proxy', component: { template: '<div />' } },
       { path: '/audit', component: { template: '<div />' } },
       { path: '/admin/users', component: { template: '<div />' } },
       { path: '/admin/servers', component: { template: '<div />' } },
@@ -42,6 +43,7 @@ describe('NavBar', () => {
     expect(wrapper.text()).toContain('Dashboard')
     expect(wrapper.text()).toContain('Servidores')
     expect(wrapper.text()).toContain('Conexiones')
+    expect(wrapper.text()).toContain('Proxy de navegador')
     // Admin items should NOT be visible for non-admin users
     expect(wrapper.text()).not.toContain('Auditoría')
     expect(wrapper.text()).not.toContain('Admin Servers')
