@@ -6,6 +6,11 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Changed
 
+- Administrative user, user-detail, and server workflows now use localized
+  accessible loading, empty, validation, dialog, and retry states. Create,
+  update, suspend, and delete operations report outcomes inline, destructive
+  failures remain visible in their confirmation dialog, and missing server
+  health data is shown as unchecked instead of inactive.
 - Administrative peer, Mesh, audit, and extension-origin views now share
   localized accessible loading, empty, and retryable error states. Filters and
   Mesh expansion expose explicit relationships, background Mesh refreshes keep

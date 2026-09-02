@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
 import type { User, AdminPeer } from '../../lib/schemas'
+import AsyncState from '../../components/AsyncState.vue'
 
 const route = useRoute()
 const userId = route.params.id as string
@@ -11,21 +12,26 @@ const userId = route.params.id as string
 const user = ref<User | null>(null)
 const peers = ref<AdminPeer[]>([])
 const loading = ref(true)
+const loadFailed = ref(false)
 const { t, formatDate } = useLocale()
 
-onMounted(async () => {
+async function loadUser() {
+  loading.value = true
+  loadFailed.value = false
   try {
     const data = await api.get<{ user: User; peers: AdminPeer[] }>(
       `/api/v1/admin/users/${userId}`
     )
     user.value = data.user
     peers.value = data.peers || []
-  } catch (e) {
-    console.error('Failed to load user', e)
+  } catch {
+    loadFailed.value = true
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(loadUser)
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
@@ -39,19 +45,18 @@ function formatBytes(bytes: number): string {
 <template>
   <div class="space-y-6">
     <router-link to="/admin/users" class="inline-flex items-center gap-2 text-sm font-semibold text-midori-400 hover:text-midori-300 transition-colors">
-      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+      <svg class="w-4 h-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
       <span>{{ t('adminUserDetail.back') }}</span>
     </router-link>
 
-    <div v-if="loading" class="flex justify-center py-16">
-      <div class="animate-spin rounded-full h-9 w-9 border-b-2 border-midori-500"></div>
-    </div>
+    <AsyncState v-if="loading" kind="loading" :title="t('adminUserDetail.loading')" />
+    <AsyncState v-else-if="loadFailed" kind="error" :title="t('adminUserDetail.loadError')" :retry-label="t('common.retry')" @retry="loadUser" />
 
     <template v-else-if="user">
       <div class="flex items-center justify-between">
         <div>
           <h1 class="text-3xl font-bold tracking-tight text-white">{{ user.email }}</h1>
-          <p class="text-sm text-slate-400 mt-1">Detalles de cuenta y túneles activos asociados</p>
+          <p class="text-sm text-slate-400 mt-1">{{ t('adminUserDetail.subtitle') }}</p>
         </div>
       </div>
 
