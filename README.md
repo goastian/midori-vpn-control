@@ -13,7 +13,9 @@ TypeScript 7 is intentionally not installed while `typescript-eslint` declares a
 
 ## Rootless workflow
 
-From this directory:
+The pinned rootless runner mounts the Core checkout as one coordinated source
+tree. Place this repository at `<core>/midori-vpn-control`, then run from this
+directory:
 
 ```bash
 bash ../scripts/pod.sh npm ci
@@ -22,7 +24,8 @@ bash ../scripts/pod.sh npm audit --audit-level=high
 bash ../scripts/pod.sh npm run dev
 ```
 
-`npm run check` runs lint with zero warnings, 82 unit/component tests, type checking and a production build.
+`npm run check` runs lint with zero warnings, the complete unit/component suite,
+type checking and a production build.
 
 ## Authentication
 
@@ -48,4 +51,5 @@ Serve `dist/` behind the host HTTPS virtual host. The Nginx image/config provide
 
 ## License
 
-AGPL-3.0-or-later; see the workspace `LICENSE`.
+AGPL-3.0-or-later; see the
+[project license](https://github.com/goastian/midori-vpn-core/blob/main/LICENSE).

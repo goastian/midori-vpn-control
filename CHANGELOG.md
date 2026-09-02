@@ -2,7 +2,7 @@
 
 All notable changes to Midori VPN Control are documented here.
 
-## 2.0.0 - 2026-08-24
+## 2.0.0 - Unreleased
 
 ### Changed
 
