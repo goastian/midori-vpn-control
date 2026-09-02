@@ -13,6 +13,11 @@ All notable changes to Midori VPN Control are documented here.
   being issued when their view opens. Proxy and cluster-health screens use
   localized accessible loading, empty and retryable error states, and degraded
   health reports preserve the real PostgreSQL, WireGuard and Redis results.
+- Server and connection views now share one localized, accessible quota
+  summary and common loading, empty and retryable error states. Connection
+  fields, warnings, notifications, table actions and the device configuration
+  dialog expose explicit names and relationships without changing key or
+  profile generation.
 - Added a separate protected publication workflow that refuses tag replacement
   and binds the Control digest to GitHub provenance, SPDX attestation and an
   immediately verified keyless Cosign workflow identity.

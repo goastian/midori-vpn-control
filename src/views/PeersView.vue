@@ -8,6 +8,8 @@ import { PRIVATE_KEYS_STORAGE_KEY } from '../lib/storage-keys'
 import { useLocale } from '../lib/i18n'
 import { useAuthStore } from '../stores/auth'
 import type { Server, Connection, ConnectionConfig } from '../lib/schemas'
+import AsyncState from '../components/AsyncState.vue'
+import QuotaSummary from '../components/QuotaSummary.vue'
 
 type ServerPingResult = {
   server_id: string
@@ -23,6 +25,7 @@ const servers = ref<Server[]>([])
 const connections = ref<Connection[]>([])
 const serverPing = ref<Record<string, ServerPingResult>>({})
 const loading = ref(true)
+const failed = ref(false)
 const connecting = ref(false)
 
 const userQuota = computed(() => auth.userQuota)
@@ -31,12 +34,12 @@ const isQuotaReached = computed(() => Boolean(userQuota.value && userQuota.value
 function getDeviceBadge(deviceName: string = '') {
   const lower = deviceName.toLowerCase()
   if (lower.includes('desktop') || lower.includes('app') || lower.includes('linux') || lower.includes('windows') || lower.includes('mac')) {
-    return { icon: '🖥️', label: 'Desktop App', tone: 'text-cyan-400 bg-cyan-950/60 border-cyan-800/50' }
+    return { icon: '🖥️', label: t('connectionsView.deviceDesktop'), tone: 'text-cyan-400 bg-cyan-950/60 border-cyan-800/50' }
   }
   if (lower.includes('extension') || lower.includes('ext') || lower.includes('browser') || lower.includes('chrome') || lower.includes('firefox')) {
-    return { icon: '🧩', label: 'Extensión', tone: 'text-amber-400 bg-amber-950/60 border-amber-800/50' }
+    return { icon: '🧩', label: t('connectionsView.deviceExtension'), tone: 'text-amber-400 bg-amber-950/60 border-amber-800/50' }
   }
-  return { icon: '📱', label: 'WireGuard', tone: 'text-midori-400 bg-midori-950/60 border-midori-800/50' }
+  return { icon: '📱', label: t('connectionsView.deviceWireGuard'), tone: 'text-midori-400 bg-midori-950/60 border-midori-800/50' }
 }
 
 // Form state
@@ -82,7 +85,7 @@ const deviceModal = ref<{
 let clipboardTimer: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
-  await loadData()
+  await Promise.all([loadData(), auth.fetchQuota()])
   if (route.query.server_id) {
     form.value.server_id = String(route.query.server_id)
   }
@@ -102,6 +105,7 @@ function onEscapeKey(e: KeyboardEvent) {
 
 async function loadData() {
   loading.value = true
+  failed.value = false
   try {
     const [s, c, pings] = await Promise.all([
       api.get<Server[]>('/api/v1/control/servers'),
@@ -111,8 +115,8 @@ async function loadData() {
     servers.value = s || []
     connections.value = c || []
     serverPing.value = Object.fromEntries((pings || []).map((item) => [item.server_id, item]))
-  } catch (e: any) {
-    showNotification('error', e.message || 'Failed to load data')
+  } catch {
+    failed.value = true
   } finally {
     loading.value = false
   }
@@ -150,7 +154,7 @@ function getPrivateKeyForPeer(peerID: string): string {
 }
 
 function buildClientConfigText(config: ConnectionConfig, privateKey?: string): string {
-  const privKey = privateKey || '<PEGA_AQUI_TU_PRIVATE_KEY>'
+  const privKey = privateKey || t('connectionsView.privateKeyPlaceholder')
   const address = config.peer_ip.includes('/') ? config.peer_ip : `${config.peer_ip}/32`
   const pskLine = config.preshared_key ? `\nPresharedKey = ${config.preshared_key}` : ''
 
@@ -169,11 +173,11 @@ PersistentKeepalive = 25`
 async function handleCreateDevice() {
   const name = form.value.device_name.trim()
   if (!name) {
-    showNotification('error', 'Por favor, ingresa un nombre para el dispositivo')
+    showNotification('error', t('connectionsView.deviceNameRequired'))
     return
   }
   if (isDuplicateDeviceName.value) {
-    showNotification('error', 'Ya tienes un dispositivo activo con este nombre')
+    showNotification('error', t('connectionsView.duplicateName'))
     return
   }
 
@@ -245,7 +249,7 @@ async function openDeviceDetail(conn: Connection) {
   try {
     const res = await api.fetchRaw(`/api/v1/control/connections/${conn.id}/config`)
     if (!res.ok) {
-      throw new Error(`Error al obtener configuración: ${res.status}`)
+      throw new Error(t('connectionsView.configLoadError', { status: res.status }))
     }
 
     let text = await res.text()
@@ -257,7 +261,7 @@ async function openDeviceDetail(conn: Connection) {
     deviceModal.value.configText = text
     deviceModal.value.qrUrl = await QRCode.toDataURL(text, { errorCorrectionLevel: 'L', scale: 5 })
   } catch (e: any) {
-    showNotification('error', e.message || 'Error al cargar detalles del dispositivo')
+    showNotification('error', e.message || t('connectionsView.configLoadError', { status: '?' }))
   } finally {
     deviceModal.value.loading = false
   }
@@ -317,7 +321,7 @@ async function disconnect(id: string) {
       closeDeviceModal()
     }
     await loadData()
-    showNotification('success', 'Dispositivo desconectado correctamente')
+    showNotification('success', t('connectionsView.disconnectedSuccess'))
   } catch (e: any) {
     showNotification('error', e.message)
   }
@@ -331,7 +335,7 @@ async function deleteConnection(id: string) {
       closeDeviceModal()
     }
     await loadData()
-    showNotification('success', 'Dispositivo eliminado')
+    showNotification('success', t('connectionsView.deletedSuccess'))
   } catch (e: any) {
     showNotification('error', e.message)
   }
@@ -355,51 +359,25 @@ function formatBytes(bytes: number): string {
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold tracking-tight text-white">{{ t('connectionsView.title') }}</h1>
-        <p class="text-sm text-slate-400 mt-1">Configura y administra tus perfiles y túneles de WireGuard</p>
+        <p class="text-sm text-slate-400 mt-1">{{ t('connectionsView.subtitle') }}</p>
       </div>
     </div>
 
     <!-- Global User Quota Bar -->
-    <div v-if="userQuota" class="rounded-3xl border border-slate-800/80 bg-slate-900/60 backdrop-blur-xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
-      <div class="space-y-1">
-        <div class="flex items-center gap-2">
-          <span class="text-xs font-semibold uppercase tracking-wider text-midori-400">Plan {{ userQuota.plan_name }}</span>
-          <span v-if="userQuota.available_devices > 0" class="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-700/50 text-emerald-300">
-            {{ userQuota.available_devices }} cupos libres
-          </span>
-          <span v-else class="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-950/60 border border-rose-700/50 text-rose-300">
-            Límite de cuota alcanzado
-          </span>
-        </div>
-        <p class="text-xl font-bold text-white">
-          {{ userQuota.connected_devices }} <span class="text-slate-400 text-sm font-normal">/ {{ userQuota.max_devices }} dispositivos conectados</span>
-        </p>
-      </div>
-
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs px-3 py-1 rounded-full border bg-slate-950/60 border-slate-800 text-cyan-300 font-medium">
-          🖥️ {{ userQuota.devices_by_type.desktop }} Desktop
-        </span>
-        <span class="text-xs px-3 py-1 rounded-full border bg-slate-950/60 border-slate-800 text-amber-300 font-medium">
-          🧩 {{ userQuota.devices_by_type.extension }} Extensión
-        </span>
-        <span class="text-xs px-3 py-1 rounded-full border bg-slate-950/60 border-slate-800 text-midori-300 font-medium">
-          📱 {{ userQuota.devices_by_type.wireguard }} WireGuard
-        </span>
-      </div>
-    </div>
+    <QuotaSummary v-if="userQuota" :quota="userQuota" />
 
     <!-- Inline notification -->
     <Transition name="fade">
       <div
         v-if="notification"
+        :role="notification.type === 'error' ? 'alert' : 'status'"
         :class="notification.type === 'success'
           ? 'bg-midori-950/50 border-midori-700/60 text-midori-200'
           : 'bg-rose-950/50 border-rose-700/60 text-rose-200'"
         class="border rounded-2xl px-5 py-4 text-sm flex items-center justify-between shadow-lg"
       >
         <span>{{ notification.message }}</span>
-        <button class="ml-3 opacity-60 hover:opacity-100 text-lg leading-none" @click="notification = null">&times;</button>
+        <button type="button" class="ml-3 opacity-60 hover:opacity-100 text-lg leading-none" :aria-label="t('connectionsView.closeNotification')" @click="notification = null">&times;</button>
       </div>
     </Transition>
 
@@ -407,15 +385,16 @@ function formatBytes(bytes: number): string {
     <div class="bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 p-6 md:p-8 backdrop-blur-xl">
       <h2 class="text-xl font-bold text-white mb-2">{{ t('connectionsView.newConnection') }}</h2>
       <p class="text-xs text-slate-400 mb-6">
-        Selecciona un servidor y asigna un nombre a tu dispositivo. Las claves WireGuard y el perfil se generarán automáticamente.
+        {{ t('connectionsView.formHelp') }}
       </p>
 
       <form class="space-y-5" @submit.prevent="handleCreateDevice">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <!-- Server selection -->
           <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('common.server') }}</label>
+            <label for="connection-server" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('common.server') }}</label>
             <select
+              id="connection-server"
               v-model="form.server_id"
               class="w-full border border-slate-700/80 bg-slate-950/60 text-white rounded-xl px-4 py-2.5 text-sm outline-none focus:border-midori-500 transition-colors"
             >
@@ -429,62 +408,64 @@ function formatBytes(bytes: number): string {
 
           <!-- Device name -->
           <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('common.device') }}</label>
+            <label for="connection-device-name" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('common.device') }}</label>
             <input
+              id="connection-device-name"
               v-model="form.device_name"
               :placeholder="t('connectionsView.deviceNamePlaceholder')"
               required
+              :aria-invalid="isDuplicateDeviceName"
+              :aria-describedby="isDuplicateDeviceName ? 'duplicate-device-name' : undefined"
               class="w-full border bg-slate-950/60 text-white rounded-xl px-4 py-2.5 text-sm outline-none transition-colors"
               :class="isDuplicateDeviceName ? 'border-rose-500/80 focus:border-rose-500' : 'border-slate-700/80 focus:border-midori-500'"
             />
-            <p v-if="isDuplicateDeviceName" class="text-xs text-rose-400 mt-1 font-medium">
-              Ya tienes un dispositivo activo con este nombre. Elige otro nombre.
+            <p v-if="isDuplicateDeviceName" id="duplicate-device-name" class="text-xs text-rose-400 mt-1 font-medium" role="alert">
+              {{ t('connectionsView.duplicateName') }}
             </p>
           </div>
         </div>
 
         <!-- Warnings -->
-        <div v-if="userQuota && userQuota.available_devices === 0" class="text-xs text-rose-300 bg-rose-950/40 border border-rose-800/60 rounded-xl px-4 py-3 font-medium">
-          Has alcanzado el límite de tu plan ({{ userQuota.max_devices }} dispositivos). Desconecta o elimina un dispositivo para conectar uno nuevo.
+        <div v-if="userQuota && userQuota.available_devices === 0" class="text-xs text-rose-300 bg-rose-950/40 border border-rose-800/60 rounded-xl px-4 py-3 font-medium" role="alert">
+          {{ t('connectionsView.quotaReached', { maximum: userQuota.max_devices }) }}
         </div>
-        <div v-if="servers.length === 0" class="text-xs text-amber-300 bg-amber-950/30 border border-amber-800/40 rounded-xl px-4 py-3">
+        <div v-if="servers.length === 0" class="text-xs text-amber-300 bg-amber-950/30 border border-amber-800/40 rounded-xl px-4 py-3" role="status">
           {{ t('connectionsView.noActiveServers') }}
         </div>
-        <div v-else-if="availableServerCount() === 0" class="text-xs text-amber-300 bg-amber-950/30 border border-amber-800/40 rounded-xl px-4 py-3">
+        <div v-else-if="availableServerCount() === 0" class="text-xs text-amber-300 bg-amber-950/30 border border-amber-800/40 rounded-xl px-4 py-3" role="status">
           {{ t('connectionsView.noRespondingServers') }}
         </div>
-        <div v-if="selectedServerUnavailable()" class="text-xs text-rose-300 bg-rose-950/30 border border-rose-800/40 rounded-xl px-4 py-3">
+        <div v-if="selectedServerUnavailable()" class="text-xs text-rose-300 bg-rose-950/30 border border-rose-800/40 rounded-xl px-4 py-3" role="alert">
           {{ t('connectionsView.serverUnavailable') }}
         </div>
 
         <div class="flex justify-end pt-2">
           <button
             type="submit"
+            :aria-busy="connecting"
             :disabled="connecting || isDuplicateDeviceName || !form.device_name.trim() || availableServerCount() === 0 || isQuotaReached"
             class="bg-midori-600 hover:bg-midori-500 text-white font-semibold px-8 py-2.5 rounded-xl transition-all disabled:opacity-50 text-sm shadow-lg shadow-midori-900/30 cursor-pointer inline-flex items-center gap-2"
           >
-            <span v-if="connecting" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-            <span>{{ connecting ? 'Creando...' : 'Crear' }}</span>
+            <span v-if="connecting" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden="true"></span>
+            <span>{{ connecting ? t('connectionsView.creating') : t('common.create') }}</span>
           </button>
         </div>
       </form>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="flex justify-center py-16">
-      <div class="animate-spin rounded-full h-9 w-9 border-b-2 border-midori-500"></div>
-    </div>
+    <AsyncState v-if="loading" kind="loading" :title="t('common.loading')" />
+
+    <AsyncState v-else-if="failed" kind="error" :title="t('connectionsView.loadError')" :retry-label="t('common.retry')" @retry="loadData" />
 
     <!-- Empty state -->
-    <div v-else-if="connections.length === 0" class="rounded-3xl border border-slate-800 bg-slate-900/60 p-12 text-center text-slate-400">
-      {{ t('connectionsView.empty') }}
-    </div>
+    <AsyncState v-else-if="connections.length === 0" kind="empty" :title="t('connectionsView.empty')" />
 
     <!-- Connections: Responsive (Mobile cards + Desktop table) -->
     <div v-else class="space-y-4">
       <div class="flex items-center justify-between px-2">
         <p class="text-xs text-slate-400">
-          Haz clic sobre cualquier dispositivo para ver su código QR y archivo de configuración.
+          {{ t('connectionsView.listHint') }}
         </p>
       </div>
 
@@ -493,8 +474,7 @@ function formatBytes(bytes: number): string {
         <div
           v-for="conn in connections"
           :key="conn.id"
-          class="bg-slate-900/80 rounded-2xl border border-slate-800 p-5 shadow-lg hover:border-slate-700 hover:bg-slate-850/80 transition-all cursor-pointer"
-          @click="openDeviceDetail(conn)"
+          class="bg-slate-900/80 rounded-2xl border border-slate-800 p-5 shadow-lg hover:border-slate-700 hover:bg-slate-850/80 transition-all"
         >
           <div class="flex items-start justify-between mb-2">
             <div>
@@ -528,13 +508,15 @@ function formatBytes(bytes: number): string {
 
           <div class="flex items-center gap-3 border-t border-slate-800 pt-3">
             <button
+              type="button"
               class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-xs text-cyan-400 hover:text-white font-medium transition-colors"
               @click.stop="openDeviceDetail(conn)"
             >
-              Ver QR / .conf
+              {{ t('connectionsView.viewConfig') }}
             </button>
             <template v-if="conn.is_active">
               <button
+                type="button"
                 class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-xs text-amber-400 hover:text-white font-medium transition-colors"
                 @click.stop="disconnect(conn.id)"
               >
@@ -542,6 +524,7 @@ function formatBytes(bytes: number): string {
               </button>
             </template>
             <button
+              type="button"
               class="text-xs text-rose-400 hover:text-rose-300 font-medium transition-colors ml-auto"
               @click.stop="deleteConnection(conn.id)"
             >
@@ -557,20 +540,19 @@ function formatBytes(bytes: number): string {
           <thead class="bg-slate-950/60 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
             <tr>
               <th class="px-6 py-4">{{ t('common.device') }}</th>
-              <th class="px-6 py-4">Tipo</th>
+              <th class="px-6 py-4">{{ t('connectionsView.type') }}</th>
               <th class="px-6 py-4">{{ t('common.server') }}</th>
               <th class="px-6 py-4">{{ t('common.ip') }}</th>
               <th class="px-6 py-4 hidden md:table-cell">{{ t('connectionsView.trafficHeader') }}</th>
               <th class="px-6 py-4">{{ t('common.status') }}</th>
-              <th class="px-6 py-4 text-right"></th>
+              <th class="px-6 py-4 text-right"><span class="sr-only">{{ t('common.actions') }}</span></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-800/60">
             <tr
               v-for="conn in connections"
               :key="conn.id"
-              class="hover:bg-slate-800/60 transition-colors cursor-pointer group"
-              @click="openDeviceDetail(conn)"
+              class="hover:bg-slate-800/60 transition-colors group"
             >
               <td class="px-6 py-4 font-semibold text-white group-hover:text-midori-300 transition-colors flex items-center gap-2">
                 {{ conn.device_name || t('common.unnamed') }}
@@ -600,13 +582,15 @@ function formatBytes(bytes: number): string {
               <td class="px-6 py-4 text-right">
                 <div class="flex items-center justify-end gap-2">
                   <button
+                    type="button"
                     class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800/80 text-xs font-medium text-cyan-400 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer"
                     @click.stop="openDeviceDetail(conn)"
                   >
-                    Ver QR / .conf
+                    {{ t('connectionsView.viewConfig') }}
                   </button>
                   <template v-if="conn.is_active">
                     <button
+                      type="button"
                       class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800/80 text-xs font-medium text-amber-400 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer"
                       @click.stop="disconnect(conn.id)"
                     >
@@ -614,8 +598,10 @@ function formatBytes(bytes: number): string {
                     </button>
                   </template>
                   <button
+                    type="button"
                     class="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/30 transition-colors cursor-pointer"
                     :title="t('connectionsView.deleteDevice')"
+                    :aria-label="t('connectionsView.deleteDevice')"
                     @click.stop="deleteConnection(conn.id)"
                   >
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -634,16 +620,17 @@ function formatBytes(bytes: number): string {
         <div
           v-if="deviceModal.open"
           class="fixed inset-0 z-50 flex items-center justify-center p-4"
-          @click.self="closeDeviceModal"
         >
           <!-- Backdrop -->
-          <div class="absolute inset-0 bg-slate-950/85 backdrop-blur-md"></div>
+          <button type="button" class="absolute inset-0 bg-slate-950/85 backdrop-blur-md" :aria-label="t('connectionsView.closeModal')" @click="closeDeviceModal"></button>
 
           <!-- Modal Card Container -->
-          <div class="relative bg-slate-900 border border-slate-800/90 rounded-3xl shadow-2xl p-6 md:p-8 max-w-2xl w-full mx-4 flex flex-col gap-6 text-left max-h-[90vh] overflow-y-auto">
+          <div role="dialog" aria-modal="true" aria-labelledby="device-modal-title" class="relative bg-slate-900 border border-slate-800/90 rounded-3xl shadow-2xl p-6 md:p-8 max-w-2xl w-full mx-4 flex flex-col gap-6 text-left max-h-[90vh] overflow-y-auto">
             <!-- Close button -->
             <button
+              type="button"
               class="absolute top-5 right-5 text-slate-400 hover:text-white text-2xl leading-none cursor-pointer"
+              :aria-label="t('connectionsView.closeModal')"
               @click="closeDeviceModal"
             >
               &times;
@@ -653,32 +640,34 @@ function formatBytes(bytes: number): string {
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pr-8">
               <div>
                 <div class="flex items-center gap-2.5">
-                  <h3 class="text-2xl font-bold text-white">
-                    {{ deviceModal.conn?.device_name || 'Dispositivo WireGuard' }}
+                  <h3 id="device-modal-title" class="text-2xl font-bold text-white">
+                    {{ deviceModal.conn?.device_name || t('connectionsView.defaultDevice') }}
                   </h3>
                   <span
                     :class="deviceModal.conn?.is_active ? 'bg-midori-950/60 border-midori-700/50 text-midori-300' : 'bg-slate-800 border-slate-700 text-slate-400'"
                     class="text-xs font-semibold px-2.5 py-0.5 rounded-full border"
                   >
-                    {{ deviceModal.conn?.is_active ? 'Activo' : 'Inactivo' }}
+                    {{ deviceModal.conn?.is_active ? t('common.active') : t('common.inactive') }}
                   </span>
                 </div>
                 <p class="text-xs text-slate-400 mt-1">
-                  Servidor: <span class="text-slate-200 font-medium">{{ serverName(deviceModal.conn?.server_id || '') }}</span> ·
-                  IP: <span class="font-mono text-midori-300">{{ deviceModal.conn?.assigned_ip.replace('/32','') }}</span>
+                  {{ t('connectionsView.serverLabel') }}: <span class="text-slate-200 font-medium">{{ serverName(deviceModal.conn?.server_id || '') }}</span> ·
+                  {{ t('common.ip') }}: <span class="font-mono text-midori-300">{{ deviceModal.conn?.assigned_ip.replace('/32','') }}</span>
                 </p>
               </div>
 
               <!-- Quick action buttons -->
               <div class="flex items-center gap-2">
                 <button
+                  type="button"
                   class="px-3 py-1.5 rounded-xl border border-midori-700/50 bg-midori-900/40 text-xs font-semibold text-midori-300 hover:bg-midori-900/70 transition-colors cursor-pointer inline-flex items-center gap-1.5"
                   @click="copyDeviceModalConfig"
                 >
                   <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                  {{ deviceModal.copied ? '¡Copiado!' : 'Copiar' }}
+                  {{ deviceModal.copied ? t('connectionsView.copiedShort') : t('common.copy') }}
                 </button>
                 <button
+                  type="button"
                   class="px-3 py-1.5 rounded-xl border border-midori-700/50 bg-midori-900/40 text-xs font-semibold text-midori-300 hover:bg-midori-900/70 transition-colors cursor-pointer inline-flex items-center gap-1.5"
                   @click="downloadDeviceModalConfig"
                 >
@@ -687,6 +676,7 @@ function formatBytes(bytes: number): string {
                 </button>
                 <button
                   v-if="deviceModal.qrUrl"
+                  type="button"
                   class="px-3 py-1.5 rounded-xl border border-cyan-700/50 bg-cyan-950/40 text-xs font-semibold text-cyan-300 hover:bg-cyan-900/70 transition-colors cursor-pointer inline-flex items-center gap-1.5"
                   @click="downloadDeviceModalQR"
                 >
@@ -696,24 +686,22 @@ function formatBytes(bytes: number): string {
             </div>
 
             <!-- Modal Body (Config & QR) -->
-            <div v-if="deviceModal.loading" class="flex justify-center py-16">
-              <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-midori-500"></div>
-            </div>
+            <AsyncState v-if="deviceModal.loading" kind="loading" :title="t('common.loading')" />
 
             <div v-else class="flex flex-col md:flex-row gap-6">
               <!-- Config code block -->
               <div class="flex-1 min-w-0 flex flex-col">
-                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Configuración WireGuard</label>
+                <p class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{{ t('connectionsView.configLabel') }}</p>
                 <pre class="text-xs bg-slate-950 border border-slate-800/90 rounded-2xl p-4 font-mono text-midori-200 overflow-x-auto flex-1 shadow-inner leading-relaxed select-all">{{ deviceModal.configText }}</pre>
               </div>
 
               <!-- QR Code Card -->
               <div class="flex-shrink-0 flex flex-col items-center justify-center p-4 bg-slate-950/80 border border-slate-800 rounded-2xl">
-                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Escanear en Móvil</label>
+                <p class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">{{ t('connectionsView.scanMobile') }}</p>
                 <img
                   v-if="deviceModal.qrUrl"
                   :src="deviceModal.qrUrl"
-                  alt="WireGuard QR Code"
+                  :alt="t('connectionsView.qrAlt')"
                   class="w-44 h-44 rounded-xl border border-white/10 bg-white p-2 shadow-md"
                 />
               </div>
@@ -722,21 +710,23 @@ function formatBytes(bytes: number): string {
             <!-- Footer Stats & Management Actions -->
             <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-800/80 pt-4 text-xs text-slate-400">
               <div class="font-mono">
-                Tráfico: ↑{{ formatBytes(deviceModal.conn?.bytes_sent || 0) }} · ↓{{ formatBytes(deviceModal.conn?.bytes_received || 0) }}
+                {{ t('connectionsView.trafficLabel') }}: ↑{{ formatBytes(deviceModal.conn?.bytes_sent || 0) }} · ↓{{ formatBytes(deviceModal.conn?.bytes_received || 0) }}
               </div>
               <div class="flex items-center gap-2">
                 <button
                   v-if="deviceModal.conn?.is_active"
+                  type="button"
                   class="px-3 py-1.5 rounded-xl border border-amber-700/50 bg-amber-950/40 text-amber-300 hover:bg-amber-900/60 font-semibold transition-colors cursor-pointer"
                   @click="disconnect(deviceModal.conn.id)"
                 >
-                  Desconectar
+                  {{ t('common.disconnect') }}
                 </button>
                 <button
+                  type="button"
                   class="px-3 py-1.5 rounded-xl border border-rose-800/50 bg-rose-950/40 text-rose-300 hover:bg-rose-900/60 font-semibold transition-colors cursor-pointer"
                   @click="deleteConnection(deviceModal.conn?.id || '')"
                 >
-                  Eliminar dispositivo
+                  {{ t('connectionsView.deleteDevice') }}
                 </button>
               </div>
             </div>
