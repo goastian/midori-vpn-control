@@ -18,6 +18,7 @@ function makeRouter() {
       { path: '/admin/peers', component: { template: '<div />' } },
       { path: '/admin/audit', component: { template: '<div />' } },
       { path: '/admin/mesh', component: { template: '<div />' } },
+      { path: '/admin/health', component: { template: '<div />' } },
       { path: '/admin/extensions', component: { template: '<div />' } },
     ],
   })
@@ -75,7 +76,39 @@ describe('NavBar', () => {
 
     expect(wrapper.text()).toContain('Admin Servers')
     expect(wrapper.text()).toContain('Usuarios')
+    expect(wrapper.text()).toContain('Salud del clúster')
     expect(wrapper.text()).toContain('Extensiones')
+  })
+
+  it('exposes and closes the mobile navigation predictably', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const router = makeRouter()
+    await router.push('/dashboard')
+    await router.isReady()
+
+    const wrapper = mount(NavBar, {
+      attachTo: document.body,
+      global: { plugins: [pinia, router] },
+    })
+    const trigger = wrapper.get('[aria-controls="mobile-navigation"]')
+
+    expect(trigger.attributes('aria-expanded')).toBe('false')
+    await trigger.trigger('click')
+    expect(trigger.attributes('aria-expanded')).toBe('true')
+    expect(wrapper.find('#mobile-navigation').exists()).toBe(true)
+    expect(wrapper.get('button.absolute.inset-0').attributes('aria-label')).toBe('Cerrar menú')
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await wrapper.vm.$nextTick()
+    expect(trigger.attributes('aria-expanded')).toBe('false')
+
+    await trigger.trigger('click')
+    await router.push('/servers')
+    await wrapper.vm.$nextTick()
+    expect(trigger.attributes('aria-expanded')).toBe('false')
+
+    wrapper.unmount()
   })
 
   it('shows user email', async () => {

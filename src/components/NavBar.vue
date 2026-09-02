@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import LanguageSelector from './LanguageSelector.vue'
@@ -30,6 +30,7 @@ const navGroups = computed(() => {
         { name: t('nav.adminServers'), path: '/admin/servers', icon: 'shield' },
         { name: t('nav.adminPeers'), path: '/admin/peers', icon: 'pulse' },
         { name: t('nav.adminMesh'), path: '/admin/mesh', icon: 'mesh' },
+        { name: t('nav.adminHealth'), path: '/admin/health', icon: 'health' },
         { name: t('nav.adminExtensions'), path: '/admin/extensions', icon: 'extension' },
         { name: t('nav.adminLogs'), path: '/admin/audit', icon: 'log' },
       ],
@@ -63,6 +64,8 @@ function iconPath(icon: string) {
       return 'M5 3a2 2 0 100 4 2 2 0 000-4zm8 0a2 2 0 100 4 2 2 0 000-4zM3 10a2 2 0 114 0 2 2 0 01-4 0zm8 0a2 2 0 114 0 2 2 0 01-4 0zM5 14.5a2 2 0 100 4 2 2 0 000-4zm8 0a2 2 0 100 4 2 2 0 000-4zM7 5h6M7 12h6M5 8v4m10-4v4M7 16.5h6'
     case 'extension':
       return 'M7.5 2a1 1 0 00-1 1v2.5H4a2 2 0 00-2 2v2a1 1 0 001 1h1a1.5 1.5 0 010 3H3a1 1 0 00-1 1v2a2 2 0 002 2h4a1 1 0 001-1v-1a1.5 1.5 0 013 0v1a1 1 0 001 1h3a2 2 0 002-2v-3a1 1 0 00-1-1h-1a1.5 1.5 0 010-3h1a1 1 0 001-1v-1a2 2 0 00-2-2h-3.5V3a1 1 0 00-1-1h-3z'
+    case 'health':
+      return 'M2.5 10a1 1 0 011-1h2.2l1.4-3.5a1 1 0 011.87.05l1.6 4.8 1.1-2.2a1 1 0 01.9-.55h3.95a1 1 0 110 2h-3.33l-1.78 3.56a1 1 0 01-1.84-.1l-1.52-4.56-.8 2A1 1 0 015 11H3.5a1 1 0 01-1-1z'
     default:
       return 'M10 2a8 8 0 100 16 8 8 0 000-16z'
   }
@@ -71,6 +74,14 @@ function iconPath(icon: string) {
 function closeMobile() {
   mobileOpen.value = false
 }
+
+function handleEscape(event: KeyboardEvent) {
+  if (event.key === 'Escape' && mobileOpen.value) closeMobile()
+}
+
+watch(() => route.fullPath, closeMobile)
+onMounted(() => document.addEventListener('keydown', handleEscape))
+onBeforeUnmount(() => document.removeEventListener('keydown', handleEscape))
 </script>
 
 <template>
@@ -82,8 +93,11 @@ function closeMobile() {
         MidoriVPN
       </router-link>
       <button
+        type="button"
         class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700 bg-slate-800/80 text-slate-300 hover:text-white"
         :aria-label="t('nav.openMenu')"
+        aria-controls="mobile-navigation"
+        :aria-expanded="mobileOpen"
         @click="mobileOpen = true"
       >
         <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -154,11 +168,13 @@ function closeMobile() {
   <transition name="fade">
     <div v-if="mobileOpen" class="fixed inset-0 z-50 lg:hidden">
       <button
+        type="button"
         class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
-        aria-label="Cerrar menu"
+        :aria-label="t('nav.closeMenu')"
         @click="closeMobile"
       ></button>
       <aside
+        id="mobile-navigation"
         class="absolute inset-y-0 left-0 w-72 border-r border-slate-800 bg-slate-900 p-5 text-slate-100 shadow-2xl"
       >
         <div class="flex items-center justify-between px-2 pb-4 border-b border-slate-800">
@@ -170,6 +186,7 @@ function closeMobile() {
             {{ t('common.appName') }}
           </router-link>
           <button
+            type="button"
             class="rounded-xl p-2 text-slate-400 hover:text-white"
             :aria-label="t('nav.closeMenu')"
             @click="closeMobile"

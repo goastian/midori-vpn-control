@@ -6,6 +6,9 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Changed
 
+- Responsive navigation now reports its open state to assistive technology,
+  closes on Escape or route changes, localizes every close action, and exposes
+  the existing cluster-health view to administrators.
 - Added a separate protected publication workflow that refuses tag replacement
   and binds the Control digest to GitHub provenance, SPDX attestation and an
   immediately verified keyless Cosign workflow identity.
