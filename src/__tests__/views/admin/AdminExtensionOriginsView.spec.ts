@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import AdminExtensionOriginsView from '@/views/admin/AdminExtensionOriginsView.vue'
+import AsyncState from '@/components/AsyncState.vue'
 
 vi.mock('@/lib/api', () => ({
   api: { get: vi.fn(), put: vi.fn() },
@@ -18,7 +19,6 @@ describe('AdminExtensionOriginsView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     Object.defineProperty(window, 'confirm', { value: vi.fn(() => true), configurable: true })
-    Object.defineProperty(window, 'alert', { value: vi.fn(), configurable: true })
   })
 
   it('lists registered extension origins and their browser family', async () => {
@@ -48,6 +48,7 @@ describe('AdminExtensionOriginsView', () => {
       { revoked: true },
     )
     expect(wrapper.text()).toContain('Revocado')
+    expect(wrapper.text()).toContain('El origen de la extensión fue revocado.')
   })
 
   it('does not update an origin when confirmation is cancelled', async () => {
@@ -69,7 +70,23 @@ describe('AdminExtensionOriginsView', () => {
     const wrapper = shallowMount(AdminExtensionOriginsView)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Network unavailable')
-    expect(wrapper.text()).toContain('Reintentar')
+    const state = wrapper.findComponent(AsyncState)
+    expect(state.props('kind')).toBe('error')
+    expect(state.props('title')).toContain('No se pudieron cargar')
+    expect(state.props('retryLabel')).toBe('Reintentar')
+  })
+
+  it('shows localized inline feedback when an update fails', async () => {
+    const { api } = await import('@/lib/api')
+    vi.mocked(api.get).mockResolvedValue([{ ...registeredOrigin }])
+    vi.mocked(api.put).mockRejectedValue(new Error('Internal detail'))
+
+    const wrapper = shallowMount(AdminExtensionOriginsView)
+    await flushPromises()
+    await wrapper.find('tbody button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="alert"]').text()).toContain('No se pudo actualizar')
+    expect(wrapper.text()).not.toContain('Internal detail')
   })
 })

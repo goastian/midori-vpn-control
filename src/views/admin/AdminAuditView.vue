@@ -3,10 +3,11 @@ import { ref, onMounted } from 'vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
 import type { AuditLog } from '../../lib/schemas'
+import AsyncState from '../../components/AsyncState.vue'
 
 const logs = ref<AuditLog[]>([])
 const loading = ref(true)
-const loadError = ref('')
+const loadFailed = ref(false)
 const currentOffset = ref(0)
 const hasMore = ref(true)
 const PAGE_SIZE = 50
@@ -17,7 +18,7 @@ onMounted(() => loadLogs())
 
 async function loadLogs(append = false) {
   loading.value = true
-  loadError.value = ''
+  loadFailed.value = false
   try {
     const offset = append ? currentOffset.value : 0
     const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) })
@@ -31,8 +32,8 @@ async function loadLogs(append = false) {
     }
     hasMore.value = page.length >= PAGE_SIZE
     currentOffset.value = (append ? currentOffset.value : 0) + page.length
-  } catch (e: any) {
-    loadError.value = e.message ?? 'Failed to load audit logs'
+  } catch {
+    loadFailed.value = true
   } finally {
     loading.value = false
   }
@@ -61,10 +62,12 @@ function actionColor(action: string): string {
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold tracking-tight text-white">{{ t('adminAudit.title') }}</h1>
-        <p class="text-sm text-slate-400 mt-1">Historial inmutable de eventos de seguridad y acciones administrativas</p>
+        <p class="text-sm text-slate-400 mt-1">{{ t('adminAudit.subtitle') }}</p>
       </div>
       <div>
+        <label for="audit-action-filter" class="sr-only">{{ t('adminAudit.filterLabel') }}</label>
         <select
+          id="audit-action-filter"
           v-model="actionFilter"
           class="border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-900/80 text-white outline-none focus:border-midori-500 transition-colors cursor-pointer"
           @change="loadLogs()"
@@ -83,18 +86,9 @@ function actionColor(action: string): string {
       </div>
     </div>
 
-    <div v-if="loadError" class="p-4 bg-rose-950/40 border border-rose-800/50 rounded-2xl text-sm text-rose-300 flex items-center justify-between">
-      <span>{{ loadError }}</span>
-      <button class="text-xs underline ml-3 font-semibold" @click="loadLogs()">{{ t('common.retry') }}</button>
-    </div>
-
-    <div v-if="loading && logs.length === 0" class="flex justify-center py-16">
-      <div class="animate-spin rounded-full h-9 w-9 border-b-2 border-midori-500"></div>
-    </div>
-
-    <div v-else-if="logs.length === 0" class="rounded-3xl border border-slate-800 bg-slate-900/60 p-12 text-center text-slate-400">
-      {{ t('adminAudit.empty') }}
-    </div>
+    <AsyncState v-if="loading && logs.length === 0" kind="loading" :title="t('adminAudit.loading')" />
+    <AsyncState v-else-if="loadFailed" kind="error" :title="t('adminAudit.loadError')" :retry-label="t('common.retry')" @retry="loadLogs()" />
+    <AsyncState v-else-if="logs.length === 0" kind="empty" :title="t('adminAudit.empty')" />
 
     <div v-else class="bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 overflow-hidden backdrop-blur-xl">
       <table class="w-full text-sm">
@@ -129,7 +123,9 @@ function actionColor(action: string): string {
       </table>
       <div v-if="hasMore" class="px-6 py-4 border-t border-slate-800 text-center">
         <button
+          type="button"
           :disabled="loading"
+          :aria-busy="loading"
           class="text-sm font-semibold text-midori-400 hover:text-midori-300 disabled:opacity-50 cursor-pointer"
           @click="loadMoreLogs"
         >

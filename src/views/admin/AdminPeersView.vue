@@ -3,21 +3,24 @@ import { ref, onMounted } from 'vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
 import type { AdminPeer } from '../../lib/schemas'
+import AsyncState from '../../components/AsyncState.vue'
 
 const peers = ref<AdminPeer[]>([])
 const loading = ref(true)
-const loadError = ref('')
+const loadFailed = ref(false)
+const disconnectingID = ref('')
+const feedback = ref<{ kind: 'success' | 'error'; message: string } | null>(null)
 const { t } = useLocale()
 
 onMounted(() => loadPeers())
 
 async function loadPeers() {
   loading.value = true
-  loadError.value = ''
+  loadFailed.value = false
   try {
     peers.value = (await api.get<AdminPeer[]>('/api/v1/admin/peers')) || []
-  } catch (e: any) {
-    loadError.value = e.message ?? 'Failed to load peers'
+  } catch {
+    loadFailed.value = true
   } finally {
     loading.value = false
   }
@@ -25,11 +28,16 @@ async function loadPeers() {
 
 async function forceDisconnect(id: string) {
   if (!confirm(t('adminPeers.forceDisconnectConfirm'))) return
+  disconnectingID.value = id
+  feedback.value = null
   try {
     await api.delete(`/api/v1/admin/peers/${id}`)
     await loadPeers()
-  } catch (e: any) {
-    alert(e.message)
+    feedback.value = { kind: 'success', message: t('adminPeers.disconnectSuccess') }
+  } catch {
+    feedback.value = { kind: 'error', message: t('adminPeers.disconnectError') }
+  } finally {
+    disconnectingID.value = ''
   }
 }
 
@@ -46,21 +54,21 @@ function formatBytes(bytes: number): string {
   <div class="space-y-6">
     <div>
       <h1 class="text-3xl font-bold tracking-tight text-white">{{ t('adminPeers.title') }}</h1>
-      <p class="text-sm text-slate-400 mt-1">Monitoreo de todas las sesiones de clientes WireGuard conectadas</p>
+      <p class="text-sm text-slate-400 mt-1">{{ t('adminPeers.subtitle') }}</p>
     </div>
 
-    <div v-if="loadError" class="p-4 bg-rose-950/40 border border-rose-800/50 rounded-2xl text-sm text-rose-300 flex items-center justify-between">
-      <span>{{ loadError }}</span>
-      <button class="text-xs underline ml-3 font-semibold" @click="loadPeers()">{{ t('common.retry') }}</button>
+    <div
+      v-if="feedback"
+      :role="feedback.kind === 'error' ? 'alert' : 'status'"
+      class="rounded-2xl border p-4 text-sm"
+      :class="feedback.kind === 'error' ? 'border-rose-800/50 bg-rose-950/40 text-rose-300' : 'border-midori-800/50 bg-midori-950/40 text-midori-300'"
+    >
+      {{ feedback.message }}
     </div>
 
-    <div v-if="loading" class="flex justify-center py-16">
-      <div class="animate-spin rounded-full h-9 w-9 border-b-2 border-midori-500"></div>
-    </div>
-
-    <div v-else-if="peers.length === 0" class="rounded-3xl border border-slate-800 bg-slate-900/60 p-12 text-center text-slate-400">
-      {{ t('adminPeers.empty') }}
-    </div>
+    <AsyncState v-if="loading" kind="loading" :title="t('adminPeers.loading')" />
+    <AsyncState v-else-if="loadFailed" kind="error" :title="t('adminPeers.loadError')" :retry-label="t('common.retry')" @retry="loadPeers" />
+    <AsyncState v-else-if="peers.length === 0" kind="empty" :title="t('adminPeers.empty')" />
 
     <div v-else class="bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 overflow-hidden backdrop-blur-xl">
       <table class="w-full text-sm">
@@ -95,7 +103,10 @@ function formatBytes(bytes: number): string {
             <td class="px-6 py-4 text-right">
               <button
                 v-if="p.is_active"
+                type="button"
                 class="px-2.5 py-1 rounded-lg border border-rose-900/40 bg-rose-950/20 text-xs font-medium text-rose-400 hover:bg-rose-900/40 transition cursor-pointer"
+                :disabled="disconnectingID === p.id"
+                :aria-busy="disconnectingID === p.id"
                 @click="forceDisconnect(p.id)"
               >
                 {{ t('common.disconnect') }}

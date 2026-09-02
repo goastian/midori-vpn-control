@@ -6,6 +6,11 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Changed
 
+- Administrative peer, Mesh, audit, and extension-origin views now share
+  localized accessible loading, empty, and retryable error states. Filters and
+  Mesh expansion expose explicit relationships, background Mesh refreshes keep
+  the last usable topology, and revoke, restore, or disconnect actions report
+  their outcome inline without exposing backend error details.
 - Responsive navigation now reports its open state to assistive technology,
   closes on Escape or route changes, localizes every close action, and exposes
   the existing cluster-health view to administrators.

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { shallowMount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import AdminPeersView from '@/views/admin/AdminPeersView.vue'
+import AsyncState from '@/components/AsyncState.vue'
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -57,7 +58,7 @@ describe('AdminPeersView', () => {
       global: { plugins: [createPinia()] },
     })
 
-    expect(wrapper.find('.animate-spin').exists()).toBe(true)
+    expect(wrapper.findComponent(AsyncState).props('kind')).toBe('loading')
   })
 
   it('renders peer rows after successful load', async () => {
@@ -70,7 +71,7 @@ describe('AdminPeersView', () => {
 
     await flushPromises()
 
-    expect(wrapper.find('.animate-spin').exists()).toBe(false)
+    expect(wrapper.findComponent(AsyncState).exists()).toBe(false)
     expect(wrapper.text()).toContain('laptop')
     expect(wrapper.text()).toContain('10.8.0.2')
     expect(wrapper.text()).toContain('alice@example.com')
@@ -86,7 +87,7 @@ describe('AdminPeersView', () => {
 
     await flushPromises()
 
-    expect(wrapper.find('.animate-spin').exists()).toBe(false)
+    expect(wrapper.findComponent(AsyncState).props('kind')).toBe('empty')
     // table should NOT be present (no peers)
     expect(wrapper.find('table').exists()).toBe(false)
   })
@@ -121,6 +122,7 @@ describe('AdminPeersView', () => {
     await flushPromises()
 
     expect(vi.mocked(api.delete)).toHaveBeenCalledWith('/api/v1/admin/peers/p1')
+    expect(wrapper.text()).toContain('La sesión VPN se desconectó correctamente.')
   })
 
   it('does not call DELETE when forceDisconnect is cancelled', async () => {
@@ -138,5 +140,21 @@ describe('AdminPeersView', () => {
     await vm.forceDisconnect('p1')
 
     expect(vi.mocked(api.delete)).not.toHaveBeenCalled()
+  })
+
+  it('shows localized inline feedback when disconnection fails', async () => {
+    const { api } = await import('@/lib/api')
+    vi.mocked(api.get).mockResolvedValue(mockPeers)
+    vi.mocked(api.delete).mockRejectedValue(new Error('Internal detail'))
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    const wrapper = shallowMount(AdminPeersView, {
+      global: { plugins: [createPinia()] },
+    })
+    await flushPromises()
+    await (wrapper.vm as any).forceDisconnect('p1')
+
+    expect(wrapper.find('[role="alert"]').text()).toContain('No se pudo desconectar')
+    expect(wrapper.text()).not.toContain('Internal detail')
   })
 })

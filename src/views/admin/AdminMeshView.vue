@@ -3,10 +3,11 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
 import type { AdminMeshNetwork } from '../../lib/schemas'
+import AsyncState from '../../components/AsyncState.vue'
 
 const meshNetworks = ref<AdminMeshNetwork[]>([])
 const loading = ref(true)
-const error = ref('')
+const loadFailed = ref(false)
 const expanded = ref<Set<string>>(new Set())
 const { t } = useLocale()
 let refreshTimer: number | undefined
@@ -14,7 +15,7 @@ let refreshTimer: number | undefined
 onMounted(() => {
   load()
   refreshTimer = window.setInterval(() => {
-    load()
+    load(true)
   }, 15000)
 })
 
@@ -22,15 +23,15 @@ onBeforeUnmount(() => {
   if (refreshTimer) window.clearInterval(refreshTimer)
 })
 
-async function load() {
-  loading.value = true
-  error.value = ''
+async function load(silent = false) {
+  if (!silent) loading.value = true
+  loadFailed.value = false
   try {
     meshNetworks.value = (await api.get<AdminMeshNetwork[]>('/api/v1/admin/mesh')) || []
-  } catch (e: any) {
-    error.value = e.message || 'Failed to load mesh networks'
+  } catch {
+    if (!silent || meshNetworks.value.length === 0) loadFailed.value = true
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
 }
 
@@ -52,28 +53,23 @@ function connectedCount(net: AdminMeshNetwork) {
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold tracking-tight text-white">{{ t('adminMesh.title') }}</h1>
-        <p class="text-sm text-slate-400 mt-1">Topología de redes mesh peer-to-peer y subredes privadas</p>
+        <p class="text-sm text-slate-400 mt-1">{{ t('adminMesh.subtitle') }}</p>
       </div>
       <button
+        type="button"
         class="inline-flex items-center gap-2 px-4 py-2 border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold rounded-xl transition-all cursor-pointer self-start sm:self-auto"
-        @click="load"
+        :disabled="loading"
+        :aria-busy="loading"
+        @click="load()"
       >
-        <svg class="w-4 h-4 text-midori-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+        <svg class="w-4 h-4 text-midori-400" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
         <span>{{ t('adminMesh.refresh') }}</span>
       </button>
     </div>
 
-    <div v-if="loading && meshNetworks.length === 0" class="flex justify-center py-16">
-      <div class="animate-spin rounded-full h-9 w-9 border-b-2 border-midori-500"></div>
-    </div>
-
-    <div v-else-if="error" class="p-4 bg-rose-950/40 border border-rose-800/50 rounded-2xl text-sm text-rose-300">
-      {{ error }}
-    </div>
-
-    <div v-else-if="meshNetworks.length === 0" class="rounded-3xl border border-slate-800 bg-slate-900/60 p-12 text-center text-slate-400">
-      {{ t('adminMesh.empty') }}
-    </div>
+    <AsyncState v-if="loading && meshNetworks.length === 0" kind="loading" :title="t('adminMesh.loading')" />
+    <AsyncState v-else-if="loadFailed" kind="error" :title="t('adminMesh.loadError')" :retry-label="t('common.retry')" @retry="load()" />
+    <AsyncState v-else-if="meshNetworks.length === 0" kind="empty" :title="t('adminMesh.empty')" />
 
     <div v-else class="space-y-4">
       <div
@@ -84,6 +80,9 @@ function connectedCount(net: AdminMeshNetwork) {
         <!-- Network header row -->
         <button
           type="button"
+          :aria-expanded="expanded.has(net.id)"
+          :aria-controls="`mesh-members-${net.id}`"
+          :aria-label="t('adminMesh.toggleMembers', { action: t(expanded.has(net.id) ? 'adminMesh.collapse' : 'adminMesh.expand'), name: net.name })"
           class="w-full flex items-center gap-4 px-6 py-5 hover:bg-slate-800/50 transition-colors text-left cursor-pointer"
           @click="toggle(net.id)"
         >
@@ -91,6 +90,7 @@ function connectedCount(net: AdminMeshNetwork) {
           <span
             :class="net.is_active ? 'bg-midori-400 shadow-md shadow-midori-500/50 animate-pulse' : 'bg-slate-600'"
             class="h-3 w-3 rounded-full flex-shrink-0"
+            aria-hidden="true"
           ></span>
 
           <!-- Name + subnet -->
@@ -111,13 +111,14 @@ function connectedCount(net: AdminMeshNetwork) {
             class="h-5 w-5 text-slate-400 flex-shrink-0 transition-transform duration-200"
             :class="expanded.has(net.id) ? 'rotate-180 text-white' : ''"
             viewBox="0 0 20 20" fill="currentColor"
+            aria-hidden="true"
           >
             <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
           </svg>
         </button>
 
         <!-- Members table (expanded) -->
-        <div v-if="expanded.has(net.id)">
+        <div v-if="expanded.has(net.id)" :id="`mesh-members-${net.id}`">
           <div class="border-t border-slate-800">
             <div v-if="net.members.length === 0" class="px-6 py-6 text-sm text-slate-400">
               {{ t('adminMesh.noMembers') }}
@@ -140,7 +141,7 @@ function connectedCount(net: AdminMeshNetwork) {
                   <!-- Mesh IP -->
                   <td class="px-6 py-4">
                     <span class="inline-flex items-center gap-1.5 font-mono text-xs bg-cyan-950/60 text-cyan-300 border border-cyan-800/50 rounded-lg px-2.5 py-1">
-                      <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                      <svg class="h-3 w-3" aria-hidden="true" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clip-rule="evenodd" />
                       </svg>
                       {{ member.mesh_ip }}
@@ -171,6 +172,7 @@ function connectedCount(net: AdminMeshNetwork) {
                       <span
                         :class="member.connected ? 'bg-midori-400 animate-pulse' : 'bg-slate-500'"
                         class="h-1.5 w-1.5 rounded-full"
+                        aria-hidden="true"
                       ></span>
                       {{ member.connected ? t('adminMesh.statusConnected') : t('adminMesh.statusOffline') }}
                     </span>

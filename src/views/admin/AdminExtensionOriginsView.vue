@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
+import AsyncState from '../../components/AsyncState.vue'
 
 interface ExtensionOrigin {
   id: string
@@ -13,13 +14,10 @@ interface ExtensionOrigin {
 
 const origins = ref<ExtensionOrigin[]>([])
 const loading = ref(true)
-const loadError = ref('')
+const loadFailed = ref(false)
 const updatingID = ref('')
+const feedback = ref<{ kind: 'success' | 'error'; message: string } | null>(null)
 const { t, formatDateTime } = useLocale()
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback
-}
 
 function browserName(origin: string): string {
   return origin.startsWith('moz-extension://')
@@ -29,12 +27,12 @@ function browserName(origin: string): string {
 
 async function loadOrigins() {
   loading.value = true
-  loadError.value = ''
+  loadFailed.value = false
   try {
     origins.value =
       (await api.get<ExtensionOrigin[]>('/api/v1/admin/trusted-extension-origins')) || []
-  } catch (error: unknown) {
-    loadError.value = errorMessage(error, t('adminExtensions.loadError'))
+  } catch {
+    loadFailed.value = true
   } finally {
     loading.value = false
   }
@@ -50,12 +48,17 @@ async function toggleOrigin(origin: ExtensionOrigin) {
     return
 
   updatingID.value = origin.id
+  feedback.value = null
   try {
     await api.put(`/api/v1/admin/trusted-extension-origins/${origin.id}`, { revoked: nextRevoked })
     origin.revoked = nextRevoked
     origin.updated_at = new Date().toISOString()
-  } catch (error: unknown) {
-    window.alert(errorMessage(error, t('adminExtensions.updateError')))
+    feedback.value = {
+      kind: 'success',
+      message: t(nextRevoked ? 'adminExtensions.revokeSuccess' : 'adminExtensions.restoreSuccess'),
+    }
+  } catch {
+    feedback.value = { kind: 'error', message: t('adminExtensions.updateError') }
   } finally {
     updatingID.value = ''
   }
@@ -74,8 +77,10 @@ onMounted(loadOrigins)
         <p class="mt-1 max-w-3xl text-sm text-slate-400">{{ t('adminExtensions.subtitle') }}</p>
       </div>
       <button
+        type="button"
         class="rounded-xl bg-midori-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-midori-500 disabled:opacity-50"
         :disabled="loading"
+        :aria-busy="loading"
         @click="loadOrigins"
       >
         {{ t('adminExtensions.refresh') }}
@@ -83,25 +88,17 @@ onMounted(loadOrigins)
     </div>
 
     <div
-      v-if="loadError"
-      class="flex items-center justify-between rounded-2xl border border-rose-800/50 bg-rose-950/40 p-4 text-sm text-rose-300"
+      v-if="feedback"
+      :role="feedback.kind === 'error' ? 'alert' : 'status'"
+      class="rounded-2xl border p-4 text-sm"
+      :class="feedback.kind === 'error' ? 'border-rose-800/50 bg-rose-950/40 text-rose-300' : 'border-midori-800/50 bg-midori-950/40 text-midori-300'"
     >
-      <span>{{ loadError }}</span>
-      <button class="ml-3 font-semibold underline" @click="loadOrigins">
-        {{ t('common.retry') }}
-      </button>
+      {{ feedback.message }}
     </div>
 
-    <div v-if="loading" class="flex justify-center py-16">
-      <div class="h-9 w-9 animate-spin rounded-full border-b-2 border-midori-500"></div>
-    </div>
-
-    <div
-      v-else-if="origins.length === 0"
-      class="rounded-3xl border border-slate-800 bg-slate-900/60 p-12 text-center text-slate-400"
-    >
-      {{ t('adminExtensions.empty') }}
-    </div>
+    <AsyncState v-if="loading" kind="loading" :title="t('adminExtensions.loading')" />
+    <AsyncState v-else-if="loadFailed" kind="error" :title="t('adminExtensions.loadError')" :retry-label="t('common.retry')" @retry="loadOrigins" />
+    <AsyncState v-else-if="origins.length === 0" kind="empty" :title="t('adminExtensions.empty')" />
 
     <div
       v-else
@@ -150,6 +147,7 @@ onMounted(loadOrigins)
             </td>
             <td class="px-6 py-4 text-right">
               <button
+                type="button"
                 class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition disabled:cursor-wait disabled:opacity-50"
                 :class="
                   origin.revoked
@@ -157,6 +155,7 @@ onMounted(loadOrigins)
                     : 'border-rose-700/50 text-rose-300 hover:bg-rose-950/50'
                 "
                 :disabled="updatingID === origin.id"
+                :aria-busy="updatingID === origin.id"
                 @click="toggleOrigin(origin)"
               >
                 {{ t(origin.revoked ? 'adminExtensions.restore' : 'adminExtensions.revoke') }}
