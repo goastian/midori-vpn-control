@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
+import { LifecycleStatusSchema } from '../../lib/schemas'
 import type { User } from '../../lib/schemas'
 import AsyncState from '../../components/AsyncState.vue'
 
@@ -113,10 +114,15 @@ async function executeBanUser() {
   acting.value = true
   feedback.value = null
   try {
-    await api.post(`/api/v1/admin/users/${id}/ban`, { reason: banReason.value.trim() })
+    const outcome = await api.validated(`/api/v1/admin/users/${id}/ban`, LifecycleStatusSchema, {
+      method: 'POST',
+      body: JSON.stringify({ reason: banReason.value.trim() }),
+    })
     confirmBan.value = null
     await loadUsers()
-    feedback.value = { kind: 'success', message: t('adminUsers.banSuccess') }
+    feedback.value = outcome.status === 'ban_cleanup_pending'
+      ? { kind: 'error', message: t('adminUsers.banCleanupPending') }
+      : { kind: 'success', message: t('adminUsers.banSuccess') }
   } catch {
     actionError.value = t('adminUsers.banError')
   } finally {
@@ -140,8 +146,10 @@ async function executeDeleteUser() {
     confirmDelete.value = null
     await loadUsers()
     feedback.value = { kind: 'success', message: t('adminUsers.deleteSuccess') }
-  } catch {
-    actionError.value = t('adminUsers.deleteError')
+  } catch (error) {
+    actionError.value = error && typeof error === 'object' && 'code' in error && error.code === 'active_devices_must_be_disconnected'
+      ? t('adminUsers.activeDevices')
+      : t('adminUsers.deleteError')
   } finally {
     acting.value = false
   }

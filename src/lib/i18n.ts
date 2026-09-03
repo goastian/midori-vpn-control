@@ -459,7 +459,8 @@ const messages: Record<LocaleCode, TranslationTree> = {
       previousPage: 'Anterior',
       nextPage: 'Siguiente',
       sessions: 'sesiones',
-      cleanupPending: 'Core no pudo retirar la sesión. El dispositivo no fue revocado; vuelve a intentarlo.',
+      cleanupPending: 'El dispositivo fue revocado y la retirada de su sesión sigue pendiente.',
+      disconnectPending: 'La desconexión quedó programada y sigue pendiente en Core.',
       connectedSuccess: 'Dispositivo conectado correctamente.',
       status: {
         connected: 'Conectado',
@@ -531,6 +532,8 @@ const messages: Record<LocaleCode, TranslationTree> = {
       createSuccess: 'El usuario fue creado.',
       banError: 'No se pudo suspender el usuario.',
       banSuccess: 'El usuario fue suspendido.',
+      banCleanupPending: 'El usuario fue suspendido; la retirada de sus sesiones sigue pendiente.',
+      activeDevices: 'Desconecta todos los dispositivos y espera que terminen sus operaciones antes de eliminar el usuario.',
       deleteError: 'No se pudo eliminar el usuario.',
       deleteSuccess: 'El usuario fue eliminado.',
     },
@@ -598,6 +601,7 @@ const messages: Record<LocaleCode, TranslationTree> = {
       updateSuccess: 'El servidor fue actualizado.',
       deleteError: 'No se pudo eliminar el servidor.',
       deleteSuccess: 'El servidor fue eliminado.',
+      serverNotDrained: 'El servidor está drenando; retira sus sesiones y espera que terminen sus operaciones.',
       closeDialog: 'Cerrar diálogo',
     },
     adminPeers: {
@@ -608,6 +612,7 @@ const messages: Record<LocaleCode, TranslationTree> = {
       loadError: 'No se pudieron cargar las sesiones VPN.',
       forceDisconnectConfirm: '¿Forzar desconexión de este peer?',
       disconnectSuccess: 'La sesión VPN se desconectó correctamente.',
+      disconnectPending: 'La desconexión quedó programada y sigue pendiente en Core.',
       disconnectError: 'No se pudo desconectar la sesión VPN.',
     },
     adminAudit: {
@@ -751,6 +756,21 @@ const messages: Record<LocaleCode, TranslationTree> = {
   ca: {},
   gl: {},
 } as Record<LocaleCode, TranslationTree>
+
+Object.assign(messages.en.connectionsView as TranslationTree, {
+  cleanupPending: 'The device was revoked and its session cleanup is still pending.',
+  disconnectPending: 'The disconnect was scheduled and is still pending in Core.',
+})
+Object.assign(messages.en.adminUsers as TranslationTree, {
+  banCleanupPending: 'The user was suspended; session cleanup is still pending.',
+  activeDevices: 'Disconnect every device and wait for its operations before deleting the user.',
+})
+Object.assign(messages.en.adminServers as TranslationTree, {
+  serverNotDrained: 'The server is draining; remove its sessions and wait for its operations.',
+})
+Object.assign(messages.en.adminPeers as TranslationTree, {
+  disconnectPending: 'The disconnect was scheduled and is still pending in Core.',
+})
 
 function cloneTranslations(locale: LocaleCode): TranslationTree {
   const english = messages.en

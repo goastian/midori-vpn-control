@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
+import { LifecycleStatusSchema } from '../../lib/schemas'
 import type { AdminPeer } from '../../lib/schemas'
 import AsyncState from '../../components/AsyncState.vue'
 
@@ -31,9 +32,11 @@ async function forceDisconnect(id: string) {
   disconnectingID.value = id
   feedback.value = null
   try {
-    await api.delete(`/api/v1/admin/peers/${id}`)
+    const outcome = await api.validated(`/api/v1/admin/peers/${id}`, LifecycleStatusSchema, { method: 'DELETE' })
     await loadPeers()
-    feedback.value = { kind: 'success', message: t('adminPeers.disconnectSuccess') }
+    feedback.value = outcome.status === 'disconnect_pending'
+      ? { kind: 'error', message: t('adminPeers.disconnectPending') }
+      : { kind: 'success', message: t('adminPeers.disconnectSuccess') }
   } catch {
     feedback.value = { kind: 'error', message: t('adminPeers.disconnectError') }
   } finally {

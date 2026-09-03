@@ -73,6 +73,7 @@ export const ServerSchema = z.object({
   max_peers: z.number(),
   current_peers: z.number(),
   is_active: z.boolean(),
+  draining_at: z.string().nullable().optional(),
   supports_wireguard: z.boolean().optional().default(false),
   supports_proxy: z.boolean().optional().default(false),
   supports_mesh_exit: z.boolean().optional().default(false),
@@ -154,6 +155,14 @@ export const DeviceSessionPageSchema = z.object({
 })
 
 export type DeviceSessionPage = z.infer<typeof DeviceSessionPageSchema>
+
+export const LifecycleStatusSchema = z.object({
+  status: z.enum(['disconnected', 'disconnect_pending', 'banned', 'ban_cleanup_pending', 'device_cleanup_pending']),
+  operation_id: z.string().optional(),
+})
+
+export type LifecycleStatus = z.infer<typeof LifecycleStatusSchema>
+export const DeviceDeleteResponseSchema = z.union([DeviceSchema, LifecycleStatusSchema])
 
 export const ConnectionConfigSchema = z.object({
   peer_id: z.string(),

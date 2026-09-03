@@ -164,6 +164,28 @@ describe('AdminServersView', () => {
     expect(wrapper.text()).not.toContain('Internal detail')
   })
 
+  it('explains that a server must finish draining before deletion', async () => {
+    const { api } = await import('@/lib/api')
+    vi.mocked(api.get).mockImplementation((path: string) => {
+      if (path.includes('/ping')) return Promise.resolve(mockPings)
+      return Promise.resolve(mockServers)
+    })
+    vi.mocked(api.delete).mockRejectedValue({ code: 'server_not_drained' })
+
+    const wrapper = shallowMount(AdminServersView, {
+      global: { plugins: [createPinia()] },
+    })
+    await flushPromises()
+
+    const remove = wrapper.findAll('button').find(button => button.text() === 'Eliminar')
+    await remove?.trigger('click')
+    const confirm = wrapper.findAll('[role="alertdialog"] button').find(button => button.text() === 'Eliminar')
+    await confirm?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="alertdialog"] [role="alert"]').text()).toContain('está drenando')
+  })
+
   it('associates the primary server fields with their labels', async () => {
     const { api } = await import('@/lib/api')
     vi.mocked(api.get).mockResolvedValue([])

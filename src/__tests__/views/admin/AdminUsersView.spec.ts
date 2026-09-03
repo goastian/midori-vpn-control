@@ -146,7 +146,7 @@ describe('AdminUsersView', () => {
   it('keeps a failed suspension dialog open with localized feedback', async () => {
     const { api } = await import('@/lib/api')
     vi.mocked(api.get).mockResolvedValue(mockUsers)
-    vi.mocked(api.post).mockRejectedValue(new Error('Internal detail'))
+    vi.mocked(api.validated).mockRejectedValue(new Error('Internal detail'))
 
     const wrapper = shallowMount(AdminUsersView, {
       global: { plugins: [createPinia(), makeRouter()] },
@@ -163,6 +163,27 @@ describe('AdminUsersView', () => {
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
     expect(wrapper.find('#ban-error').text()).toContain('No se pudo suspender')
     expect(wrapper.text()).not.toContain('Internal detail')
+  })
+
+  it('reports pending cleanup after suspending access', async () => {
+    const { api } = await import('@/lib/api')
+    vi.mocked(api.get).mockResolvedValue(mockUsers)
+    vi.mocked(api.validated).mockResolvedValue({ status: 'ban_cleanup_pending' })
+
+    const wrapper = shallowMount(AdminUsersView, {
+      global: { plugins: [createPinia(), makeRouter()] },
+    })
+    await flushPromises()
+
+    const suspend = wrapper.findAll('button').find(button => button.text() === 'Suspender')
+    await suspend?.trigger('click')
+    await wrapper.find('#ban-reason').setValue('Policy violation')
+    const confirm = wrapper.findAll('[role="dialog"] button').find(button => button.text() === 'Suspender')
+    await confirm?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="alert"]').text()).toContain('retirada de sus sesiones sigue pendiente')
+    expect(wrapper.text()).not.toContain('El usuario fue suspendido.')
   })
 
   it('creates a user from labelled fields and announces success', async () => {

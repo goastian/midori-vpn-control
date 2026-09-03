@@ -5,14 +5,16 @@ import QRCode from 'qrcode'
 
 import AsyncState from '../components/AsyncState.vue'
 import QuotaSummary from '../components/QuotaSummary.vue'
-import { APIError, api } from '../lib/api'
+import { api } from '../lib/api'
 import { generateClientKeypair } from '../lib/crypto'
 import { useLocale } from '../lib/i18n'
 import {
   ConnectionConfigSchema,
+  DeviceDeleteResponseSchema,
   DeviceListSchema,
   DeviceSchema,
   DeviceSessionPageSchema,
+  LifecycleStatusSchema,
   ServerListSchema,
   ServerPingResultListSchema,
 } from '../lib/schemas'
@@ -325,10 +327,14 @@ async function disconnectDevice(device: Device) {
   if (!peerID || !confirm(t('connectionsView.disconnectConfirm'))) return
   pendingDeviceID.value = device.id
   try {
-    await api.delete(`/api/v1/control/connections/${peerID}`)
-    forgetPrivateKey(peerID)
+    const outcome = await api.validated(`/api/v1/control/connections/${peerID}`, LifecycleStatusSchema, { method: 'DELETE' })
+    if (outcome.status === 'disconnect_pending') {
+      showNotification('error', t('connectionsView.disconnectPending'))
+    } else {
+      forgetPrivateKey(peerID)
+      showNotification('success', t('connectionsView.disconnectedSuccess'))
+    }
     await Promise.all([loadData(), auth.fetchQuota()])
-    showNotification('success', t('connectionsView.disconnectedSuccess'))
   } catch (error) {
     showNotification('error', error instanceof Error ? error.message : t('connectionsView.loadError'))
   } finally {
@@ -340,13 +346,16 @@ async function deleteDevice(device: Device) {
   if (!confirm(t('connectionsView.deleteConfirm'))) return
   pendingDeviceID.value = device.id
   try {
-    await api.delete(`/api/v1/control/devices/${device.id}`)
-    forgetPrivateKey(device.active_connection?.id)
+    const outcome = await api.validated(`/api/v1/control/devices/${device.id}`, DeviceDeleteResponseSchema, { method: 'DELETE' })
+    if ('status' in outcome && outcome.status === 'device_cleanup_pending') {
+      showNotification('error', t('connectionsView.cleanupPending'))
+    } else {
+      forgetPrivateKey(device.active_connection?.id)
+      showNotification('success', t('connectionsView.deletedSuccess'))
+    }
     await Promise.all([loadData(), auth.fetchQuota()])
-    showNotification('success', t('connectionsView.deletedSuccess'))
   } catch (error) {
-    if (error instanceof APIError && error.code === 'device_cleanup_pending') showNotification('error', t('connectionsView.cleanupPending'))
-    else showNotification('error', error instanceof Error ? error.message : t('connectionsView.loadError'))
+    showNotification('error', error instanceof Error ? error.message : t('connectionsView.loadError'))
     await loadData()
   } finally {
     pendingDeviceID.value = ''

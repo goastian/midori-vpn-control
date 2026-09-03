@@ -195,8 +195,10 @@ async function executeDeleteServer() {
     confirmDelete.value = null
     await loadServers()
     feedback.value = { kind: 'success', message: t('adminServers.deleteSuccess') }
-  } catch {
-    deleteError.value = t('adminServers.deleteError')
+  } catch (error) {
+    deleteError.value = error && typeof error === 'object' && 'code' in error && error.code === 'server_not_drained'
+      ? t('adminServers.serverNotDrained')
+      : t('adminServers.deleteError')
   } finally {
     deleting.value = false
   }

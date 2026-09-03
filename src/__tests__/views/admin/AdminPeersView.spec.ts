@@ -108,7 +108,7 @@ describe('AdminPeersView', () => {
   it('calls DELETE when forceDisconnect is confirmed', async () => {
     const { api } = await import('@/lib/api')
     vi.mocked(api.get).mockResolvedValue(mockPeers)
-    vi.mocked(api.delete).mockResolvedValue(undefined)
+    vi.mocked(api.validated).mockResolvedValue({ status: 'disconnected' })
     vi.spyOn(window, 'confirm').mockReturnValue(true)
 
     const wrapper = shallowMount(AdminPeersView, {
@@ -121,7 +121,7 @@ describe('AdminPeersView', () => {
     await vm.forceDisconnect('p1')
     await flushPromises()
 
-    expect(vi.mocked(api.delete)).toHaveBeenCalledWith('/api/v1/admin/peers/p1')
+    expect(vi.mocked(api.validated)).toHaveBeenCalledWith('/api/v1/admin/peers/p1', expect.anything(), { method: 'DELETE' })
     expect(wrapper.text()).toContain('La sesión VPN se desconectó correctamente.')
   })
 
@@ -139,13 +139,30 @@ describe('AdminPeersView', () => {
     const vm = wrapper.vm as any
     await vm.forceDisconnect('p1')
 
-    expect(vi.mocked(api.delete)).not.toHaveBeenCalled()
+    expect(vi.mocked(api.validated)).not.toHaveBeenCalled()
+  })
+
+  it('reports a scheduled disconnection without claiming convergence', async () => {
+    const { api } = await import('@/lib/api')
+    vi.mocked(api.get).mockResolvedValue(mockPeers)
+    vi.mocked(api.validated).mockResolvedValue({ status: 'disconnect_pending', operation_id: 'operation-1' })
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    const wrapper = shallowMount(AdminPeersView, {
+      global: { plugins: [createPinia()] },
+    })
+    await flushPromises()
+    await (wrapper.vm as any).forceDisconnect('p1')
+    await flushPromises()
+
+    expect(wrapper.find('[role="alert"]').text()).toContain('sigue pendiente en Core')
+    expect(wrapper.text()).not.toContain('se desconectó correctamente')
   })
 
   it('shows localized inline feedback when disconnection fails', async () => {
     const { api } = await import('@/lib/api')
     vi.mocked(api.get).mockResolvedValue(mockPeers)
-    vi.mocked(api.delete).mockRejectedValue(new Error('Internal detail'))
+    vi.mocked(api.validated).mockRejectedValue(new Error('Internal detail'))
     vi.spyOn(window, 'confirm').mockReturnValue(true)
 
     const wrapper = shallowMount(AdminPeersView, {
