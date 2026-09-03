@@ -749,7 +749,7 @@ function downloadQR() {
               {{ device.reported_name || t('common.unavailable') }}
             </p>
             <p v-if="device.adapter_label" class="mt-1 font-mono text-xs text-slate-400">
-              {{ device.adapter_label }}
+              {{ t('connectionsView.adapterReference') }}: {{ device.adapter_label }}
             </p>
           </div>
           <div class="text-sm">
@@ -851,7 +851,8 @@ function downloadQR() {
               <p class="mt-1 text-xs text-slate-400">
                 {{ deviceModal.device.reported_name || t('common.unavailable')
                 }}<span v-if="deviceModal.device.adapter_label">
-                  · {{ deviceModal.device.adapter_label }}</span
+                  · {{ t('connectionsView.adapterReference') }}:
+                  {{ deviceModal.device.adapter_label }}</span
                 >
               </p>
             </div>
