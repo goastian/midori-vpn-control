@@ -29,6 +29,22 @@ export class APIError extends Error {
   }
 }
 
+function isInvalidRefreshFailure(error: unknown): boolean {
+  return !localStorage.getItem('refresh_token') || (
+    error instanceof APIError && [400, 401, 403].includes(error.status)
+  )
+}
+
+function normalizeRefreshFailure(error: unknown): Error {
+  if (isInvalidRefreshFailure(error)) {
+    clearAccessToken()
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('token_expires_at')
+    return new APIError(401, 'unauthorized', 'Unauthorized')
+  }
+  return error instanceof Error ? error : new Error('Token refresh failed')
+}
+
 async function responseError(res: Response, fallback: string): Promise<APIError> {
   let payload: Partial<ApiFailure> = {}
   try {
@@ -62,14 +78,16 @@ function processRefreshQueue(error: Error | null, token: string | null) {
 
 // In-memory access token — never persisted to localStorage.
 let _accessToken = ''
-let _onRefreshCallback: ((token: string) => void) | null = null
+let _onAccessTokenCallback: ((token: string) => void) | null = null
 
 export function setAccessToken(token: string): void {
   _accessToken = token
+  _onAccessTokenCallback?.(token)
 }
 
 export function clearAccessToken(): void {
   _accessToken = ''
+  _onAccessTokenCallback?.('')
 }
 
 /** Returns the current in-memory access token without exposing the variable. */
@@ -77,8 +95,8 @@ export function getAccessToken(): string {
   return _accessToken
 }
 
-export function onAccessTokenRefreshed(cb: (token: string) => void): void {
-  _onRefreshCallback = cb
+export function onAccessTokenChanged(cb: (token: string) => void): void {
+  _onAccessTokenCallback = cb
 }
 
 /**
@@ -91,10 +109,13 @@ export async function initFromStoredRefreshToken(): Promise<string | null> {
   if (!saved) return null
   try {
     return await tryRefreshToken()
-  } catch {
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('token_expires_at')
-    return null
+  } catch (error) {
+    if (isInvalidRefreshFailure(error)) {
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('token_expires_at')
+      return null
+    }
+    throw error
   }
 }
 
@@ -121,7 +142,6 @@ async function tryRefreshToken(): Promise<string> {
 
   // Keep access token in memory only — never write to localStorage.
   setAccessToken(json.data.access_token)
-  _onRefreshCallback?.(json.data.access_token)
 
   if (json.data.refresh_token) {
     localStorage.setItem('refresh_token', json.data.refresh_token)
@@ -159,11 +179,9 @@ async function request<T>(path: string, options: RequestInit = {}, _isRetry = fa
         return request<T>(path, options, true)
       } catch (err) {
         isRefreshing = false
-        processRefreshQueue(err as Error, null)
-        clearAccessToken()
-        localStorage.removeItem('refresh_token')
-        window.location.href = '/dashboard'
-        throw new APIError(401, 'unauthorized', 'Unauthorized')
+        const failure = normalizeRefreshFailure(err)
+        processRefreshQueue(failure, null)
+        throw failure
       }
     } else {
       // Another refresh is in progress — wait for it
@@ -179,7 +197,7 @@ async function request<T>(path: string, options: RequestInit = {}, _isRetry = fa
   if (res.status === 401 && _isRetry) {
     clearAccessToken()
     localStorage.removeItem('refresh_token')
-    window.location.href = '/dashboard'
+    localStorage.removeItem('token_expires_at')
     throw new APIError(401, 'unauthorized', 'Unauthorized')
   }
 
@@ -223,11 +241,9 @@ async function requestRaw(path: string, options: RequestInit = {}, _isRetry = fa
         return requestRaw(path, options, true)
       } catch (err) {
         isRefreshing = false
-        processRefreshQueue(err as Error, null)
-        clearAccessToken()
-        localStorage.removeItem('refresh_token')
-        window.location.href = '/dashboard'
-        throw new APIError(401, 'unauthorized', 'Unauthorized')
+        const failure = normalizeRefreshFailure(err)
+        processRefreshQueue(failure, null)
+        throw failure
       }
     } else {
       return new Promise<Response>((resolve, reject) => {
@@ -242,7 +258,7 @@ async function requestRaw(path: string, options: RequestInit = {}, _isRetry = fa
   if (res.status === 401 && _isRetry) {
     clearAccessToken()
     localStorage.removeItem('refresh_token')
-    window.location.href = '/dashboard'
+    localStorage.removeItem('token_expires_at')
     throw new APIError(401, 'unauthorized', 'Unauthorized')
   }
 

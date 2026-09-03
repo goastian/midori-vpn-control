@@ -13,7 +13,7 @@ vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn().mockResolvedValue('data
 vi.mock('@/lib/api', () => ({
   setAccessToken: vi.fn(),
   clearAccessToken: vi.fn(),
-  onAccessTokenRefreshed: vi.fn(),
+  onAccessTokenChanged: vi.fn(),
   initFromStoredRefreshToken: vi.fn().mockResolvedValue(null),
   api: {
     get: vi.fn(),

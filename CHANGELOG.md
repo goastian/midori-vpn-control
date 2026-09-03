@@ -6,6 +6,11 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Changed
 
+- Authenticated routes and navigation now remain unmounted until both the
+  refreshed access token and validated profile are ready. Transient bootstrap
+  failures preserve the refresh session behind a localized retry screen,
+  invalid sessions resolve anonymously, and OAuth callbacks remain isolated
+  from stored-session restoration.
 - Connections now render one stable row per registered device with its current
   session, explicit client type, private adapter label and lifecycle state.
   Historical sessions are fetched as a validated, paginated detail only when

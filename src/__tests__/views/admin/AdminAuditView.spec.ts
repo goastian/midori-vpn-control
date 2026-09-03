@@ -14,7 +14,7 @@ vi.mock('@/lib/api', () => ({
   },
   setAccessToken: vi.fn(),
   clearAccessToken: vi.fn(),
-  onAccessTokenRefreshed: vi.fn(),
+  onAccessTokenChanged: vi.fn(),
   initFromStoredRefreshToken: vi.fn().mockResolvedValue(null),
   exchangeCode: vi.fn(),
 }))

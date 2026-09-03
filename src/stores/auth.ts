@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { generateCodeVerifier, generateCodeChallenge } from '../lib/pkce'
-import { exchangeCode, api, setAccessToken, clearAccessToken, onAccessTokenRefreshed, initFromStoredRefreshToken } from '../lib/api'
+import { APIError, exchangeCode, api, setAccessToken, clearAccessToken, onAccessTokenChanged, initFromStoredRefreshToken } from '../lib/api'
 import { UserSchema, type User, type UserQuota } from '../lib/schemas'
 import { SENSITIVE_SESSION_KEYS } from '../lib/storage-keys'
 
@@ -66,6 +66,8 @@ interface JWTPayload {
   [key: string]: unknown
 }
 
+export type BootstrapState = 'idle' | 'loading' | 'ready' | 'error'
+
 function decodeJWTPayload(token: string): JWTPayload | null {
   try {
     const parts = token.split('.')
@@ -97,10 +99,11 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const loading = ref(false)
   const error = ref('')
-  const initialized = ref(false)
+  const bootstrapState = ref<BootstrapState>('idle')
   let restorePromise: Promise<void> | null = null
 
-  const isAuthenticated = computed(() => !!accessToken.value)
+  const initialized = computed(() => bootstrapState.value === 'ready')
+  const isAuthenticated = computed(() => !!accessToken.value && user.value !== null)
   const isAdmin = computed(() =>
     user.value?.groups?.some((g) =>
       g === 'vpn-admins' || g === 'admins' || g === 'authentik Admins'
@@ -134,6 +137,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function handleCallback(code: string) {
     loading.value = true
     error.value = ''
+    bootstrapState.value = 'loading'
 
     try {
       const oidc = await getOIDCConfig()
@@ -169,41 +173,46 @@ export const useAuthStore = defineStore('auth', () => {
       }
 
       await fetchProfile()
-      initialized.value = true
+      bootstrapState.value = 'ready'
       startSessionCheck()
     } catch (e: any) {
       error.value = e.message || 'Login failed'
+      clearLocalSession()
+      bootstrapState.value = 'ready'
       throw e
     } finally {
       loading.value = false
     }
   }
 
-  async function fetchProfile() {
-    try {
-      user.value = await api.validated('/api/v1/control/me', UserSchema)
-    } catch (e: any) {
-      if (e.message === 'Unauthorized') {
-        logout()
-      }
+  async function fetchProfile(): Promise<User> {
+    const profile = await api.validated('/api/v1/control/me', UserSchema)
+    user.value = profile
+    return profile
+  }
+
+  function clearLocalSession(options: { preserveRefreshToken?: boolean } = {}) {
+    accessToken.value = ''
+    user.value = null
+    clearAccessToken()
+    stopSessionCheck()
+
+    if (!options.preserveRefreshToken) {
+      refreshToken.value = ''
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('token_expires_at')
     }
   }
 
   async function logout() {
-    accessToken.value = ''
-    refreshToken.value = ''
-    user.value = null
-    clearAccessToken() // clear in-memory token from api module
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('token_expires_at')
+    clearLocalSession()
     // Wipe sensitive material from sessionStorage (e.g. WireGuard private keys).
     // Non-sensitive caches (platform detection, etc.) are intentionally preserved.
     for (const key of SENSITIVE_SESSION_KEYS) {
       try { sessionStorage.removeItem(key) } catch { /* sessionStorage unavailable */ }
     }
-    initialized.value = true
+    bootstrapState.value = 'ready'
     restorePromise = null
-    stopSessionCheck()
 
     // Notify subscribers (e.g. dashboard WS) so they can release resources
     // before the page is unloaded by the redirect below.
@@ -216,41 +225,66 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // Keep accessToken ref in sync when api.ts silently refreshes the token.
-  onAccessTokenRefreshed((token) => {
+  onAccessTokenChanged((token) => {
     accessToken.value = token
+    if (!token) {
+      user.value = null
+      refreshToken.value = ''
+      stopSessionCheck()
+    }
   })
 
   async function restoreSession(): Promise<void> {
     if (restorePromise) return restorePromise
+    if (bootstrapState.value === 'ready' || bootstrapState.value === 'error') return
 
     const savedRefresh = localStorage.getItem('refresh_token')
     if (!savedRefresh) {
-      refreshToken.value = ''
-      initialized.value = true
+      clearLocalSession()
+      error.value = ''
+      bootstrapState.value = 'ready'
       return
     }
 
     restorePromise = (async () => {
       refreshToken.value = savedRefresh
       loading.value = true
+      error.value = ''
+      bootstrapState.value = 'loading'
       try {
         const token = await initFromStoredRefreshToken()
         if (token) {
           accessToken.value = token
           await fetchProfile()
           startSessionCheck()
+          bootstrapState.value = 'ready'
         } else {
-          refreshToken.value = ''
+          clearLocalSession()
+          bootstrapState.value = 'ready'
         }
-      } catch {
-        refreshToken.value = ''
+      } catch (e: any) {
+        if (e instanceof APIError && [401, 403].includes(e.status)) {
+          clearLocalSession()
+          bootstrapState.value = 'ready'
+        } else {
+          clearLocalSession({ preserveRefreshToken: true })
+          refreshToken.value = localStorage.getItem('refresh_token') || savedRefresh
+          error.value = e?.message || 'Session restoration failed'
+          bootstrapState.value = 'error'
+        }
       } finally {
         loading.value = false
-        initialized.value = true
+        restorePromise = null
       }
     })()
 
     return restorePromise
+  }
+
+  async function retryBootstrap(): Promise<void> {
+    if (bootstrapState.value !== 'error') return restoreSession()
+    bootstrapState.value = 'idle'
+    return restoreSession()
   }
 
   // Periodic session validity check (every 5 minutes).
@@ -302,8 +336,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  void restoreSession()
-
   return {
     accessToken,
     refreshToken,
@@ -311,11 +343,13 @@ export const useAuthStore = defineStore('auth', () => {
     userQuota,
     loading,
     error,
+    bootstrapState,
     initialized,
     isAuthenticated,
     isAdmin,
     isTokenExpired: () => isTokenExpired(accessToken.value),
     restoreSession,
+    retryBootstrap,
     startLogin,
     handleCallback,
     fetchProfile,

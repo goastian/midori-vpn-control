@@ -1,36 +1,89 @@
 <script setup lang="ts">
-import { RouterView, useRoute } from 'vue-router'
+import { RouterView, useRoute, useRouter } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 import { useAuthStore } from './stores/auth'
-import { computed } from 'vue'
+import { useLocale } from './lib/i18n'
+import { computed, watch } from 'vue'
 
 const auth = useAuthStore()
 const route = useRoute()
+const router = useRouter()
+const { t } = useLocale()
 
 const isFullPage = computed(() => route.meta?.fullPage === true)
+const bypassesBootstrap = computed(() => route.meta?.bootstrapBypass === true)
+
+async function retryBootstrap() {
+  await auth.retryBootstrap()
+  if (auth.bootstrapState !== 'ready') return
+
+  if (auth.isAuthenticated && (route.name === 'landing' || route.name === 'login')) {
+    await router.replace({ name: 'dashboard' })
+  } else if (!auth.isAuthenticated && !route.meta.public) {
+    await router.replace({ name: 'landing' })
+  }
+}
+
+watch(
+  () => auth.isAuthenticated,
+  (authenticated, wasAuthenticated) => {
+    if (wasAuthenticated && !authenticated && !route.meta.public) {
+      void router.replace({ name: 'landing' })
+    }
+  },
+)
 </script>
 
 <template>
-  <!-- Full-page routes (landing, login, oauth callbacks) render without shell -->
-  <RouterView v-if="isFullPage" />
+  <!-- OAuth callbacks are isolated full-page routes and cannot expose the shell. -->
+  <RouterView v-if="bypassesBootstrap" />
 
-  <!-- Initialization guard: show a neutral spinner until session restore completes.
-       This prevents any authenticated shell (NavBar, user email, admin role) from
-       briefly flashing to unauthenticated visitors during the async restore window. -->
-  <div v-else-if="!auth.initialized" class="min-h-screen app-shell-bg flex items-center justify-center">
-    <div class="h-9 w-9 animate-spin rounded-full border-b-2 border-midori-600"></div>
+  <!-- No route or authenticated chrome mounts before token and profile validation. -->
+  <div
+    v-else-if="auth.bootstrapState === 'idle' || auth.bootstrapState === 'loading'"
+    class="min-h-screen app-shell-bg flex items-center justify-center p-6 text-slate-900 dark:text-slate-100"
+    role="status"
+    aria-live="polite"
+  >
+    <div class="max-w-md text-center">
+      <div class="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-slate-300 border-t-midori-600 dark:border-slate-700 dark:border-t-midori-400" aria-hidden="true"></div>
+      <h1 class="mt-5 text-lg font-semibold">{{ t('bootstrap.loadingTitle') }}</h1>
+      <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">{{ t('bootstrap.loadingDetail') }}</p>
+    </div>
   </div>
 
-  <!-- App shell for authenticated / standard routes -->
-  <div v-else class="min-h-screen app-shell-bg text-slate-900 dark:text-slate-100">
-    <NavBar v-if="auth.isAuthenticated" />
+  <div
+    v-else-if="auth.bootstrapState === 'error'"
+    class="min-h-screen app-shell-bg flex items-center justify-center p-6 text-slate-900 dark:text-slate-100"
+    role="alert"
+  >
+    <div class="w-full max-w-md rounded-3xl border border-rose-200 bg-white p-8 text-center shadow-xl dark:border-rose-900/70 dark:bg-slate-900">
+      <h1 class="text-xl font-semibold">{{ t('bootstrap.errorTitle') }}</h1>
+      <p class="mt-3 text-sm text-slate-600 dark:text-slate-400">{{ t('bootstrap.errorDetail') }}</p>
+      <button
+        type="button"
+        class="mt-6 rounded-xl bg-midori-600 px-5 py-3 font-semibold text-white transition-colors hover:bg-midori-500 disabled:cursor-wait disabled:opacity-60"
+        :disabled="auth.loading"
+        @click="retryBootstrap"
+      >
+        {{ t('bootstrap.retry') }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Full-page public routes render only after bootstrap resolves. -->
+  <RouterView v-else-if="isFullPage" />
+
+  <!-- Authenticated routes mount only with a validated profile. -->
+  <div v-else-if="auth.isAuthenticated" class="min-h-screen app-shell-bg text-slate-900 dark:text-slate-100">
+    <NavBar />
     <main
-      :class="[
-        'mx-auto w-full px-4 py-6 sm:px-6 lg:px-10 lg:py-10',
-        auth.isAuthenticated ? 'max-w-[1800px] lg:pl-[19rem]' : 'max-w-7xl',
-      ]"
+      class="mx-auto w-full max-w-[1800px] px-4 py-6 sm:px-6 lg:py-10 lg:pl-[19rem] lg:pr-10"
     >
       <RouterView />
     </main>
   </div>
+
+  <!-- The router normally redirects this transition immediately. -->
+  <div v-else class="min-h-screen app-shell-bg" aria-hidden="true"></div>
 </template>

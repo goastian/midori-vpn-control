@@ -53,6 +53,13 @@ const messages: Record<LocaleCode, TranslationTree> = {
       label: 'Idioma',
       switcherAria: 'Seleccionar idioma',
     },
+    bootstrap: {
+      loadingTitle: 'Preparando tu sesión…',
+      loadingDetail: 'Estamos validando tu perfil antes de mostrar el panel.',
+      errorTitle: 'No se pudo restaurar la sesión',
+      errorDetail: 'La sesión no se modificó. Comprueba la conexión e inténtalo de nuevo.',
+      retry: 'Reintentar',
+    },
     common: {
       appName: 'MidoriVPN',
       loading: 'Cargando...',
@@ -666,6 +673,7 @@ const messages: Record<LocaleCode, TranslationTree> = {
   },
   en: {
     language: { label: 'Language', switcherAria: 'Select language' },
+    bootstrap: { loadingTitle: 'Preparing your session…', loadingDetail: 'We are validating your profile before showing the dashboard.', errorTitle: 'The session could not be restored', errorDetail: 'Your session was not changed. Check the connection and try again.', retry: 'Retry' },
     common: {
       appName: 'MidoriVPN', loading: 'Loading...', save: 'Save', cancel: 'Cancel', create: 'Create', edit: 'Edit', delete: 'Delete', close: 'Close', copy: 'Copy', view: 'View', actions: 'Actions', active: 'Active', inactive: 'Inactive', status: 'Status', date: 'Date', details: 'Details', traffic: 'Traffic', device: 'Device', server: 'Server', user: 'User', users: 'Users', servers: 'Servers', peers: 'Peers', ip: 'IP', name: 'Name', email: 'Email', groups: 'Groups', back: 'Back', allActions: 'All actions', noResults: 'No results.', system: 'system', unnamed: 'Unnamed', yes: 'Yes', no: 'No', topFive: 'Top 5', live: 'live', total: 'Total', registeredAccounts: 'registered accounts', available: '{count} available', provisioned: '{count} provisioned', totalConnections: '{count} total', peersConnected: 'connected peers', sessionActive: 'Active session', roleAdmin: 'Admin profile', roleUser: 'User profile', signOut: 'Sign out', noNamedDevice: 'Unnamed device', noDataYet: 'No data yet.', connect: 'Connect', connecting: 'Connecting...', disconnect: 'Disconnect', search: 'Search', retry: 'Retry', loadMore: 'Load more'
     },

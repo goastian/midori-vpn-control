@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type Router } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
 const router = createRouter({
@@ -20,7 +20,7 @@ const router = createRouter({
       path: '/auth/callback',
       name: 'auth-callback',
       component: () => import('../views/AuthCallback.vue'),
-      meta: { public: true, fullPage: true },
+      meta: { public: true, fullPage: true, bootstrapBypass: true },
     },
     {
       // Dedicated callback route for the browser extension.
@@ -29,7 +29,7 @@ const router = createRouter({
       path: '/extension/callback',
       name: 'extension-callback',
       component: () => import('../views/ExtensionCallback.vue'),
-      meta: { public: true, fullPage: true },
+      meta: { public: true, fullPage: true, bootstrapBypass: true },
     },
     {
       path: '/dashboard',
@@ -110,45 +110,56 @@ const router = createRouter({
 // Auth-only routes that should redirect authenticated users to the dashboard.
 const REDIRECT_IF_AUTHED = new Set<string | symbol>(['login', 'landing'])
 
-router.beforeEach(async (to) => {
-  const auth = useAuthStore()
+export function installAuthGuard(targetRouter: Router): void {
+  targetRouter.beforeEach(async (to) => {
+    const auth = useAuthStore()
 
-  // Always resolve the session before making any routing decision.
-  // restoreSession() is idempotent — subsequent calls return the same promise.
-  await auth.restoreSession()
+    // OAuth callbacks must remain reachable before a stored web session is
+    // restored. Their full-page views never expose the authenticated shell.
+    if (to.meta.bootstrapBypass) return true
 
-  // Never keep users on an intermediate login screen.
-  // Hitting /login should jump directly to the Authentik authorization endpoint.
-  if (to.name === 'login' && !auth.isAuthenticated) {
-    try {
-      await auth.startLogin()
-      return false
-    } catch {
-      return true
+    // Resolve both refresh and the validated profile before routing decisions.
+    await auth.restoreSession()
+
+    // Keep the requested location while App displays the recoverable bootstrap
+    // failure. A successful retry can then reveal or redirect it deterministically.
+    if (auth.bootstrapState === 'error') return true
+
+    // Never keep users on an intermediate login screen.
+    // Hitting /login should jump directly to the Authentik authorization endpoint.
+    if (to.name === 'login' && !auth.isAuthenticated) {
+      try {
+        await auth.startLogin()
+        return false
+      } catch {
+        return true
+      }
     }
-  }
 
-  // Redirect authenticated users away from login / landing.
-  if (typeof to.name === 'string' && REDIRECT_IF_AUTHED.has(to.name) && auth.isAuthenticated) {
-    return { name: 'dashboard' }
-  }
-
-  // Protect all non-public routes.
-  if (!to.meta.public && !auth.isAuthenticated) {
-    return { name: 'landing' }
-  }
-
-  // Revalidate profile from server on every admin navigation.
-  if (to.meta.admin) {
-    try {
-      await auth.fetchProfile()
-    } catch {
-      return { name: 'landing' }
-    }
-    if (!auth.isAdmin) {
+    // Redirect authenticated users away from login / landing.
+    if (typeof to.name === 'string' && REDIRECT_IF_AUTHED.has(to.name) && auth.isAuthenticated) {
       return { name: 'dashboard' }
     }
-  }
-})
+
+    // Protect all non-public routes.
+    if (!to.meta.public && !auth.isAuthenticated) {
+      return { name: 'landing' }
+    }
+
+    // Revalidate profile from server on every admin navigation.
+    if (to.meta.admin) {
+      try {
+        await auth.fetchProfile()
+      } catch {
+        return auth.isAuthenticated ? { name: 'dashboard' } : { name: 'landing' }
+      }
+      if (!auth.isAdmin) {
+        return { name: 'dashboard' }
+      }
+    }
+  })
+}
+
+installAuthGuard(router)
 
 export default router
