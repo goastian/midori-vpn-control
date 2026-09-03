@@ -2,9 +2,11 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
-import { AdminMeshNetworkListSchema, type AdminMeshNetwork } from '../../lib/schemas'
+import { AdminMeshNetworkPageSchema, type AdminMeshNetwork } from '../../lib/schemas'
 import AsyncState from '../../components/AsyncState.vue'
 import ResourceSkeleton from '../../components/ResourceSkeleton.vue'
+import PaginationControls from '../../components/PaginationControls.vue'
+import AdminListFilters from '../../components/AdminListFilters.vue'
 import {
   beginResourceLoad,
   completeResourceLoad,
@@ -13,6 +15,13 @@ import {
 
 const meshNetworks = ref<AdminMeshNetwork[]>([])
 const meshState = ref<ResourceState>('idle')
+const page = ref(1)
+const total = ref(0)
+const PAGE_SIZE = 20
+const search = ref('')
+const status = ref('all')
+const sort = ref('created_at')
+const order = ref('desc')
 const expanded = ref<Set<string>>(new Set())
 const { t } = useLocale()
 let refreshTimer: number | undefined
@@ -28,14 +37,34 @@ onBeforeUnmount(() => {
   if (refreshTimer) window.clearInterval(refreshTimer)
 })
 
-async function load() {
+async function load(requestedPage?: number) {
   meshState.value = beginResourceLoad(meshNetworks.value.length > 0 || meshState.value === 'empty')
   try {
-    meshNetworks.value = await api.validated('/api/v1/admin/mesh', AdminMeshNetworkListSchema)
+    const targetPage = typeof requestedPage === 'number' ? requestedPage : page.value
+    const params = new URLSearchParams({
+      page: String(targetPage),
+      page_size: String(PAGE_SIZE),
+      status: status.value,
+      sort: sort.value,
+      order: order.value,
+    })
+    if (search.value) params.set('search', search.value)
+    const response = await api.validated(`/api/v1/admin/mesh?${params}`, AdminMeshNetworkPageSchema)
+    meshNetworks.value = response.items
+    page.value = response.page
+    total.value = response.total
     meshState.value = completeResourceLoad(meshNetworks.value.length > 0)
   } catch {
     meshState.value = 'error'
   }
+}
+
+function applyFilters(filters: { search: string; status: string; sort: string; order: string }) {
+  search.value = filters.search
+  status.value = filters.status
+  sort.value = filters.sort
+  order.value = filters.order
+  void load(1)
 }
 
 function toggle(id: string) {
@@ -82,6 +111,17 @@ function connectedCount(net: AdminMeshNetwork) {
         <span>{{ t('adminMesh.refresh') }}</span>
       </button>
     </div>
+
+    <AdminListFilters
+      :search="search"
+      :status="status"
+      :sort="sort"
+      :order="order"
+      :statuses="['all', 'active', 'inactive']"
+      :sorts="['created_at', 'name', 'member_count']"
+      :disabled="meshState === 'loading' || meshState === 'refreshing'"
+      @apply="applyFilters"
+    />
 
     <ResourceSkeleton
       v-if="meshState === 'idle' || meshState === 'loading'"
@@ -256,6 +296,13 @@ function connectedCount(net: AdminMeshNetwork) {
           </div>
         </div>
       </div>
+      <PaginationControls
+        :page="page"
+        :page-size="PAGE_SIZE"
+        :total="total"
+        :disabled="meshState === 'refreshing'"
+        @change="load"
+      />
     </div>
   </div>
 </template>

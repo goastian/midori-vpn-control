@@ -41,6 +41,8 @@ const mockLogs = [
   },
 ]
 
+const page = <T>(items: T[]) => ({ items, page: 1, page_size: 50, total: items.length })
+
 describe('AdminAuditView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -62,7 +64,7 @@ describe('AdminAuditView', () => {
 
   it('renders audit log rows after successful load', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.validated).mockResolvedValue(mockLogs)
+    vi.mocked(api.validated).mockResolvedValue(page(mockLogs))
 
     const wrapper = shallowMount(AdminAuditView, {
       global: { plugins: [createPinia()] },
@@ -77,7 +79,7 @@ describe('AdminAuditView', () => {
 
   it('shows empty state when there are no logs', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.validated).mockResolvedValue([])
+    vi.mocked(api.validated).mockResolvedValue(page([]))
 
     const wrapper = shallowMount(AdminAuditView, {
       global: { plugins: [createPinia()] },
@@ -103,7 +105,7 @@ describe('AdminAuditView', () => {
 
   it('includes action filter in query when actionFilter is set', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.validated).mockResolvedValue(mockLogs)
+    vi.mocked(api.validated).mockResolvedValue(page(mockLogs))
 
     const wrapper = shallowMount(AdminAuditView, {
       global: { plugins: [createPinia()] },
@@ -125,7 +127,7 @@ describe('AdminAuditView', () => {
 
   it('calls api with no action filter when actionFilter is empty', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.validated).mockResolvedValue([])
+    vi.mocked(api.validated).mockResolvedValue(page([]))
 
     shallowMount(AdminAuditView, {
       global: { plugins: [createPinia()] },
@@ -141,7 +143,7 @@ describe('AdminAuditView', () => {
 
   it('associates an accessible label with the action filter', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.validated).mockResolvedValue([])
+    vi.mocked(api.validated).mockResolvedValue(page([]))
 
     const wrapper = shallowMount(AdminAuditView, {
       global: { plugins: [createPinia()] },

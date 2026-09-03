@@ -2,9 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
-import { LifecycleStatusSchema, UserListSchema, type User } from '../../lib/schemas'
+import { AdminUserPageSchema, LifecycleStatusSchema, type User } from '../../lib/schemas'
 import AsyncState from '../../components/AsyncState.vue'
 import ResourceSkeleton from '../../components/ResourceSkeleton.vue'
+import PaginationControls from '../../components/PaginationControls.vue'
+import AdminListFilters from '../../components/AdminListFilters.vue'
 import {
   beginResourceLoad,
   completeResourceLoad,
@@ -13,9 +15,13 @@ import {
 
 const users = ref<User[]>([])
 const usersState = ref<ResourceState>('idle')
-const currentOffset = ref(0)
-const hasMore = ref(true)
+const page = ref(1)
+const total = ref(0)
 const PAGE_SIZE = 50
+const search = ref('')
+const status = ref('all')
+const sort = ref('created_at')
+const order = ref('desc')
 const showCreate = ref(false)
 const { t } = useLocale()
 
@@ -41,33 +47,37 @@ onMounted(async () => {
   await loadUsers()
 })
 
-async function loadUsers(append = false) {
+async function loadUsers(requestedPage?: number) {
   usersState.value = beginResourceLoad(users.value.length > 0 || usersState.value === 'empty')
   try {
-    const offset = append ? currentOffset.value : 0
-    const page = await api.validated(
-      `/api/v1/admin/users?limit=${PAGE_SIZE}&offset=${offset}`,
-      UserListSchema,
-    )
-    if (append) {
-      users.value = [...users.value, ...page]
-    } else {
-      users.value = page
-      currentOffset.value = 0
-    }
-    hasMore.value = page.length >= PAGE_SIZE
-    currentOffset.value = (append ? currentOffset.value : 0) + page.length
+    const targetPage = typeof requestedPage === 'number' ? requestedPage : page.value
+    const params = new URLSearchParams({
+      page: String(targetPage),
+      page_size: String(PAGE_SIZE),
+      status: status.value,
+      sort: sort.value,
+      order: order.value,
+    })
+    if (search.value) params.set('search', search.value)
+    const response = await api.validated(`/api/v1/admin/users?${params}`, AdminUserPageSchema)
+    users.value = response.items
+    page.value = response.page
+    total.value = response.total
     usersState.value = completeResourceLoad(users.value.length > 0)
   } catch {
     usersState.value = 'error'
-    if (append && users.value.length > 0) {
+    if (users.value.length > 0) {
       feedback.value = { kind: 'error', message: t('adminUsers.loadError') }
     }
   }
 }
 
-async function loadMoreUsers() {
-  await loadUsers(true)
+function applyFilters(filters: { search: string; status: string; sort: string; order: string }) {
+  search.value = filters.search
+  status.value = filters.status
+  sort.value = filters.sort
+  order.value = filters.order
+  void loadUsers(1)
 }
 
 function validateCreateForm(): boolean {
@@ -405,6 +415,17 @@ defineExpose({ deleteUser })
       {{ feedback.message }}
     </div>
 
+    <AdminListFilters
+      :search="search"
+      :status="status"
+      :sort="sort"
+      :order="order"
+      :statuses="['all', 'active', 'banned']"
+      :sorts="['created_at', 'email', 'display_name']"
+      :disabled="usersState === 'loading' || usersState === 'refreshing'"
+      @apply="applyFilters"
+    />
+
     <ResourceSkeleton
       v-if="usersState === 'idle' || usersState === 'loading'"
       :title="t('adminUsers.loading')"
@@ -501,17 +522,13 @@ defineExpose({ deleteUser })
           </tr>
         </tbody>
       </table>
-      <div v-if="hasMore" class="px-6 py-4 border-t border-slate-800 text-center">
-        <button
-          type="button"
-          :disabled="usersState === 'refreshing'"
-          :aria-busy="usersState === 'refreshing'"
-          class="text-sm font-semibold text-midori-400 hover:text-midori-300 disabled:opacity-50 cursor-pointer"
-          @click="loadMoreUsers"
-        >
-          {{ usersState === 'refreshing' ? t('common.loading') : t('common.loadMore') }}
-        </button>
-      </div>
+      <PaginationControls
+        :page="page"
+        :page-size="PAGE_SIZE"
+        :total="total"
+        :disabled="usersState === 'refreshing'"
+        @change="loadUsers"
+      />
     </div>
   </div>
 </template>

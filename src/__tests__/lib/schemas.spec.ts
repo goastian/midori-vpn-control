@@ -15,6 +15,7 @@ import {
   DashboardSummarySchema,
   AuditLogSchema,
   AdminPeerSchema,
+  AdminPeerPageSchema,
   AdminUserDetailSchema,
   HealthEnvelopeSchema,
   WebSocketStatsMessageSchema,
@@ -416,6 +417,16 @@ describe('Zod API schemas', () => {
 
     it('rejects an incomplete user-detail envelope', () => {
       expect(() => AdminUserDetailSchema.parse({ user: { id: 'partial' }, peers: [] })).toThrow()
+    })
+
+    it('requires bounded pagination metadata for administrator lists', () => {
+      expect(() =>
+        AdminPeerPageSchema.parse({ items: [], page: 1, page_size: 100, total: 0 }),
+      ).not.toThrow()
+      expect(() =>
+        AdminPeerPageSchema.parse({ items: [], page: 1, page_size: 101, total: 0 }),
+      ).toThrow()
+      expect(() => AdminPeerPageSchema.parse([])).toThrow()
     })
   })
 

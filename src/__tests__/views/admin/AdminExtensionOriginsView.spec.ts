@@ -15,6 +15,8 @@ const registeredOrigin = {
   updated_at: '2026-08-28T11:00:00Z',
 }
 
+const page = <T>(items: T[]) => ({ items, page: 1, page_size: 50, total: items.length })
+
 describe('AdminExtensionOriginsView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -23,7 +25,7 @@ describe('AdminExtensionOriginsView', () => {
 
   it('lists registered extension origins and their browser family', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.validated).mockResolvedValue([{ ...registeredOrigin }])
+    vi.mocked(api.validated).mockResolvedValue(page([{ ...registeredOrigin }]))
 
     const wrapper = shallowMount(AdminExtensionOriginsView)
     await flushPromises()
@@ -35,7 +37,7 @@ describe('AdminExtensionOriginsView', () => {
 
   it('revokes an origin after confirmation', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.validated).mockResolvedValue([{ ...registeredOrigin }])
+    vi.mocked(api.validated).mockResolvedValue(page([{ ...registeredOrigin }]))
     vi.mocked(api.put).mockResolvedValue({})
 
     const wrapper = shallowMount(AdminExtensionOriginsView)
@@ -53,7 +55,7 @@ describe('AdminExtensionOriginsView', () => {
 
   it('does not update an origin when confirmation is cancelled', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.validated).mockResolvedValue([{ ...registeredOrigin }])
+    vi.mocked(api.validated).mockResolvedValue(page([{ ...registeredOrigin }]))
     vi.mocked(window.confirm).mockReturnValue(false)
 
     const wrapper = shallowMount(AdminExtensionOriginsView)
@@ -78,7 +80,7 @@ describe('AdminExtensionOriginsView', () => {
 
   it('shows localized inline feedback when an update fails', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.validated).mockResolvedValue([{ ...registeredOrigin }])
+    vi.mocked(api.validated).mockResolvedValue(page([{ ...registeredOrigin }]))
     vi.mocked(api.put).mockRejectedValue(new Error('Internal detail'))
 
     const wrapper = shallowMount(AdminExtensionOriginsView)
@@ -93,7 +95,7 @@ describe('AdminExtensionOriginsView', () => {
   it('keeps registered origins visible when refresh fails', async () => {
     const { api } = await import('@/lib/api')
     vi.mocked(api.validated)
-      .mockResolvedValueOnce([{ ...registeredOrigin }])
+      .mockResolvedValueOnce(page([{ ...registeredOrigin }]))
       .mockRejectedValueOnce(new Error('offline'))
 
     const wrapper = shallowMount(AdminExtensionOriginsView)

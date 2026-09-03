@@ -51,6 +51,7 @@ const mockServers = [
 ]
 
 const mockPings = [{ server_id: 's1', latency_ms: 42, available: true }]
+const page = <T>(items: T[]) => ({ items, page: 1, page_size: 50, total: items.length })
 
 describe('AdminServersView', () => {
   let consoleError: ReturnType<typeof vi.spyOn>
@@ -82,7 +83,7 @@ describe('AdminServersView', () => {
     const { api } = await import('@/lib/api')
     vi.mocked(api.validated).mockImplementation((path: string) => {
       if (path.includes('/ping')) return Promise.resolve(mockPings)
-      return Promise.resolve(mockServers)
+      return Promise.resolve(page(mockServers))
     })
 
     const wrapper = shallowMount(AdminServersView, {
@@ -98,7 +99,7 @@ describe('AdminServersView', () => {
 
   it('handles empty server list', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.validated).mockResolvedValue([])
+    vi.mocked(api.validated).mockResolvedValue(page([]))
 
     const wrapper = shallowMount(AdminServersView, {
       global: { plugins: [createPinia()] },
@@ -127,7 +128,7 @@ describe('AdminServersView', () => {
     const { api } = await import('@/lib/api')
     vi.mocked(api.validated).mockImplementation((path: string) => {
       if (path.includes('/ping')) return Promise.reject(new Error('ping failed'))
-      return Promise.resolve(mockServers)
+      return Promise.resolve(page(mockServers))
     })
 
     const wrapper = shallowMount(AdminServersView, {
@@ -145,7 +146,7 @@ describe('AdminServersView', () => {
     const { api } = await import('@/lib/api')
     vi.mocked(api.validated).mockImplementation((path: string) => {
       if (path.includes('/ping')) return Promise.resolve(mockPings)
-      return Promise.resolve(mockServers)
+      return Promise.resolve(page(mockServers))
     })
     vi.mocked(api.delete).mockRejectedValue(new Error('Internal detail'))
 
@@ -173,7 +174,7 @@ describe('AdminServersView', () => {
     const { api } = await import('@/lib/api')
     vi.mocked(api.validated).mockImplementation((path: string) => {
       if (path.includes('/ping')) return Promise.resolve(mockPings)
-      return Promise.resolve(mockServers)
+      return Promise.resolve(page(mockServers))
     })
     vi.mocked(api.delete).mockRejectedValue({ code: 'server_not_drained' })
 
@@ -195,7 +196,7 @@ describe('AdminServersView', () => {
 
   it('associates the primary server fields with their labels', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.validated).mockResolvedValue([])
+    vi.mocked(api.validated).mockResolvedValue(page([]))
 
     const wrapper = shallowMount(AdminServersView, {
       global: { plugins: [createPinia()] },
@@ -213,7 +214,7 @@ describe('AdminServersView', () => {
     const { api } = await import('@/lib/api')
     vi.mocked(api.validated).mockImplementation((path: string) => {
       if (path.includes('/ping')) return Promise.resolve(mockPings)
-      return Promise.resolve(mockServers)
+      return Promise.resolve(page(mockServers))
     })
     vi.mocked(api.put).mockResolvedValue({})
 

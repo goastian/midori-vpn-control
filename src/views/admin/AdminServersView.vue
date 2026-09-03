@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
 import {
-  ServerListSchema,
+  AdminServerPageSchema,
   ServerPingResultListSchema,
   type Server,
   type ServerPingResult,
@@ -11,6 +11,8 @@ import {
 } from '../../lib/schemas'
 import AsyncState from '../../components/AsyncState.vue'
 import ResourceSkeleton from '../../components/ResourceSkeleton.vue'
+import PaginationControls from '../../components/PaginationControls.vue'
+import AdminListFilters from '../../components/AdminListFilters.vue'
 import {
   beginResourceLoad,
   completeResourceLoad,
@@ -20,6 +22,13 @@ import {
 const servers = ref<Server[]>([])
 const serverPing = ref<Record<string, ServerPingResult>>({})
 const serversState = ref<ResourceState>('idle')
+const page = ref(1)
+const total = ref(0)
+const PAGE_SIZE = 50
+const search = ref('')
+const status = ref('all')
+const sort = ref('name')
+const order = ref('desc')
 const pingState = ref<ResourceState>('idle')
 const showForm = ref(false)
 const editingId = ref<string | null>(null)
@@ -76,15 +85,35 @@ onUnmounted(() => {
   }
 })
 
-async function loadServers() {
+async function loadServers(requestedPage?: number) {
   serversState.value = beginResourceLoad(servers.value.length > 0 || serversState.value === 'empty')
   try {
-    servers.value = await api.validated('/api/v1/admin/servers', ServerListSchema)
+    const targetPage = typeof requestedPage === 'number' ? requestedPage : page.value
+    const params = new URLSearchParams({
+      page: String(targetPage),
+      page_size: String(PAGE_SIZE),
+      status: status.value,
+      sort: sort.value,
+      order: order.value,
+    })
+    if (search.value) params.set('search', search.value)
+    const response = await api.validated(`/api/v1/admin/servers?${params}`, AdminServerPageSchema)
+    servers.value = response.items
+    page.value = response.page
+    total.value = response.total
     serversState.value = completeResourceLoad(servers.value.length > 0)
     void loadPings()
   } catch {
     serversState.value = 'error'
   }
+}
+
+function applyFilters(filters: { search: string; status: string; sort: string; order: string }) {
+  search.value = filters.search
+  status.value = filters.status
+  sort.value = filters.sort
+  order.value = filters.order
+  void loadServers(1)
 }
 
 async function loadPings() {
@@ -666,6 +695,17 @@ async function executeDeleteServer() {
       {{ feedback.message }}
     </div>
 
+    <AdminListFilters
+      :search="search"
+      :status="status"
+      :sort="sort"
+      :order="order"
+      :statuses="['all', 'active', 'inactive', 'draining']"
+      :sorts="['name', 'created_at', 'current_peers']"
+      :disabled="serversState === 'loading' || serversState === 'refreshing'"
+      @apply="applyFilters"
+    />
+
     <ResourceSkeleton
       v-if="serversState === 'idle' || serversState === 'loading'"
       :title="t('adminServers.loading')"
@@ -803,6 +843,13 @@ async function executeDeleteServer() {
           </tr>
         </tbody>
       </table>
+      <PaginationControls
+        :page="page"
+        :page-size="PAGE_SIZE"
+        :total="total"
+        :disabled="serversState === 'refreshing'"
+        @change="loadServers"
+      />
     </div>
   </div>
 </template>

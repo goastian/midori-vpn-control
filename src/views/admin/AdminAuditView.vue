@@ -2,9 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
-import { AuditLogListSchema, type AuditLog } from '../../lib/schemas'
+import { AdminAuditLogPageSchema, type AuditLog } from '../../lib/schemas'
 import AsyncState from '../../components/AsyncState.vue'
 import ResourceSkeleton from '../../components/ResourceSkeleton.vue'
+import PaginationControls from '../../components/PaginationControls.vue'
+import AdminListFilters from '../../components/AdminListFilters.vue'
 import {
   beginResourceLoad,
   completeResourceLoad,
@@ -13,37 +15,50 @@ import {
 
 const logs = ref<AuditLog[]>([])
 const logsState = ref<ResourceState>('idle')
-const currentOffset = ref(0)
-const hasMore = ref(true)
+const page = ref(1)
+const total = ref(0)
 const PAGE_SIZE = 50
 const actionFilter = ref('')
+const search = ref('')
+const status = ref('all')
+const sort = ref('created_at')
+const order = ref('desc')
 const { t, formatDateTime } = useLocale()
 
 onMounted(() => loadLogs())
 
-async function loadLogs(append = false) {
+async function loadLogs(requestedPage?: number) {
   logsState.value = beginResourceLoad(logs.value.length > 0 || logsState.value === 'empty')
   try {
-    const offset = append ? currentOffset.value : 0
-    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) })
+    const targetPage = typeof requestedPage === 'number' ? requestedPage : page.value
+    const params = new URLSearchParams({
+      page: String(targetPage),
+      page_size: String(PAGE_SIZE),
+      status: status.value,
+      sort: sort.value,
+      order: order.value,
+    })
+    if (search.value) params.set('search', search.value)
     if (actionFilter.value) params.set('action', actionFilter.value)
-    const page = await api.validated(`/api/v1/admin/audit-logs?${params}`, AuditLogListSchema)
-    if (append) {
-      logs.value = [...logs.value, ...page]
-    } else {
-      logs.value = page
-      currentOffset.value = 0
-    }
-    hasMore.value = page.length >= PAGE_SIZE
-    currentOffset.value = (append ? currentOffset.value : 0) + page.length
+    const response = await api.validated(
+      `/api/v1/admin/audit-logs?${params}`,
+      AdminAuditLogPageSchema,
+    )
+    logs.value = response.items
+    page.value = response.page
+    total.value = response.total
     logsState.value = completeResourceLoad(logs.value.length > 0)
   } catch {
     logsState.value = 'error'
   }
 }
 
-async function loadMoreLogs() {
-  await loadLogs(true)
+function applyFilters(filters: { search: string; status: string; sort: string; order: string }) {
+  search.value = filters.search
+  status.value = filters.status
+  sort.value = filters.sort
+  order.value = filters.order
+  void loadLogs(1)
 }
 
 function actionLabel(action: string): string {
@@ -74,7 +89,7 @@ function actionColor(action: string): string {
           id="audit-action-filter"
           v-model="actionFilter"
           class="border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-900/80 text-white outline-none focus:border-midori-500 transition-colors cursor-pointer"
-          @change="loadLogs()"
+          @change="loadLogs(1)"
         >
           <option value="" class="bg-slate-900 text-slate-100">{{ t('common.allActions') }}</option>
           <option value="peer.connect" class="bg-slate-900 text-slate-100">peer.connect</option>
@@ -101,6 +116,17 @@ function actionColor(action: string): string {
         </select>
       </div>
     </div>
+
+    <AdminListFilters
+      :search="search"
+      :status="status"
+      :sort="sort"
+      :order="order"
+      :statuses="['all']"
+      :sorts="['created_at', 'action']"
+      :disabled="logsState === 'loading' || logsState === 'refreshing'"
+      @apply="applyFilters"
+    />
 
     <ResourceSkeleton
       v-if="logsState === 'idle' || logsState === 'loading'"
@@ -173,17 +199,13 @@ function actionColor(action: string): string {
           </tr>
         </tbody>
       </table>
-      <div v-if="hasMore" class="px-6 py-4 border-t border-slate-800 text-center">
-        <button
-          type="button"
-          :disabled="logsState === 'refreshing'"
-          :aria-busy="logsState === 'refreshing'"
-          class="text-sm font-semibold text-midori-400 hover:text-midori-300 disabled:opacity-50 cursor-pointer"
-          @click="loadMoreLogs"
-        >
-          {{ logsState === 'refreshing' ? t('common.loading') : t('common.loadMore') }}
-        </button>
-      </div>
+      <PaginationControls
+        :page="page"
+        :page-size="PAGE_SIZE"
+        :total="total"
+        :disabled="logsState === 'refreshing'"
+        @change="loadLogs"
+      />
     </div>
   </div>
 </template>

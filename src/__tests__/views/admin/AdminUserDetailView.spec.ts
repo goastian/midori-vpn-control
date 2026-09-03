@@ -20,6 +20,8 @@ const user = {
   updated_at: '2026-01-01T00:00:00Z',
 }
 
+const page = <T>(items: T[]) => ({ items, page: 1, page_size: 20, total: items.length })
+
 async function makeRouter() {
   const router = createRouter({
     history: createMemoryHistory(),
@@ -40,7 +42,7 @@ describe('AdminUserDetailView', () => {
 
   it('renders localized account details after loading', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.validated).mockResolvedValue({ user, peers: [] })
+    vi.mocked(api.validated).mockResolvedValue({ user, peers: page([]) })
 
     const wrapper = shallowMount(AdminUserDetailView, {
       global: { plugins: [await makeRouter()] },

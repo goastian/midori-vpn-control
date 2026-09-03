@@ -46,6 +46,8 @@ const mockUsers = [
   },
 ]
 
+const page = <T>(items: T[]) => ({ items, page: 1, page_size: 50, total: items.length })
+
 function makeRouter() {
   return createRouter({
     history: createMemoryHistory(),
@@ -82,7 +84,7 @@ describe('AdminUsersView', () => {
 
   it('renders user rows after successful load', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.validated).mockResolvedValue(mockUsers)
+    vi.mocked(api.validated).mockResolvedValue(page(mockUsers))
 
     const wrapper = shallowMount(AdminUsersView, {
       global: { plugins: [createPinia(), makeRouter()] },
@@ -97,7 +99,7 @@ describe('AdminUsersView', () => {
 
   it('shows an explicit empty state', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.validated).mockResolvedValue([])
+    vi.mocked(api.validated).mockResolvedValue(page([]))
 
     const wrapper = shallowMount(AdminUsersView, {
       global: { plugins: [createPinia(), makeRouter()] },
@@ -126,7 +128,7 @@ describe('AdminUsersView', () => {
 
   it('calls DELETE endpoint when deleteUser is triggered', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.validated).mockResolvedValue(mockUsers)
+    vi.mocked(api.validated).mockResolvedValue(page(mockUsers))
     vi.mocked(api.delete).mockResolvedValue(undefined)
     vi.spyOn(window, 'confirm').mockReturnValue(true)
 
@@ -149,7 +151,7 @@ describe('AdminUsersView', () => {
   it('keeps a failed suspension dialog open with localized feedback', async () => {
     const { api } = await import('@/lib/api')
     vi.mocked(api.validated).mockImplementation(async (path: string) => {
-      if (path.startsWith('/api/v1/admin/users?')) return mockUsers
+      if (path.startsWith('/api/v1/admin/users?')) return page(mockUsers)
       throw new Error('Internal detail')
     })
 
@@ -175,7 +177,7 @@ describe('AdminUsersView', () => {
   it('reports pending cleanup after suspending access', async () => {
     const { api } = await import('@/lib/api')
     vi.mocked(api.validated).mockImplementation(async (path: string) =>
-      path.startsWith('/api/v1/admin/users?') ? mockUsers : { status: 'ban_cleanup_pending' },
+      path.startsWith('/api/v1/admin/users?') ? page(mockUsers) : { status: 'ban_cleanup_pending' },
     )
 
     const wrapper = shallowMount(AdminUsersView, {
@@ -200,7 +202,7 @@ describe('AdminUsersView', () => {
 
   it('creates a user from labelled fields and announces success', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.validated).mockResolvedValue([])
+    vi.mocked(api.validated).mockResolvedValue(page([]))
     vi.mocked(api.post).mockResolvedValue({})
 
     const wrapper = shallowMount(AdminUsersView, {

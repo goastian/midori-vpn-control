@@ -2,9 +2,11 @@
 import { onMounted, ref } from 'vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
-import { ExtensionOriginListSchema, type ExtensionOrigin } from '../../lib/schemas'
+import { ExtensionOriginPageSchema, type ExtensionOrigin } from '../../lib/schemas'
 import AsyncState from '../../components/AsyncState.vue'
 import ResourceSkeleton from '../../components/ResourceSkeleton.vue'
+import PaginationControls from '../../components/PaginationControls.vue'
+import AdminListFilters from '../../components/AdminListFilters.vue'
 import {
   beginResourceLoad,
   completeResourceLoad,
@@ -13,6 +15,13 @@ import {
 
 const origins = ref<ExtensionOrigin[]>([])
 const originsState = ref<ResourceState>('idle')
+const page = ref(1)
+const total = ref(0)
+const PAGE_SIZE = 50
+const search = ref('')
+const status = ref('all')
+const sort = ref('updated_at')
+const order = ref('desc')
 const updatingID = ref('')
 const feedback = ref<{ kind: 'success' | 'error'; message: string } | null>(null)
 const { t, formatDateTime } = useLocale()
@@ -23,17 +32,37 @@ function browserName(origin: string): string {
     : t('adminExtensions.chromium')
 }
 
-async function loadOrigins() {
+async function loadOrigins(requestedPage?: number) {
   originsState.value = beginResourceLoad(origins.value.length > 0 || originsState.value === 'empty')
   try {
-    origins.value = await api.validated(
-      '/api/v1/admin/trusted-extension-origins',
-      ExtensionOriginListSchema,
+    const targetPage = typeof requestedPage === 'number' ? requestedPage : page.value
+    const params = new URLSearchParams({
+      page: String(targetPage),
+      page_size: String(PAGE_SIZE),
+      status: status.value,
+      sort: sort.value,
+      order: order.value,
+    })
+    if (search.value) params.set('search', search.value)
+    const response = await api.validated(
+      `/api/v1/admin/trusted-extension-origins?${params}`,
+      ExtensionOriginPageSchema,
     )
+    origins.value = response.items
+    page.value = response.page
+    total.value = response.total
     originsState.value = completeResourceLoad(origins.value.length > 0)
   } catch {
     originsState.value = 'error'
   }
+}
+
+function applyFilters(filters: { search: string; status: string; sort: string; order: string }) {
+  search.value = filters.search
+  status.value = filters.status
+  sort.value = filters.sort
+  order.value = filters.order
+  void loadOrigins(1)
 }
 
 async function toggleOrigin(origin: ExtensionOrigin) {
@@ -79,7 +108,7 @@ onMounted(loadOrigins)
         class="rounded-xl bg-midori-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-midori-500 disabled:opacity-50"
         :disabled="originsState === 'loading' || originsState === 'refreshing'"
         :aria-busy="originsState === 'loading' || originsState === 'refreshing'"
-        @click="loadOrigins"
+        @click="loadOrigins()"
       >
         {{ t('adminExtensions.refresh') }}
       </button>
@@ -97,6 +126,17 @@ onMounted(loadOrigins)
     >
       {{ feedback.message }}
     </div>
+
+    <AdminListFilters
+      :search="search"
+      :status="status"
+      :sort="sort"
+      :order="order"
+      :statuses="['all', 'trusted', 'revoked']"
+      :sorts="['updated_at', 'created_at', 'origin']"
+      :disabled="originsState === 'loading' || originsState === 'refreshing'"
+      @apply="applyFilters"
+    />
 
     <ResourceSkeleton
       v-if="originsState === 'idle' || originsState === 'loading'"
@@ -194,6 +234,13 @@ onMounted(loadOrigins)
           </tr>
         </tbody>
       </table>
+      <PaginationControls
+        :page="page"
+        :page-size="PAGE_SIZE"
+        :total="total"
+        :disabled="originsState === 'refreshing'"
+        @change="loadOrigins"
+      />
     </div>
   </div>
 </template>

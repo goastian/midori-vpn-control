@@ -2,9 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
-import { AdminPeerListSchema, LifecycleStatusSchema, type AdminPeer } from '../../lib/schemas'
+import { AdminPeerPageSchema, LifecycleStatusSchema, type AdminPeer } from '../../lib/schemas'
 import AsyncState from '../../components/AsyncState.vue'
 import ResourceSkeleton from '../../components/ResourceSkeleton.vue'
+import PaginationControls from '../../components/PaginationControls.vue'
+import AdminListFilters from '../../components/AdminListFilters.vue'
 import {
   beginResourceLoad,
   completeResourceLoad,
@@ -13,20 +15,47 @@ import {
 
 const peers = ref<AdminPeer[]>([])
 const peersState = ref<ResourceState>('idle')
+const page = ref(1)
+const total = ref(0)
+const PAGE_SIZE = 50
+const search = ref('')
+const status = ref('all')
+const sort = ref('created_at')
+const order = ref('desc')
 const disconnectingID = ref('')
 const feedback = ref<{ kind: 'success' | 'error'; message: string } | null>(null)
 const { t } = useLocale()
 
 onMounted(() => loadPeers())
 
-async function loadPeers() {
+async function loadPeers(requestedPage?: number) {
   peersState.value = beginResourceLoad(peers.value.length > 0 || peersState.value === 'empty')
   try {
-    peers.value = await api.validated('/api/v1/admin/peers', AdminPeerListSchema)
+    const targetPage = typeof requestedPage === 'number' ? requestedPage : page.value
+    const params = new URLSearchParams({
+      page: String(targetPage),
+      page_size: String(PAGE_SIZE),
+      status: status.value,
+      sort: sort.value,
+      order: order.value,
+    })
+    if (search.value) params.set('search', search.value)
+    const response = await api.validated(`/api/v1/admin/peers?${params}`, AdminPeerPageSchema)
+    peers.value = response.items
+    page.value = response.page
+    total.value = response.total
     peersState.value = completeResourceLoad(peers.value.length > 0)
   } catch {
     peersState.value = 'error'
   }
+}
+
+function applyFilters(filters: { search: string; status: string; sort: string; order: string }) {
+  search.value = filters.search
+  status.value = filters.status
+  sort.value = filters.sort
+  order.value = filters.order
+  void loadPeers(1)
 }
 
 async function forceDisconnect(id: string) {
@@ -78,6 +107,17 @@ function formatBytes(bytes: number): string {
     >
       {{ feedback.message }}
     </div>
+
+    <AdminListFilters
+      :search="search"
+      :status="status"
+      :sort="sort"
+      :order="order"
+      :statuses="['all', 'active', 'inactive']"
+      :sorts="['created_at', 'last_handshake', 'traffic']"
+      :disabled="peersState === 'loading' || peersState === 'refreshing'"
+      @apply="applyFilters"
+    />
 
     <ResourceSkeleton
       v-if="peersState === 'idle' || peersState === 'loading'"
@@ -163,6 +203,13 @@ function formatBytes(bytes: number): string {
           </tr>
         </tbody>
       </table>
+      <PaginationControls
+        :page="page"
+        :page-size="PAGE_SIZE"
+        :total="total"
+        :disabled="peersState === 'refreshing'"
+        @change="loadPeers"
+      />
     </div>
   </div>
 </template>

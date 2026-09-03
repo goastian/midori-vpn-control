@@ -29,6 +29,8 @@ const network = {
   ],
 }
 
+const page = <T>(items: T[]) => ({ items, page: 1, page_size: 20, total: items.length })
+
 describe('AdminMeshView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -49,7 +51,7 @@ describe('AdminMeshView', () => {
 
   it('exposes expansion state and its controlled member region', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.validated).mockResolvedValue([network])
+    vi.mocked(api.validated).mockResolvedValue(page([network]))
 
     const wrapper = shallowMount(AdminMeshView)
     await flushPromises()

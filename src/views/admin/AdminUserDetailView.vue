@@ -6,6 +6,8 @@ import { useLocale } from '../../lib/i18n'
 import { AdminUserDetailSchema, type User, type AdminPeer } from '../../lib/schemas'
 import AsyncState from '../../components/AsyncState.vue'
 import ResourceSkeleton from '../../components/ResourceSkeleton.vue'
+import PaginationControls from '../../components/PaginationControls.vue'
+import AdminListFilters from '../../components/AdminListFilters.vue'
 import { beginResourceLoad, type ResourceState } from '../../lib/resource-state'
 
 const route = useRoute()
@@ -14,18 +16,47 @@ const userId = route.params.id as string
 const user = ref<User | null>(null)
 const peers = ref<AdminPeer[]>([])
 const userState = ref<ResourceState>('idle')
+const page = ref(1)
+const total = ref(0)
+const PAGE_SIZE = 20
+const search = ref('')
+const status = ref('all')
+const sort = ref('created_at')
+const order = ref('desc')
 const { t, formatDate } = useLocale()
 
-async function loadUser() {
+async function loadUser(requestedPage?: number) {
   userState.value = beginResourceLoad(user.value !== null)
   try {
-    const data = await api.validated(`/api/v1/admin/users/${userId}`, AdminUserDetailSchema)
+    const targetPage = typeof requestedPage === 'number' ? requestedPage : page.value
+    const params = new URLSearchParams({
+      page: String(targetPage),
+      page_size: String(PAGE_SIZE),
+      status: status.value,
+      sort: sort.value,
+      order: order.value,
+    })
+    if (search.value) params.set('search', search.value)
+    const data = await api.validated(
+      `/api/v1/admin/users/${userId}?${params}`,
+      AdminUserDetailSchema,
+    )
     user.value = data.user
-    peers.value = data.peers
+    peers.value = data.peers.items
+    page.value = data.peers.page
+    total.value = data.peers.total
     userState.value = 'ready'
   } catch {
     userState.value = 'error'
   }
+}
+
+function applyFilters(filters: { search: string; status: string; sort: string; order: string }) {
+  search.value = filters.search
+  status.value = filters.status
+  sort.value = filters.sort
+  order.value = filters.order
+  void loadUser(1)
 }
 
 onMounted(loadUser)
@@ -137,9 +168,19 @@ function formatBytes(bytes: number): string {
       >
         <div class="px-6 py-4 border-b border-slate-800">
           <h2 class="text-lg font-bold text-white">
-            {{ t('adminUserDetail.activePeers', { count: peers.length }) }}
+            {{ t('adminUserDetail.activePeers', { count: total }) }}
           </h2>
         </div>
+        <AdminListFilters
+          :search="search"
+          :status="status"
+          :sort="sort"
+          :order="order"
+          :statuses="['all', 'active', 'inactive']"
+          :sorts="['created_at', 'last_handshake', 'traffic']"
+          :disabled="userState === 'refreshing'"
+          @apply="applyFilters"
+        />
         <div v-if="peers.length === 0" class="px-6 py-12 text-center text-slate-400 text-sm">
           {{ t('adminUserDetail.noPeers') }}
         </div>
@@ -178,6 +219,13 @@ function formatBytes(bytes: number): string {
             </tr>
           </tbody>
         </table>
+        <PaginationControls
+          :page="page"
+          :page-size="PAGE_SIZE"
+          :total="total"
+          :disabled="userState === 'refreshing'"
+          @change="loadUser"
+        />
       </div>
     </template>
   </div>

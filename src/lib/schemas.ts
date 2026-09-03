@@ -7,6 +7,15 @@ const TimestampSchema = NonEmptyStringSchema.refine((value) => !Number.isNaN(Dat
   message: 'Invalid timestamp',
 })
 
+function pageSchema<T extends z.ZodTypeAny>(itemSchema: T) {
+  return z.object({
+    items: z.array(itemSchema),
+    page: z.number().int().min(1),
+    page_size: z.number().int().min(1).max(100),
+    total: NonNegativeIntegerSchema,
+  })
+}
+
 // ─── Auth ─────────────────────────────────────────────────
 
 export const TokenResponseSchema = z.object({
@@ -61,6 +70,8 @@ export const UserSchema = z.object({
 
 export type User = z.infer<typeof UserSchema>
 export const UserListSchema = z.array(UserSchema)
+export const AdminUserPageSchema = pageSchema(UserSchema)
+export type AdminUserPage = z.infer<typeof AdminUserPageSchema>
 
 // ─── Server ───────────────────────────────────────────────
 
@@ -99,6 +110,8 @@ export const ServerSchema = z.object({
 
 export type Server = z.infer<typeof ServerSchema>
 export const ServerListSchema = z.array(ServerSchema)
+export const AdminServerPageSchema = pageSchema(ServerSchema)
+export type AdminServerPage = z.infer<typeof AdminServerPageSchema>
 
 export const ProxyCredentialResponseSchema = z.object({
   proxy_token: z.string().startsWith('mvpn2.'),
@@ -185,12 +198,7 @@ export const DeviceSchema = z.object({
 export type Device = z.infer<typeof DeviceSchema>
 export const DeviceListSchema = z.array(DeviceSchema)
 
-export const DeviceSessionPageSchema = z.object({
-  items: z.array(DeviceConnectionSchema),
-  page: z.number().int().min(1),
-  page_size: z.number().int().min(1).max(100),
-  total: NonNegativeIntegerSchema,
-})
+export const DeviceSessionPageSchema = pageSchema(DeviceConnectionSchema)
 
 export type DeviceSessionPage = z.infer<typeof DeviceSessionPageSchema>
 
@@ -299,6 +307,8 @@ export const AuditLogSchema = z.object({
 
 export type AuditLog = z.infer<typeof AuditLogSchema>
 export const AuditLogListSchema = z.array(AuditLogSchema)
+export const AdminAuditLogPageSchema = pageSchema(AuditLogSchema)
+export type AdminAuditLogPage = z.infer<typeof AdminAuditLogPageSchema>
 
 // ─── Admin Peer ───────────────────────────────────────────
 
@@ -310,10 +320,12 @@ export const AdminPeerSchema = ConnectionSchema.extend({
 
 export type AdminPeer = z.infer<typeof AdminPeerSchema>
 export const AdminPeerListSchema = z.array(AdminPeerSchema)
+export const AdminPeerPageSchema = pageSchema(AdminPeerSchema)
+export type AdminPeerPage = z.infer<typeof AdminPeerPageSchema>
 
 export const AdminUserDetailSchema = z.object({
   user: UserSchema,
-  peers: AdminPeerListSchema,
+  peers: AdminPeerPageSchema,
 })
 export type AdminUserDetail = z.infer<typeof AdminUserDetailSchema>
 
@@ -345,6 +357,8 @@ export const AdminMeshNetworkSchema = z.object({
 
 export type AdminMeshNetwork = z.infer<typeof AdminMeshNetworkSchema>
 export const AdminMeshNetworkListSchema = z.array(AdminMeshNetworkSchema)
+export const AdminMeshNetworkPageSchema = pageSchema(AdminMeshNetworkSchema)
+export type AdminMeshNetworkPage = z.infer<typeof AdminMeshNetworkPageSchema>
 
 // ─── Operational health ───────────────────────────────────
 
@@ -382,3 +396,5 @@ export const ExtensionOriginSchema = z.object({
 
 export type ExtensionOrigin = z.infer<typeof ExtensionOriginSchema>
 export const ExtensionOriginListSchema = z.array(ExtensionOriginSchema)
+export const ExtensionOriginPageSchema = pageSchema(ExtensionOriginSchema)
+export type ExtensionOriginPage = z.infer<typeof ExtensionOriginPageSchema>
