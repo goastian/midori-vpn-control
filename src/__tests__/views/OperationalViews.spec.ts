@@ -9,7 +9,9 @@ import { setLocale } from '@/lib/i18n'
 
 vi.mock('@/lib/api', () => ({
   api: {
+    get: vi.fn(),
     post: vi.fn(),
+    validated: vi.fn(),
     fetchRaw: vi.fn(),
   },
 }))
@@ -35,20 +37,28 @@ describe('operational view states', () => {
   })
 
   it('generates proxy credentials only after an explicit authenticated action', async () => {
-    vi.mocked(api.post).mockResolvedValue({
+    vi.mocked(api.validated)
+      .mockResolvedValueOnce([{ id: 'server-id', name: 'Main', location: 'Santo Domingo', transports: [{ protocol: 'proxy', enabled: true, health_status: 'healthy' }] }])
+      .mockResolvedValueOnce({
       proxy_token: 'scoped-secret',
       expires_in: 900,
-      proxy_endpoints: [{ host: 'proxy.example', port: 443, country_code: 'DO', location: 'Santo Domingo' }],
+      device_id: 'device-id',
+      proxy_endpoint: { server_id: 'server-id', host: 'proxy.example', port: 443, country_code: 'DO', location: 'Santo Domingo' },
     })
     const wrapper = mount(ProxyManagementView)
+    await flushPromises()
 
-    expect(api.post).not.toHaveBeenCalled()
+    expect(api.validated).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('No hay una credencial activa')
 
     await wrapper.get('.btn-primary').trigger('click')
     await flushPromises()
 
-    expect(api.post).toHaveBeenCalledWith('/api/v1/control/proxy-credentials')
+    expect(api.validated).toHaveBeenLastCalledWith(
+      '/api/v1/control/proxy-credentials',
+      expect.anything(),
+      expect.objectContaining({ method: 'POST', body: expect.stringContaining('"server_id":"server-id"') }),
+    )
     expect(wrapper.get('#proxy-token').attributes('value')).toBe('scoped-secret')
     expect(wrapper.text()).toContain('proxy.example:443')
   })

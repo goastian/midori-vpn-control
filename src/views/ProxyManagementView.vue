@@ -1,35 +1,55 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import AsyncState from '../components/AsyncState.vue'
 import { api } from '../lib/api'
 import { useLocale } from '../lib/i18n'
-
-interface ProxyEndpoint {
-  host: string
-  port: number
-  country_code: string
-  location: string
-}
-
-interface ProxyCredentialResponse {
-  proxy_token: string
-  expires_in: number
-  proxy_endpoints: ProxyEndpoint[]
-}
+import { ProxyCredentialResponseSchema, ServerListSchema } from '../lib/schemas'
+import type { ProxyCredentialResponse, Server } from '../lib/schemas'
 
 const { t } = useLocale()
 const credential = ref<ProxyCredentialResponse | null>(null)
 const loading = ref(false)
 const copied = ref(false)
 const failed = ref(false)
+const proxyServers = ref<Server[]>([])
+const selectedServerID = ref('')
+
+function browserDeviceIdentity() {
+  const key = 'midorivpn-control-proxy-device-v1'
+  let clientInstanceID = localStorage.getItem(key)
+  if (!clientInstanceID || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(clientInstanceID)) {
+    clientInstanceID = crypto.randomUUID()
+    localStorage.setItem(key, clientInstanceID)
+  }
+  return {
+    client_instance_id: clientInstanceID,
+    reported_name: 'MidoriVPN Control Browser',
+    device_type: 'manual',
+  }
+}
+
+onMounted(async () => {
+  try {
+    const servers = await api.validated('/api/v1/control/servers', ServerListSchema)
+    proxyServers.value = servers.filter((server) => server.transports?.some(
+      (transport) => transport.protocol === 'proxy' && transport.enabled && transport.health_status === 'healthy',
+    ))
+    selectedServerID.value = proxyServers.value[0]?.id ?? ''
+  } catch {
+    failed.value = true
+  }
+})
 
 async function generateCredentials() {
-  if (loading.value) return
+  if (loading.value || !selectedServerID.value) return
   loading.value = true
   failed.value = false
   copied.value = false
   try {
-    credential.value = await api.post<ProxyCredentialResponse>('/api/v1/control/proxy-credentials')
+    credential.value = await api.validated('/api/v1/control/proxy-credentials', ProxyCredentialResponseSchema, {
+      method: 'POST',
+      body: JSON.stringify({ server_id: selectedServerID.value, device: browserDeviceIdentity() }),
+    })
   } catch {
     failed.value = true
   } finally {
@@ -63,9 +83,19 @@ function formatExpiresIn(seconds: number) {
           <code class="font-mono text-midori-400">aud=vpn-proxy</code>.
         </p>
       </div>
+      <select
+        v-model="selectedServerID"
+        class="glass-input min-w-56"
+        :aria-label="t('proxyView.endpoints')"
+        :disabled="loading || proxyServers.length === 0"
+      >
+        <option v-for="server in proxyServers" :key="server.id" :value="server.id">
+          {{ server.name }} · {{ server.location }}
+        </option>
+      </select>
       <button
         type="button"
-        :disabled="loading"
+        :disabled="loading || !selectedServerID"
         :aria-busy="loading"
         class="btn-primary self-start disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
         @click="generateCredentials"
@@ -112,14 +142,13 @@ function formatExpiresIn(seconds: number) {
 
       <div class="space-y-3 pt-2">
         <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">{{ t('proxyView.endpoints') }}</p>
-        <AsyncState v-if="credential.proxy_endpoints.length === 0" kind="empty" :title="t('proxyView.noEndpoints')" />
-        <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div v-for="endpoint in credential.proxy_endpoints" :key="`${endpoint.host}:${endpoint.port}`" class="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-sm">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div class="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-sm">
             <div class="flex items-center gap-3">
               <span class="h-2 w-2 rounded-full bg-midori-400" aria-hidden="true"></span>
-              <span class="font-mono text-xs text-white">{{ endpoint.host }}:{{ endpoint.port }}</span>
+              <span class="font-mono text-xs text-white">{{ credential.proxy_endpoint.host }}:{{ credential.proxy_endpoint.port }}</span>
             </div>
-            <span class="rounded-md border border-slate-700 bg-slate-800 px-2 py-0.5 font-mono text-xs font-semibold uppercase text-slate-400">{{ endpoint.country_code }}</span>
+            <span class="rounded-md border border-slate-700 bg-slate-800 px-2 py-0.5 font-mono text-xs font-semibold uppercase text-slate-400">{{ credential.proxy_endpoint.country_code }}</span>
           </div>
         </div>
       </div>

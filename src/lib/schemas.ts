@@ -83,6 +83,20 @@ export const ServerSchema = z.object({
 export type Server = z.infer<typeof ServerSchema>
 export const ServerListSchema = z.array(ServerSchema)
 
+export const ProxyCredentialResponseSchema = z.object({
+  proxy_token: z.string().startsWith('mvpn2.'),
+  expires_in: z.number().int().positive().max(900),
+  device_id: z.string().uuid(),
+  proxy_endpoint: z.object({
+    server_id: z.string().uuid(),
+    host: z.string().min(1),
+    port: z.number().int().min(1).max(65535),
+    country_code: z.string(),
+    location: z.string(),
+  }),
+})
+export type ProxyCredentialResponse = z.infer<typeof ProxyCredentialResponseSchema>
+
 export const ServerPingResultSchema = z.object({
   server_id: z.string(),
   latency_ms: z.number(),
