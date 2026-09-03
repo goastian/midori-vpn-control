@@ -4,7 +4,7 @@ import AdminMeshView from '@/views/admin/AdminMeshView.vue'
 import AsyncState from '@/components/AsyncState.vue'
 
 vi.mock('@/lib/api', () => ({
-  api: { get: vi.fn() },
+  api: { validated: vi.fn() },
 }))
 
 const network = {
@@ -13,13 +13,18 @@ const network = {
   subnet: '10.44.0.0/24',
   is_active: true,
   member_count: 1,
+  country_code: 'DO',
+  is_session: false,
+  created_at: '2026-01-01T00:00:00Z',
   members: [
     {
       user_id: 'user-1',
       email: 'alice@example.com',
+      display_name: 'Alice',
       mesh_ip: '10.44.0.2',
       public_ip: '10.8.0.2',
       connected: true,
+      joined_at: '2026-01-01T00:00:00Z',
     },
   ],
 }
@@ -31,7 +36,7 @@ describe('AdminMeshView', () => {
 
   it('shows a localized retryable error without exposing backend details', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockRejectedValue(new Error('Internal detail'))
+    vi.mocked(api.validated).mockRejectedValue(new Error('Internal detail'))
 
     const wrapper = shallowMount(AdminMeshView)
     await flushPromises()
@@ -44,7 +49,7 @@ describe('AdminMeshView', () => {
 
   it('exposes expansion state and its controlled member region', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockResolvedValue([network])
+    vi.mocked(api.validated).mockResolvedValue([network])
 
     const wrapper = shallowMount(AdminMeshView)
     await flushPromises()

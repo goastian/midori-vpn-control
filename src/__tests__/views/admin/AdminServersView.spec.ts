@@ -69,7 +69,7 @@ describe('AdminServersView', () => {
 
   it('shows loading spinner while fetching', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockReturnValue(new Promise(() => {}))
+    vi.mocked(api.validated).mockReturnValue(new Promise(() => {}))
 
     const wrapper = shallowMount(AdminServersView, {
       global: { plugins: [createPinia()] },
@@ -80,7 +80,7 @@ describe('AdminServersView', () => {
 
   it('renders server names after successful load', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockImplementation((path: string) => {
+    vi.mocked(api.validated).mockImplementation((path: string) => {
       if (path.includes('/ping')) return Promise.resolve(mockPings)
       return Promise.resolve(mockServers)
     })
@@ -98,7 +98,7 @@ describe('AdminServersView', () => {
 
   it('handles empty server list', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockResolvedValue([])
+    vi.mocked(api.validated).mockResolvedValue([])
 
     const wrapper = shallowMount(AdminServersView, {
       global: { plugins: [createPinia()] },
@@ -111,7 +111,7 @@ describe('AdminServersView', () => {
 
   it('does not crash when api throws', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockRejectedValue(new Error('connection refused'))
+    vi.mocked(api.validated).mockRejectedValue(new Error('connection refused'))
 
     const wrapper = shallowMount(AdminServersView, {
       global: { plugins: [createPinia()] },
@@ -125,7 +125,7 @@ describe('AdminServersView', () => {
 
   it('does not auto-refresh when ping api fails', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockImplementation((path: string) => {
+    vi.mocked(api.validated).mockImplementation((path: string) => {
       if (path.includes('/ping')) return Promise.reject(new Error('ping failed'))
       return Promise.resolve(mockServers)
     })
@@ -143,7 +143,7 @@ describe('AdminServersView', () => {
 
   it('keeps deletion errors visible in the confirmation dialog', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockImplementation((path: string) => {
+    vi.mocked(api.validated).mockImplementation((path: string) => {
       if (path.includes('/ping')) return Promise.resolve(mockPings)
       return Promise.resolve(mockServers)
     })
@@ -154,20 +154,24 @@ describe('AdminServersView', () => {
     })
     await flushPromises()
 
-    const remove = wrapper.findAll('button').find(button => button.text() === 'Eliminar')
+    const remove = wrapper.findAll('button').find((button) => button.text() === 'Eliminar')
     await remove?.trigger('click')
-    const confirm = wrapper.findAll('[role="alertdialog"] button').find(button => button.text() === 'Eliminar')
+    const confirm = wrapper
+      .findAll('[role="alertdialog"] button')
+      .find((button) => button.text() === 'Eliminar')
     await confirm?.trigger('click')
     await flushPromises()
 
     expect(wrapper.find('[role="alertdialog"]').exists()).toBe(true)
-    expect(wrapper.find('[role="alertdialog"] [role="alert"]').text()).toContain('No se pudo eliminar')
+    expect(wrapper.find('[role="alertdialog"] [role="alert"]').text()).toContain(
+      'No se pudo eliminar',
+    )
     expect(wrapper.text()).not.toContain('Internal detail')
   })
 
   it('explains that a server must finish draining before deletion', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockImplementation((path: string) => {
+    vi.mocked(api.validated).mockImplementation((path: string) => {
       if (path.includes('/ping')) return Promise.resolve(mockPings)
       return Promise.resolve(mockServers)
     })
@@ -178,9 +182,11 @@ describe('AdminServersView', () => {
     })
     await flushPromises()
 
-    const remove = wrapper.findAll('button').find(button => button.text() === 'Eliminar')
+    const remove = wrapper.findAll('button').find((button) => button.text() === 'Eliminar')
     await remove?.trigger('click')
-    const confirm = wrapper.findAll('[role="alertdialog"] button').find(button => button.text() === 'Eliminar')
+    const confirm = wrapper
+      .findAll('[role="alertdialog"] button')
+      .find((button) => button.text() === 'Eliminar')
     await confirm?.trigger('click')
     await flushPromises()
 
@@ -189,13 +195,13 @@ describe('AdminServersView', () => {
 
   it('associates the primary server fields with their labels', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockResolvedValue([])
+    vi.mocked(api.validated).mockResolvedValue([])
 
     const wrapper = shallowMount(AdminServersView, {
       global: { plugins: [createPinia()] },
     })
     await flushPromises()
-    const add = wrapper.findAll('button').find(button => button.text() === 'Agregar servidor')
+    const add = wrapper.findAll('button').find((button) => button.text() === 'Agregar servidor')
     await add?.trigger('click')
 
     expect(wrapper.find('label[for="server-name"]').exists()).toBe(true)
@@ -205,7 +211,7 @@ describe('AdminServersView', () => {
 
   it('updates a server with the normalized transport payload and announces success', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockImplementation((path: string) => {
+    vi.mocked(api.validated).mockImplementation((path: string) => {
       if (path.includes('/ping')) return Promise.resolve(mockPings)
       return Promise.resolve(mockServers)
     })
@@ -216,19 +222,24 @@ describe('AdminServersView', () => {
     })
     await flushPromises()
 
-    const edit = wrapper.findAll('button').find(button => button.text() === 'Editar')
+    const edit = wrapper.findAll('button').find((button) => button.text() === 'Editar')
     await edit?.trigger('click')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    expect(api.put).toHaveBeenCalledWith('/api/v1/admin/servers/s1', expect.objectContaining({
-      endpoint: 'us-east.vpn.example.com',
-      wg_port: 51820,
-      transports: [expect.objectContaining({
-        protocol: 'wireguard',
-        metadata: {},
-      })],
-    }))
+    expect(api.put).toHaveBeenCalledWith(
+      '/api/v1/admin/servers/s1',
+      expect.objectContaining({
+        endpoint: 'us-east.vpn.example.com',
+        wg_port: 51820,
+        transports: [
+          expect.objectContaining({
+            protocol: 'wireguard',
+            metadata: {},
+          }),
+        ],
+      }),
+    )
     const payload = vi.mocked(api.put).mock.calls[0][1] as Record<string, unknown>
     expect(JSON.stringify(payload)).not.toContain('metadataText')
     expect(wrapper.text()).toContain('El servidor fue actualizado.')

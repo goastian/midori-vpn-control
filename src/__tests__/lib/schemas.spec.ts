@@ -1,15 +1,22 @@
 import { describe, it, expect } from 'vitest'
 import {
   TokenResponseSchema,
+  DesktopAgentCallbackResponseSchema,
+  UserQuotaSchema,
   UserSchema,
+  UserListSchema,
   ServerSchema,
   ConnectionSchema,
+  ConnectionListSchema,
   ConnectionConfigSchema,
   DeviceSchema,
   DeviceSessionPageSchema,
   AdminStatsSchema,
   AuditLogSchema,
   AdminPeerSchema,
+  AdminUserDetailSchema,
+  HealthEnvelopeSchema,
+  WebSocketStatsMessageSchema,
 } from '@/lib/schemas'
 
 describe('Zod API schemas', () => {
@@ -26,6 +33,16 @@ describe('Zod API schemas', () => {
 
     it('rejects missing access_token', () => {
       expect(() => TokenResponseSchema.parse({ token_type: 'Bearer', expires_in: 3600 })).toThrow()
+    })
+  })
+
+  describe('DesktopAgentCallbackResponseSchema', () => {
+    it('normalizes an omitted optional username', () => {
+      expect(DesktopAgentCallbackResponseSchema.parse({})).toEqual({ username: '' })
+    })
+
+    it('rejects a non-object callback response', () => {
+      expect(DesktopAgentCallbackResponseSchema.safeParse(null).success).toBe(false)
     })
   })
 
@@ -53,6 +70,50 @@ describe('Zod API schemas', () => {
 
     it('rejects non-array groups', () => {
       expect(() => UserSchema.parse({ ...validUser, groups: 'not-array' })).toThrow()
+    })
+
+    it('normalizes optional display fields before templates consume them', () => {
+      const { display_name, groups, ban_reason } = UserSchema.parse({
+        ...validUser,
+        display_name: undefined,
+        groups: undefined,
+      })
+      expect({ display_name, groups, ban_reason }).toEqual({
+        display_name: '',
+        groups: [],
+        ban_reason: '',
+      })
+    })
+
+    it('rejects an incomplete user in a rendered list', () => {
+      expect(() => UserListSchema.parse([{ id: 'partial' }])).toThrow()
+    })
+  })
+
+  describe('UserQuotaSchema', () => {
+    it('rejects an incomplete quota instead of rendering false availability', () => {
+      expect(() =>
+        UserQuotaSchema.parse({
+          connected_devices: 1,
+          max_devices: 5,
+          available_devices: 4,
+          plan_slug: 'pro',
+          plan_name: 'Pro',
+        }),
+      ).toThrow()
+    })
+
+    it('rejects negative counters', () => {
+      expect(() =>
+        UserQuotaSchema.parse({
+          connected_devices: -1,
+          max_devices: 5,
+          available_devices: 6,
+          plan_slug: 'pro',
+          plan_name: 'Pro',
+          devices_by_type: { desktop: 0, extension: 0, wireguard: 0 },
+        }),
+      ).toThrow()
     })
   })
 
@@ -141,6 +202,10 @@ describe('Zod API schemas', () => {
 
       expect(parsed).not.toHaveProperty('preshared_key')
     })
+
+    it('rejects a partial connection list before Dashboard rendering', () => {
+      expect(() => ConnectionListSchema.parse([{ id: 'partial' }])).toThrow()
+    })
   })
 
   describe('ConnectionConfigSchema', () => {
@@ -195,25 +260,32 @@ describe('Zod API schemas', () => {
     })
 
     it('rejects a partial active session without replacing valid data', () => {
-      expect(() => DeviceSchema.parse({
-        id: 'device-1',
-        client_instance_id: null,
-        reported_name: 'Legacy',
-        alias: '',
-        display_name: 'Legacy',
-        device_type: 'manual',
-        adapter_reference: '',
-        adapter_label: '',
-        first_seen_at: '2026-09-02T00:00:00Z',
-        last_seen_at: '2026-09-03T00:00:00Z',
-        revoked_at: null,
-        status: 'connected',
-        active_connection: { id: 'partial' },
-      })).toThrow()
+      expect(() =>
+        DeviceSchema.parse({
+          id: 'device-1',
+          client_instance_id: null,
+          reported_name: 'Legacy',
+          alias: '',
+          display_name: 'Legacy',
+          device_type: 'manual',
+          adapter_reference: '',
+          adapter_label: '',
+          first_seen_at: '2026-09-02T00:00:00Z',
+          last_seen_at: '2026-09-03T00:00:00Z',
+          revoked_at: null,
+          status: 'connected',
+          active_connection: { id: 'partial' },
+        }),
+      ).toThrow()
     })
 
     it('parses paginated history', () => {
-      const parsed = DeviceSessionPageSchema.parse({ items: [connection], page: 1, page_size: 10, total: 1 })
+      const parsed = DeviceSessionPageSchema.parse({
+        items: [connection],
+        page: 1,
+        page_size: 10,
+        total: 1,
+      })
       expect(parsed.items).toHaveLength(1)
     })
   })
@@ -230,6 +302,15 @@ describe('Zod API schemas', () => {
         total_bytes_received: 2147483648,
       }
       expect(() => AdminStatsSchema.parse(stats)).not.toThrow()
+    })
+
+    it('rejects incomplete WebSocket statistics', () => {
+      expect(
+        WebSocketStatsMessageSchema.safeParse({
+          type: 'stats',
+          data: { total_users: 1 },
+        }).success,
+      ).toBe(false)
     })
   })
 
@@ -262,6 +343,33 @@ describe('Zod API schemas', () => {
         created_at: '2024-01-01T00:00:00Z',
       }
       expect(() => AdminPeerSchema.parse(peer)).not.toThrow()
+    })
+
+    it('rejects an incomplete user-detail envelope', () => {
+      expect(() => AdminUserDetailSchema.parse({ user: { id: 'partial' }, peers: [] })).toThrow()
+    })
+  })
+
+  describe('HealthEnvelopeSchema', () => {
+    it('accepts a degraded but complete protected readiness payload', () => {
+      expect(() =>
+        HealthEnvelopeSchema.parse({
+          ok: true,
+          data: {
+            status: 'degraded',
+            checks: {
+              postgres: { status: 'ok', latency_ms: 3 },
+              wireguard: { status: 'error' },
+            },
+          },
+        }),
+      ).not.toThrow()
+    })
+
+    it('rejects an incomplete readiness envelope', () => {
+      expect(HealthEnvelopeSchema.safeParse({ ok: true, data: { status: 'ready' } }).success).toBe(
+        false,
+      )
     })
   })
 })

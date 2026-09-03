@@ -131,6 +131,7 @@ describe('useAuthStore', () => {
       display_name: 'ponchale',
       groups: ['authentik Admins'],
       is_banned: false,
+      ban_reason: '',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }

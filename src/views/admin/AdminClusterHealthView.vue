@@ -5,26 +5,7 @@ import ResourceSkeleton from '../../components/ResourceSkeleton.vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
 import { beginResourceLoad, type ResourceState } from '../../lib/resource-state'
-
-interface HealthCheck {
-  status: string
-  latency_ms?: number
-  interface?: string
-}
-
-interface HealthResponse {
-  status: string
-  checks: {
-    postgres?: HealthCheck
-    wireguard?: HealthCheck
-    redis?: HealthCheck
-  }
-}
-
-interface HealthEnvelope {
-  ok: boolean
-  data?: HealthResponse
-}
+import { HealthEnvelopeSchema, type HealthResponse } from '../../lib/schemas'
 
 const { t, formatDate } = useLocale()
 const healthData = ref<HealthResponse | null>(null)
@@ -50,9 +31,9 @@ async function fetchHealth() {
     // The protected readiness endpoint intentionally returns HTTP 503 with an
     // ok envelope when dependencies are degraded. Preserve that useful body.
     const response = await api.fetchRaw('/api/v1/admin/health')
-    const envelope = await response.json() as HealthEnvelope
-    if (!envelope.ok || !envelope.data) throw new Error('invalid health response')
-    healthData.value = envelope.data
+    const envelope = HealthEnvelopeSchema.safeParse(await response.json())
+    if (!envelope.success) throw new Error('invalid health response')
+    healthData.value = envelope.data.data
     lastChecked.value = formatDate(new Date(), { timeStyle: 'medium' })
     healthState.value = 'ready'
   } catch {
@@ -77,8 +58,16 @@ onMounted(fetchHealth)
         class="btn-primary self-start disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
         @click="fetchHealth"
       >
-        <span v-if="healthState === 'loading' || healthState === 'refreshing'" class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>
-        {{ healthState === 'loading' || healthState === 'refreshing' ? t('clusterHealth.refreshing') : t('clusterHealth.refresh') }}
+        <span
+          v-if="healthState === 'loading' || healthState === 'refreshing'"
+          class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+          aria-hidden="true"
+        ></span>
+        {{
+          healthState === 'loading' || healthState === 'refreshing'
+            ? t('clusterHealth.refreshing')
+            : t('clusterHealth.refresh')
+        }}
       </button>
     </div>
 
@@ -99,8 +88,16 @@ onMounted(fetchHealth)
     />
 
     <template v-else-if="healthData">
-      <p v-if="healthState === 'refreshing'" role="status" class="text-sm text-slate-400">{{ t('common.refreshing') }}</p>
-      <p v-else-if="healthState === 'error'" role="alert" class="rounded-xl border border-rose-800/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-300">{{ t('common.refreshFailed') }}</p>
+      <p v-if="healthState === 'refreshing'" role="status" class="text-sm text-slate-400">
+        {{ t('common.refreshing') }}
+      </p>
+      <p
+        v-else-if="healthState === 'error'"
+        role="alert"
+        class="rounded-xl border border-rose-800/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-300"
+      >
+        {{ t('common.refreshFailed') }}
+      </p>
       <div
         role="status"
         :class="[
@@ -111,43 +108,92 @@ onMounted(fetchHealth)
         ]"
       >
         <div class="flex items-center gap-3">
-          <span :class="['h-3 w-3 rounded-full', healthData.status === 'ready' ? 'animate-pulse bg-midori-400' : 'bg-amber-400']" aria-hidden="true"></span>
+          <span
+            :class="[
+              'h-3 w-3 rounded-full',
+              healthData.status === 'ready' ? 'animate-pulse bg-midori-400' : 'bg-amber-400',
+            ]"
+            aria-hidden="true"
+          ></span>
           <span class="text-lg font-bold text-white">
-            {{ t('clusterHealth.overall', { status: healthData.status === 'ready' ? t('clusterHealth.ready') : t('clusterHealth.degraded') }) }}
+            {{
+              t('clusterHealth.overall', {
+                status:
+                  healthData.status === 'ready'
+                    ? t('clusterHealth.ready')
+                    : t('clusterHealth.degraded'),
+              })
+            }}
           </span>
         </div>
-        <span class="font-mono text-xs text-slate-400">{{ t('clusterHealth.lastChecked', { time: lastChecked }) }}</span>
+        <span class="font-mono text-xs text-slate-400">{{
+          t('clusterHealth.lastChecked', { time: lastChecked })
+        }}</span>
       </div>
 
       <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         <div class="glass-card space-y-4 p-6">
           <div class="flex items-center justify-between gap-3">
             <span class="text-base font-bold text-white">{{ t('clusterHealth.postgres') }}</span>
-            <span :class="['rounded-full border px-2.5 py-1 text-xs font-semibold uppercase', statusClass(healthData.checks.postgres?.status)]">
+            <span
+              :class="[
+                'rounded-full border px-2.5 py-1 text-xs font-semibold uppercase',
+                statusClass(healthData.checks.postgres?.status),
+              ]"
+            >
               {{ statusLabel(healthData.checks.postgres?.status) }}
             </span>
           </div>
-          <p class="font-mono text-xs text-slate-400">{{ t('clusterHealth.pingLatency') }}: <span class="text-midori-300">{{ Number.isFinite(healthData.checks.postgres?.latency_ms) ? `${healthData.checks.postgres?.latency_ms} ms` : t('clusterHealth.unavailable') }}</span></p>
+          <p class="font-mono text-xs text-slate-400">
+            {{ t('clusterHealth.pingLatency') }}:
+            <span class="text-midori-300">{{
+              Number.isFinite(healthData.checks.postgres?.latency_ms)
+                ? `${healthData.checks.postgres?.latency_ms} ms`
+                : t('clusterHealth.unavailable')
+            }}</span>
+          </p>
         </div>
 
         <div class="glass-card space-y-4 p-6">
           <div class="flex items-center justify-between gap-3">
             <span class="text-base font-bold text-white">{{ t('clusterHealth.wireguard') }}</span>
-            <span :class="['rounded-full border px-2.5 py-1 text-xs font-semibold uppercase', statusClass(healthData.checks.wireguard?.status)]">
+            <span
+              :class="[
+                'rounded-full border px-2.5 py-1 text-xs font-semibold uppercase',
+                statusClass(healthData.checks.wireguard?.status),
+              ]"
+            >
               {{ statusLabel(healthData.checks.wireguard?.status) }}
             </span>
           </div>
-          <p class="font-mono text-xs text-slate-400">{{ t('clusterHealth.interface') }}: <span class="text-cyan-300">{{ healthData.checks.wireguard?.interface || t('clusterHealth.unavailable') }}</span></p>
+          <p class="font-mono text-xs text-slate-400">
+            {{ t('clusterHealth.interface') }}:
+            <span class="text-cyan-300">{{
+              healthData.checks.wireguard?.interface || t('clusterHealth.unavailable')
+            }}</span>
+          </p>
         </div>
 
         <div class="glass-card space-y-4 p-6">
           <div class="flex items-center justify-between gap-3">
             <span class="text-base font-bold text-white">{{ t('clusterHealth.redis') }}</span>
-            <span :class="['rounded-full border px-2.5 py-1 text-xs font-semibold uppercase', statusClass(healthData.checks.redis?.status)]">
+            <span
+              :class="[
+                'rounded-full border px-2.5 py-1 text-xs font-semibold uppercase',
+                statusClass(healthData.checks.redis?.status),
+              ]"
+            >
               {{ statusLabel(healthData.checks.redis?.status) }}
             </span>
           </div>
-          <p class="font-mono text-xs text-slate-400">{{ t('clusterHealth.pingLatency') }}: <span class="text-midori-300">{{ Number.isFinite(healthData.checks.redis?.latency_ms) ? `${healthData.checks.redis?.latency_ms} ms` : t('clusterHealth.unavailable') }}</span></p>
+          <p class="font-mono text-xs text-slate-400">
+            {{ t('clusterHealth.pingLatency') }}:
+            <span class="text-midori-300">{{
+              Number.isFinite(healthData.checks.redis?.latency_ms)
+                ? `${healthData.checks.redis?.latency_ms} ms`
+                : t('clusterHealth.unavailable')
+            }}</span>
+          </p>
         </div>
       </div>
     </template>

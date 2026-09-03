@@ -53,7 +53,7 @@ describe('AdminPeersView', () => {
 
   it('shows loading spinner while fetching', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockReturnValue(new Promise(() => {}))
+    vi.mocked(api.validated).mockReturnValue(new Promise(() => {}))
 
     const wrapper = shallowMount(AdminPeersView, {
       global: { plugins: [createPinia()] },
@@ -64,7 +64,7 @@ describe('AdminPeersView', () => {
 
   it('renders peer rows after successful load', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockResolvedValue(mockPeers)
+    vi.mocked(api.validated).mockResolvedValue(mockPeers)
 
     const wrapper = shallowMount(AdminPeersView, {
       global: { plugins: [createPinia()] },
@@ -80,7 +80,7 @@ describe('AdminPeersView', () => {
 
   it('shows empty-state message when no peers', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockResolvedValue([])
+    vi.mocked(api.validated).mockResolvedValue([])
 
     const wrapper = shallowMount(AdminPeersView, {
       global: { plugins: [createPinia()] },
@@ -95,7 +95,7 @@ describe('AdminPeersView', () => {
 
   it('does not crash when api throws', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockRejectedValue(new Error('Network error'))
+    vi.mocked(api.validated).mockRejectedValue(new Error('Network error'))
 
     const wrapper = shallowMount(AdminPeersView, {
       global: { plugins: [createPinia()] },
@@ -108,8 +108,9 @@ describe('AdminPeersView', () => {
 
   it('calls DELETE when forceDisconnect is confirmed', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockResolvedValue(mockPeers)
-    vi.mocked(api.validated).mockResolvedValue({ status: 'disconnected' })
+    vi.mocked(api.validated).mockImplementation(async (path: string) =>
+      path === '/api/v1/admin/peers' ? mockPeers : { status: 'disconnected' },
+    )
     vi.spyOn(window, 'confirm').mockReturnValue(true)
 
     const wrapper = shallowMount(AdminPeersView, {
@@ -122,13 +123,17 @@ describe('AdminPeersView', () => {
     await vm.forceDisconnect('p1')
     await flushPromises()
 
-    expect(vi.mocked(api.validated)).toHaveBeenCalledWith('/api/v1/admin/peers/p1', expect.anything(), { method: 'DELETE' })
+    expect(vi.mocked(api.validated)).toHaveBeenCalledWith(
+      '/api/v1/admin/peers/p1',
+      expect.anything(),
+      { method: 'DELETE' },
+    )
     expect(wrapper.text()).toContain('La sesión VPN se desconectó correctamente.')
   })
 
   it('does not call DELETE when forceDisconnect is cancelled', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockResolvedValue(mockPeers)
+    vi.mocked(api.validated).mockResolvedValue(mockPeers)
     vi.spyOn(window, 'confirm').mockReturnValue(false)
 
     const wrapper = shallowMount(AdminPeersView, {
@@ -140,13 +145,20 @@ describe('AdminPeersView', () => {
     const vm = wrapper.vm as any
     await vm.forceDisconnect('p1')
 
-    expect(vi.mocked(api.validated)).not.toHaveBeenCalled()
+    expect(vi.mocked(api.validated)).not.toHaveBeenCalledWith(
+      '/api/v1/admin/peers/p1',
+      expect.anything(),
+      { method: 'DELETE' },
+    )
   })
 
   it('reports a scheduled disconnection without claiming convergence', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockResolvedValue(mockPeers)
-    vi.mocked(api.validated).mockResolvedValue({ status: 'disconnect_pending', operation_id: 'operation-1' })
+    vi.mocked(api.validated).mockImplementation(async (path: string) =>
+      path === '/api/v1/admin/peers'
+        ? mockPeers
+        : { status: 'disconnect_pending', operation_id: 'operation-1' },
+    )
     vi.spyOn(window, 'confirm').mockReturnValue(true)
 
     const wrapper = shallowMount(AdminPeersView, {
@@ -162,8 +174,10 @@ describe('AdminPeersView', () => {
 
   it('shows localized inline feedback when disconnection fails', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockResolvedValue(mockPeers)
-    vi.mocked(api.validated).mockRejectedValue(new Error('Internal detail'))
+    vi.mocked(api.validated).mockImplementation(async (path: string) => {
+      if (path === '/api/v1/admin/peers') return mockPeers
+      throw new Error('Internal detail')
+    })
     vi.spyOn(window, 'confirm').mockReturnValue(true)
 
     const wrapper = shallowMount(AdminPeersView, {

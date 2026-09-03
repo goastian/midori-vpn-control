@@ -1,8 +1,16 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { generateCodeVerifier, generateCodeChallenge } from '../lib/pkce'
-import { APIError, exchangeCode, api, setAccessToken, clearAccessToken, onAccessTokenChanged, initFromStoredRefreshToken } from '../lib/api'
-import { UserSchema, type User, type UserQuota } from '../lib/schemas'
+import {
+  APIError,
+  exchangeCode,
+  api,
+  setAccessToken,
+  clearAccessToken,
+  onAccessTokenChanged,
+  initFromStoredRefreshToken,
+} from '../lib/api'
+import { UserQuotaSchema, UserSchema, type User } from '../lib/schemas'
 import { beginResourceLoad, completeResourceLoad, type ResourceState } from '../lib/resource-state'
 import { SENSITIVE_SESSION_KEYS } from '../lib/storage-keys'
 
@@ -107,10 +115,11 @@ export const useAuthStore = defineStore('auth', () => {
 
   const initialized = computed(() => bootstrapState.value === 'ready')
   const isAuthenticated = computed(() => !!accessToken.value && user.value !== null)
-  const isAdmin = computed(() =>
-    user.value?.groups?.some((g) =>
-      g === 'vpn-admins' || g === 'admins' || g === 'authentik Admins'
-    ) ?? false
+  const isAdmin = computed(
+    () =>
+      user.value?.groups?.some(
+        (g) => g === 'vpn-admins' || g === 'admins' || g === 'authentik Admins',
+      ) ?? false,
   )
 
   async function startLogin() {
@@ -223,14 +232,22 @@ export const useAuthStore = defineStore('auth', () => {
     // Wipe sensitive material from sessionStorage (e.g. WireGuard private keys).
     // Non-sensitive caches (platform detection, etc.) are intentionally preserved.
     for (const key of SENSITIVE_SESSION_KEYS) {
-      try { sessionStorage.removeItem(key) } catch { /* sessionStorage unavailable */ }
+      try {
+        sessionStorage.removeItem(key)
+      } catch {
+        /* sessionStorage unavailable */
+      }
     }
     bootstrapState.value = 'ready'
     restorePromise = null
 
     // Notify subscribers (e.g. dashboard WS) so they can release resources
     // before the page is unloaded by the redirect below.
-    try { window.dispatchEvent(new Event(AUTH_LOGOUT_EVENT)) } catch { /* ignore */ }
+    try {
+      window.dispatchEvent(new Event(AUTH_LOGOUT_EVENT))
+    } catch {
+      /* ignore */
+    }
     // Yield one tick so listeners have a chance to call ws.close() before
     // the navigation tears down the page.
     const oidc = await getOIDCConfig()
@@ -342,7 +359,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchQuota() {
     quotaState.value = beginResourceLoad(userQuota.value !== null)
     try {
-      const quota = await api.get<UserQuota>('/api/v1/control/quota')
+      const quota = await api.validated('/api/v1/control/quota', UserQuotaSchema)
       if (quota && user.value) {
         user.value.quota = quota
       }

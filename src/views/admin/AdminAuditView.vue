@@ -2,10 +2,14 @@
 import { ref, onMounted } from 'vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
-import type { AuditLog } from '../../lib/schemas'
+import { AuditLogListSchema, type AuditLog } from '../../lib/schemas'
 import AsyncState from '../../components/AsyncState.vue'
 import ResourceSkeleton from '../../components/ResourceSkeleton.vue'
-import { beginResourceLoad, completeResourceLoad, type ResourceState } from '../../lib/resource-state'
+import {
+  beginResourceLoad,
+  completeResourceLoad,
+  type ResourceState,
+} from '../../lib/resource-state'
 
 const logs = ref<AuditLog[]>([])
 const logsState = ref<ResourceState>('idle')
@@ -23,7 +27,7 @@ async function loadLogs(append = false) {
     const offset = append ? currentOffset.value : 0
     const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) })
     if (actionFilter.value) params.set('action', actionFilter.value)
-    const page = (await api.get<AuditLog[]>(`/api/v1/admin/audit-logs?${params}`)) || []
+    const page = await api.validated(`/api/v1/admin/audit-logs?${params}`, AuditLogListSchema)
     if (append) {
       logs.value = [...logs.value, ...page]
     } else {
@@ -48,7 +52,8 @@ function actionLabel(action: string): string {
 }
 
 function actionColor(action: string): string {
-  if (action.includes('ban') || action.includes('delete') || action.includes('disconnect')) return 'bg-red-100 text-red-600'
+  if (action.includes('ban') || action.includes('delete') || action.includes('disconnect'))
+    return 'bg-red-100 text-red-600'
   if (action.includes('create') || action.includes('connect')) return 'bg-green-100 text-green-700'
   if (action.includes('update')) return 'bg-blue-100 text-blue-700'
   if (action.includes('cleanup')) return 'bg-yellow-100 text-yellow-700'
@@ -73,27 +78,66 @@ function actionColor(action: string): string {
         >
           <option value="" class="bg-slate-900 text-slate-100">{{ t('common.allActions') }}</option>
           <option value="peer.connect" class="bg-slate-900 text-slate-100">peer.connect</option>
-          <option value="peer.disconnect" class="bg-slate-900 text-slate-100">peer.disconnect</option>
+          <option value="peer.disconnect" class="bg-slate-900 text-slate-100">
+            peer.disconnect
+          </option>
           <option value="peer.cleanup" class="bg-slate-900 text-slate-100">peer.cleanup</option>
-          <option value="admin.server.create" class="bg-slate-900 text-slate-100">admin.server.create</option>
-          <option value="admin.server.update" class="bg-slate-900 text-slate-100">admin.server.update</option>
-          <option value="admin.server.delete" class="bg-slate-900 text-slate-100">admin.server.delete</option>
-          <option value="admin.user.create" class="bg-slate-900 text-slate-100">admin.user.create</option>
+          <option value="admin.server.create" class="bg-slate-900 text-slate-100">
+            admin.server.create
+          </option>
+          <option value="admin.server.update" class="bg-slate-900 text-slate-100">
+            admin.server.update
+          </option>
+          <option value="admin.server.delete" class="bg-slate-900 text-slate-100">
+            admin.server.delete
+          </option>
+          <option value="admin.user.create" class="bg-slate-900 text-slate-100">
+            admin.user.create
+          </option>
           <option value="admin.user.ban" class="bg-slate-900 text-slate-100">admin.user.ban</option>
-          <option value="admin.peer.disconnect" class="bg-slate-900 text-slate-100">admin.peer.disconnect</option>
+          <option value="admin.peer.disconnect" class="bg-slate-900 text-slate-100">
+            admin.peer.disconnect
+          </option>
         </select>
       </div>
     </div>
 
-    <ResourceSkeleton v-if="logsState === 'idle' || logsState === 'loading'" :title="t('adminAudit.loading')" item-class="h-20" />
-    <AsyncState v-else-if="logsState === 'error' && logs.length === 0" kind="error" :title="t('adminAudit.loadError')" :retry-label="t('common.retry')" @retry="loadLogs()" />
+    <ResourceSkeleton
+      v-if="logsState === 'idle' || logsState === 'loading'"
+      :title="t('adminAudit.loading')"
+      item-class="h-20"
+    />
+    <AsyncState
+      v-else-if="logsState === 'error' && logs.length === 0"
+      kind="error"
+      :title="t('adminAudit.loadError')"
+      :retry-label="t('common.retry')"
+      @retry="loadLogs()"
+    />
     <AsyncState v-else-if="logsState === 'empty'" kind="empty" :title="t('adminAudit.empty')" />
 
-    <div v-else class="bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 overflow-hidden backdrop-blur-xl">
-      <p v-if="logsState === 'refreshing'" role="status" class="border-b border-slate-800 px-6 py-3 text-xs text-slate-400">{{ t('common.refreshing') }}</p>
-      <p v-else-if="logsState === 'error'" role="alert" class="border-b border-rose-900/50 bg-rose-950/30 px-6 py-3 text-xs text-rose-300">{{ t('common.refreshFailed') }}</p>
+    <div
+      v-else
+      class="bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 overflow-hidden backdrop-blur-xl"
+    >
+      <p
+        v-if="logsState === 'refreshing'"
+        role="status"
+        class="border-b border-slate-800 px-6 py-3 text-xs text-slate-400"
+      >
+        {{ t('common.refreshing') }}
+      </p>
+      <p
+        v-else-if="logsState === 'error'"
+        role="alert"
+        class="border-b border-rose-900/50 bg-rose-950/30 px-6 py-3 text-xs text-rose-300"
+      >
+        {{ t('common.refreshFailed') }}
+      </p>
       <table class="w-full text-sm">
-        <thead class="bg-slate-950/60 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
+        <thead
+          class="bg-slate-950/60 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800"
+        >
           <tr>
             <th class="px-6 py-4">{{ t('common.date') }}</th>
             <th class="px-6 py-4">{{ t('auditView.action') }}</th>
@@ -108,15 +152,22 @@ function actionColor(action: string): string {
               {{ formatDateTime(log.created_at) }}
             </td>
             <td class="px-6 py-4">
-              <span :class="actionColor(log.action)" class="text-xs font-semibold px-2.5 py-1 rounded-full border">
+              <span
+                :class="actionColor(log.action)"
+                class="text-xs font-semibold px-2.5 py-1 rounded-full border"
+              >
                 {{ actionLabel(log.action) }}
               </span>
             </td>
             <td class="px-6 py-4 hidden md:table-cell text-xs font-medium text-slate-300">
               {{ log.user_email || (log.user_id ? t('common.unavailable') : t('common.system')) }}
             </td>
-            <td class="px-6 py-4 font-mono text-midori-300 hidden md:table-cell text-xs">{{ log.ip_address }}</td>
-            <td class="px-6 py-4 text-xs text-slate-400 hidden lg:table-cell font-mono max-w-xs truncate">
+            <td class="px-6 py-4 font-mono text-midori-300 hidden md:table-cell text-xs">
+              {{ log.ip_address || t('common.unavailable') }}
+            </td>
+            <td
+              class="px-6 py-4 text-xs text-slate-400 hidden lg:table-cell font-mono max-w-xs truncate"
+            >
               {{ JSON.stringify(log.metadata) }}
             </td>
           </tr>

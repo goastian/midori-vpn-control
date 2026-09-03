@@ -8,7 +8,13 @@ import { detectDesktopEnvironment } from '../lib/platform'
 import { beginResourceLoad, completeResourceLoad, type ResourceState } from '../lib/resource-state'
 import AsyncState from '../components/AsyncState.vue'
 import ResourceSkeleton from '../components/ResourceSkeleton.vue'
-import type { AdminStats, Connection } from '../lib/schemas'
+import {
+  AdminStatsSchema,
+  ConnectionListSchema,
+  WebSocketStatsMessageSchema,
+  type AdminStats,
+  type Connection,
+} from '../lib/schemas'
 import type { DesktopPlatform, LinuxPackageFormat, DetectionConfidence } from '../lib/platform'
 
 type DesktopDownload = {
@@ -32,15 +38,20 @@ const hasConnectionSnapshot = ref(false)
 let ws: WebSocket | null = null
 let unmounting = false
 
-const dashboardLoading = computed(() =>
-  connectionsState.value === 'idle' || connectionsState.value === 'loading' ||
-  auth.quotaState === 'idle' || auth.quotaState === 'loading' ||
-  (auth.isAdmin && (adminStatsState.value === 'idle' || adminStatsState.value === 'loading'))
+const dashboardLoading = computed(
+  () =>
+    connectionsState.value === 'idle' ||
+    connectionsState.value === 'loading' ||
+    auth.quotaState === 'idle' ||
+    auth.quotaState === 'loading' ||
+    (auth.isAdmin && (adminStatsState.value === 'idle' || adminStatsState.value === 'loading')),
 )
 
-const dashboardHasError = computed(() =>
-  connectionsState.value === 'error' || auth.quotaState === 'error' ||
-  (auth.isAdmin && adminStatsState.value === 'error')
+const dashboardHasError = computed(
+  () =>
+    connectionsState.value === 'error' ||
+    auth.quotaState === 'error' ||
+    (auth.isAdmin && adminStatsState.value === 'error'),
 )
 
 const desktopReleaseBase = 'https://github.com/goastian/midori-vpn-desktop/releases/latest/download'
@@ -78,8 +89,12 @@ const dashboardCards = computed(() => {
     },
     {
       title: t('dashboard.cards.networkUsage'),
-      value: hasConnectionSnapshot.value ? formatBytes(totalTransferredBytes.value) : t('common.unavailable'),
-      subtitle: hasConnectionSnapshot.value ? `↑${formatBytes(totalSentBytes.value)} / ↓${formatBytes(totalReceivedBytes.value)}` : t('common.unavailable'),
+      value: hasConnectionSnapshot.value
+        ? formatBytes(totalTransferredBytes.value)
+        : t('common.unavailable'),
+      subtitle: hasConnectionSnapshot.value
+        ? `↑${formatBytes(totalSentBytes.value)} / ↓${formatBytes(totalReceivedBytes.value)}`
+        : t('common.unavailable'),
       tone: 'cyan',
     },
     {
@@ -102,13 +117,17 @@ const dashboardCards = computed(() => {
       {
         title: t('common.servers'),
         value: stats ? String(stats.active_servers) : t('common.unavailable'),
-        subtitle: stats ? t('common.available', { count: stats.total_servers }) : t('common.unavailable'),
+        subtitle: stats
+          ? t('common.available', { count: stats.total_servers })
+          : t('common.unavailable'),
         tone: 'amber',
       },
       {
         title: t('common.peers'),
         value: stats ? String(stats.active_peers) : t('common.unavailable'),
-        subtitle: stats ? t('common.provisioned', { count: stats.total_peers }) : t('common.unavailable'),
+        subtitle: stats
+          ? t('common.provisioned', { count: stats.total_peers })
+          : t('common.unavailable'),
         tone: 'rose',
       },
     )
@@ -286,7 +305,9 @@ const desktopDownloads = computed<DesktopDownload[]>(() => {
   ]
 })
 
-const primaryDesktopDownload = computed(() => desktopDownloads.value.find((download) => download.primary) || null)
+const primaryDesktopDownload = computed(
+  () => desktopDownloads.value.find((download) => download.primary) || null,
+)
 
 function desktopDownloadUrl(filename: string): string {
   return `${desktopReleaseBase}/${filename}`
@@ -317,7 +338,7 @@ function formatBytes(bytes: number): string {
 async function loadConnections() {
   connectionsState.value = beginResourceLoad(hasConnectionSnapshot.value)
   try {
-    connections.value = (await api.get<Connection[]>('/api/v1/control/connections')) || []
+    connections.value = await api.validated('/api/v1/control/connections', ConnectionListSchema)
     hasConnectionSnapshot.value = true
     connectionsState.value = completeResourceLoad(connections.value.length > 0)
   } catch {
@@ -328,8 +349,8 @@ async function loadConnections() {
 async function loadAdminStats() {
   adminStatsState.value = beginResourceLoad(adminStats.value !== null)
   try {
-    adminStats.value = await api.get<AdminStats>('/api/v1/admin/dashboard/stats')
-    adminStatsState.value = adminStats.value ? 'ready' : 'empty'
+    adminStats.value = await api.validated('/api/v1/admin/dashboard/stats', AdminStatsSchema)
+    adminStatsState.value = 'ready'
   } catch {
     adminStatsState.value = 'error'
   }
@@ -345,13 +366,25 @@ function connectWebSocket() {
       ws?.send(JSON.stringify({ token: auth.accessToken }))
     }
     ws.onmessage = (event) => {
-      const msg = JSON.parse(event.data)
-      if (msg.type === 'stats' && auth.isAdmin) {
-        adminStats.value = msg.data
-        adminStatsState.value = 'ready'
+      let payload: unknown
+      try {
+        payload = JSON.parse(event.data)
+      } catch {
+        websocketState.value = 'error'
+        return
       }
+      const parsed = WebSocketStatsMessageSchema.safeParse(payload)
+      if (!parsed.success) {
+        websocketState.value = 'error'
+        return
+      }
+      if (!auth.isAdmin) return
+      adminStats.value = parsed.data.data
+      adminStatsState.value = 'ready'
     }
-    ws.onerror = () => { websocketState.value = 'error' }
+    ws.onerror = () => {
+      websocketState.value = 'error'
+    }
     ws.onclose = () => {
       if (!unmounting) websocketState.value = 'error'
     }
@@ -386,7 +419,11 @@ function closeWsForLogout() {
   // Close the WebSocket cleanly before the auth store redirects to the IdP
   // end-session endpoint, so the server-side connection — still authenticated
   // with the access_token — is not left lingering during the redirect.
-  try { ws?.close(1000, 'logout') } catch { /* already closed */ }
+  try {
+    ws?.close(1000, 'logout')
+  } catch {
+    /* already closed */
+  }
   ws = null
   websocketState.value = 'idle'
 }
@@ -395,40 +432,92 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
 
 <template>
   <div class="space-y-6">
-    <section class="relative overflow-hidden rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-2xl shadow-black/40 backdrop-blur-xl">
-      <div class="absolute -right-14 -top-14 h-40 w-40 rounded-full bg-midori-500/10 blur-2xl"></div>
-      <div class="absolute -bottom-10 left-1/3 h-32 w-32 rounded-full bg-cyan-500/10 blur-2xl"></div>
+    <section
+      class="relative overflow-hidden rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-2xl shadow-black/40 backdrop-blur-xl"
+    >
+      <div
+        class="absolute -right-14 -top-14 h-40 w-40 rounded-full bg-midori-500/10 blur-2xl"
+      ></div>
+      <div
+        class="absolute -bottom-10 left-1/3 h-32 w-32 rounded-full bg-cyan-500/10 blur-2xl"
+      ></div>
       <div class="relative z-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.2em] text-midori-400">{{ t('dashboard.eyebrow') }}</p>
-          <h1 class="mt-2 text-3xl font-bold tracking-tight text-white">{{ t('dashboard.title') }}</h1>
+          <p class="text-xs font-semibold uppercase tracking-[0.2em] text-midori-400">
+            {{ t('dashboard.eyebrow') }}
+          </p>
+          <h1 class="mt-2 text-3xl font-bold tracking-tight text-white">
+            {{ t('dashboard.title') }}
+          </h1>
           <p class="mt-2 text-sm text-slate-400">{{ t('dashboard.subtitle') }}</p>
         </div>
         <div class="rounded-2xl border border-slate-700/60 bg-slate-800/80 px-4 py-3 shadow-inner">
           <p class="text-xs text-slate-400">{{ t('common.sessionActive') }}</p>
-          <p class="text-sm font-semibold text-slate-200">{{ auth.user?.email || t('common.unavailable') }}</p>
+          <p class="text-sm font-semibold text-slate-200">
+            {{ auth.user?.email || t('common.unavailable') }}
+          </p>
         </div>
       </div>
     </section>
 
-    <ResourceSkeleton v-if="dashboardLoading" :title="t('common.loading')" :count="auth.isAdmin ? 6 : 3" item-class="h-36" />
+    <ResourceSkeleton
+      v-if="dashboardLoading"
+      :title="t('common.loading')"
+      :count="auth.isAdmin ? 6 : 3"
+      item-class="h-36"
+    />
 
     <template v-else>
-      <p v-if="dashboardHasError" role="alert" class="rounded-xl border border-rose-800/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-300">{{ t('resourceStatus.dashboardError') }}</p>
-      <p v-else-if="connectionsState === 'refreshing' || auth.quotaState === 'refreshing' || adminStatsState === 'refreshing'" role="status" class="text-sm text-slate-400">{{ t('common.refreshing') }}</p>
-      <section v-if="detectedConfidence !== 'mobile'" class="relative overflow-hidden rounded-[2rem] border border-cyan-400/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(15,23,42,0.9))] p-6 shadow-xl shadow-cyan-950/10 lg:p-8">
+      <p
+        v-if="dashboardHasError"
+        role="alert"
+        class="rounded-xl border border-rose-800/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-300"
+      >
+        {{ t('resourceStatus.dashboardError') }}
+      </p>
+      <p
+        v-else-if="
+          connectionsState === 'refreshing' ||
+          auth.quotaState === 'refreshing' ||
+          adminStatsState === 'refreshing'
+        "
+        role="status"
+        class="text-sm text-slate-400"
+      >
+        {{ t('common.refreshing') }}
+      </p>
+      <section
+        v-if="detectedConfidence !== 'mobile'"
+        class="relative overflow-hidden rounded-[2rem] border border-cyan-400/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(15,23,42,0.9))] p-6 shadow-xl shadow-cyan-950/10 lg:p-8"
+      >
         <div class="absolute right-0 top-0 h-56 w-56 rounded-full bg-midori-500/10 blur-3xl"></div>
-        <div class="absolute bottom-0 left-1/4 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl"></div>
+        <div
+          class="absolute bottom-0 left-1/4 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl"
+        ></div>
 
-        <div class="relative z-10 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.25fr)_420px] xl:items-center">
+        <div
+          class="relative z-10 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.25fr)_420px] xl:items-center"
+        >
           <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.26em] text-cyan-300">{{ t('dashboard.desktopDownload.eyebrow') }}</p>
-            <h2 class="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-white lg:text-4xl">{{ t('dashboard.desktopDownload.title') }}</h2>
-            <p class="mt-3 max-w-2xl text-sm leading-7 text-slate-300 lg:text-base">{{ t('dashboard.desktopDownload.subtitle') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.26em] text-cyan-300">
+              {{ t('dashboard.desktopDownload.eyebrow') }}
+            </p>
+            <h2 class="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-white lg:text-4xl">
+              {{ t('dashboard.desktopDownload.title') }}
+            </h2>
+            <p class="mt-3 max-w-2xl text-sm leading-7 text-slate-300 lg:text-base">
+              {{ t('dashboard.desktopDownload.subtitle') }}
+            </p>
 
-            <div class="mt-5 inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm text-cyan-50 backdrop-blur">
+            <div
+              class="mt-5 inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm text-cyan-50 backdrop-blur"
+            >
               <span class="mr-2 h-2.5 w-2.5 rounded-full bg-midori-400"></span>
-              {{ t('dashboard.desktopDownload.detected', { platform: desktopPlatformLabel(detectedDesktopPlatform) }) }}
+              {{
+                t('dashboard.desktopDownload.detected', {
+                  platform: desktopPlatformLabel(detectedDesktopPlatform),
+                })
+              }}
             </div>
 
             <div class="mt-6 flex flex-wrap gap-3">
@@ -439,9 +528,11 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
                 target="_blank"
                 rel="noreferrer"
                 class="group inline-flex min-w-[220px] flex-1 items-center justify-between rounded-2xl border px-4 py-3 transition md:flex-none"
-                :class="download.primary
-                  ? 'border-midori-400/40 bg-midori-500/12 text-white hover:bg-midori-500/18'
-                  : 'border-white/10 bg-white/5 text-slate-200 hover:border-cyan-300/40 hover:bg-white/10'"
+                :class="
+                  download.primary
+                    ? 'border-midori-400/40 bg-midori-500/12 text-white hover:bg-midori-500/18'
+                    : 'border-white/10 bg-white/5 text-slate-200 hover:border-cyan-300/40 hover:bg-white/10'
+                "
               >
                 <div>
                   <p class="text-sm font-semibold">{{ download.label }}</p>
@@ -457,11 +548,22 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
             </div>
           </div>
 
-          <div v-if="primaryDesktopDownload" class="rounded-[1.75rem] border border-white/10 bg-slate-950/40 p-5 backdrop-blur-md">
-            <div class="rounded-[1.4rem] border border-midori-400/20 bg-gradient-to-br from-midori-500 via-midori-600 to-emerald-500 p-6 text-white shadow-lg shadow-midori-950/20">
-              <p class="text-xs font-semibold uppercase tracking-[0.22em] text-midori-100/90">{{ t('dashboard.desktopDownload.recommended') }}</p>
-              <p class="mt-3 text-2xl font-semibold tracking-tight">{{ primaryDesktopDownload.label }}</p>
-              <p class="mt-2 text-sm leading-6 text-midori-50/90">{{ t(primaryDesktopDownload.hintKey) }}</p>
+          <div
+            v-if="primaryDesktopDownload"
+            class="rounded-[1.75rem] border border-white/10 bg-slate-950/40 p-5 backdrop-blur-md"
+          >
+            <div
+              class="rounded-[1.4rem] border border-midori-400/20 bg-gradient-to-br from-midori-500 via-midori-600 to-emerald-500 p-6 text-white shadow-lg shadow-midori-950/20"
+            >
+              <p class="text-xs font-semibold uppercase tracking-[0.22em] text-midori-100/90">
+                {{ t('dashboard.desktopDownload.recommended') }}
+              </p>
+              <p class="mt-3 text-2xl font-semibold tracking-tight">
+                {{ primaryDesktopDownload.label }}
+              </p>
+              <p class="mt-2 text-sm leading-6 text-midori-50/90">
+                {{ t(primaryDesktopDownload.hintKey) }}
+              </p>
 
               <a
                 :href="desktopDownloadUrl(primaryDesktopDownload.filename)"
@@ -474,7 +576,9 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
 
               <div class="mt-4 rounded-2xl border border-white/15 bg-black/10 px-4 py-3">
                 <p class="text-[11px] uppercase tracking-[0.2em] text-midori-100/70">Asset</p>
-                <p class="mt-1 break-all text-xs font-mono text-white/90">{{ primaryDesktopDownload.filename }}</p>
+                <p class="mt-1 break-all text-xs font-mono text-white/90">
+                  {{ primaryDesktopDownload.filename }}
+                </p>
               </div>
             </div>
           </div>
@@ -508,51 +612,84 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
             'border-rose-700/40 bg-rose-950/30': card.tone === 'rose',
           }"
         >
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ card.title }}</p>
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            {{ card.title }}
+          </p>
           <p class="mt-3 text-3xl font-bold text-white">{{ card.value }}</p>
           <p class="mt-1 text-xs text-slate-400">{{ card.subtitle }}</p>
         </article>
       </section>
 
       <section v-if="hasConnectionSnapshot" class="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <article class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl xl:col-span-2">
+        <article
+          class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl xl:col-span-2"
+        >
           <div class="mb-4 flex items-center justify-between">
             <div>
               <h2 class="text-lg font-bold text-white">{{ t('dashboard.weeklyTraffic') }}</h2>
               <p class="text-sm text-slate-400">{{ t('dashboard.weeklyTrafficSubtitle') }}</p>
             </div>
             <div class="text-right">
-              <p class="text-xs uppercase tracking-widest text-slate-400">{{ t('common.total') }}</p>
-              <p class="text-sm font-semibold text-midori-400">{{ formatBytes(totalTransferredBytes) }}</p>
+              <p class="text-xs uppercase tracking-widest text-slate-400">
+                {{ t('common.total') }}
+              </p>
+              <p class="text-sm font-semibold text-midori-400">
+                {{ formatBytes(totalTransferredBytes) }}
+              </p>
             </div>
           </div>
           <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 shadow-inner">
             <svg viewBox="0 0 100 100" class="h-28 w-full">
-              <polyline points="0,100 100,100" fill="none" class="stroke-slate-800" stroke-width="1" />
-              <polyline :points="trafficSparkline" fill="none" class="stroke-midori-400" stroke-width="2.5" stroke-linecap="round" />
+              <polyline
+                points="0,100 100,100"
+                fill="none"
+                class="stroke-slate-800"
+                stroke-width="1"
+              />
+              <polyline
+                :points="trafficSparkline"
+                fill="none"
+                class="stroke-midori-400"
+                stroke-width="2.5"
+                stroke-linecap="round"
+              />
             </svg>
             <div class="mt-3 grid grid-cols-7 gap-2">
               <div v-for="day in trafficByDay" :key="day.key" class="space-y-1 text-center">
                 <div class="mx-auto flex h-16 w-6 items-end rounded-full bg-slate-800/80 p-1">
                   <div
                     class="w-full rounded-full bg-gradient-to-t from-midori-600 to-cyan-400 shadow-sm"
-                    :style="{ height: `${Math.max((day.value / maxTrafficDay) * 100, day.value > 0 ? 14 : 3)}%` }"
+                    :style="{
+                      height: `${Math.max((day.value / maxTrafficDay) * 100, day.value > 0 ? 14 : 3)}%`,
+                    }"
                   ></div>
                 </div>
-                <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{{ day.label }}</p>
+                <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  {{ day.label }}
+                </p>
               </div>
             </div>
           </div>
         </article>
 
-        <article class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl">
+        <article
+          class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl"
+        >
           <h2 class="text-lg font-bold text-white">{{ t('dashboard.connectionHealth') }}</h2>
           <p class="mt-1 text-sm text-slate-400">{{ t('dashboard.connectionHealthSubtitle') }}</p>
 
           <div class="mt-6 flex items-center justify-center">
             <div class="relative">
               <svg viewBox="0 0 120 120" class="h-44 w-44 -rotate-90">
-                <circle cx="60" cy="60" r="48" stroke="currentColor" stroke-width="14" fill="none" class="text-slate-800" />
+                <circle
+                  cx="60"
+                  cy="60"
+                  r="48"
+                  stroke="currentColor"
+                  stroke-width="14"
+                  fill="none"
+                  class="text-slate-800"
+                />
                 <circle
                   cx="60"
                   cy="60"
@@ -566,18 +703,27 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
                 />
               </svg>
               <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <p class="text-3xl font-bold text-white">{{ activePercent ?? t('common.unavailable') }}<span v-if="activePercent !== null">%</span></p>
-                <p class="text-xs uppercase tracking-[0.2em] text-midori-400">{{ t('dashboard.activeLabel') }}</p>
+                <p class="text-3xl font-bold text-white">
+                  {{ activePercent ?? t('common.unavailable')
+                  }}<span v-if="activePercent !== null">%</span>
+                </p>
+                <p class="text-xs uppercase tracking-[0.2em] text-midori-400">
+                  {{ t('dashboard.activeLabel') }}
+                </p>
               </div>
             </div>
           </div>
 
           <div class="mt-4 space-y-2 text-sm">
-            <div class="flex items-center justify-between rounded-xl bg-slate-800/80 px-4 py-2.5 border border-slate-700/50">
+            <div
+              class="flex items-center justify-between rounded-xl bg-slate-800/80 px-4 py-2.5 border border-slate-700/50"
+            >
               <span class="text-slate-300">{{ t('dashboard.activeLabel') }}</span>
               <span class="font-bold text-midori-400">{{ connectionTotals.active }}</span>
             </div>
-            <div class="flex items-center justify-between rounded-xl bg-slate-800/80 px-4 py-2.5 border border-slate-700/50">
+            <div
+              class="flex items-center justify-between rounded-xl bg-slate-800/80 px-4 py-2.5 border border-slate-700/50"
+            >
               <span class="text-slate-300">{{ t('dashboard.inactiveLabel') }}</span>
               <span class="font-bold text-slate-400">{{ connectionTotals.inactive }}</span>
             </div>
@@ -588,17 +734,27 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
       <AsyncState v-else kind="error" :title="t('resourceStatus.dashboardError')" />
 
       <section v-if="hasConnectionSnapshot" class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <article class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl">
+        <article
+          class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl"
+        >
           <div class="mb-4 flex items-center justify-between">
             <h2 class="text-lg font-bold text-white">{{ t('dashboard.performanceByDevice') }}</h2>
-            <span class="text-xs uppercase tracking-[0.2em] text-midori-400 font-semibold">{{ t('common.topFive') }}</span>
+            <span class="text-xs uppercase tracking-[0.2em] text-midori-400 font-semibold">{{
+              t('common.topFive')
+            }}</span>
           </div>
 
           <div v-if="deviceUsage.length" class="space-y-3">
-            <div v-for="device in deviceUsage" :key="device.device" class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 shadow-sm">
+            <div
+              v-for="device in deviceUsage"
+              :key="device.device"
+              class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 shadow-sm"
+            >
               <div class="mb-2 flex items-center justify-between gap-4">
                 <p class="truncate text-sm font-semibold text-white">{{ device.device }}</p>
-                <span class="text-xs text-midori-400 font-mono">{{ formatBytes(device.total) }}</span>
+                <span class="text-xs text-midori-400 font-mono">{{
+                  formatBytes(device.total)
+                }}</span>
               </div>
               <div class="h-2 w-full overflow-hidden rounded-full bg-slate-800">
                 <div
@@ -606,19 +762,42 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
                   :style="{ width: `${Math.max((device.total / mostUsedDeviceBytes) * 100, 10)}%` }"
                 ></div>
               </div>
-              <p class="mt-2 text-xs text-slate-400">{{ t('dashboard.connectionsActiveSuffix', { count: device.active }) }}</p>
+              <p class="mt-2 text-xs text-slate-400">
+                {{ t('dashboard.connectionsActiveSuffix', { count: device.active }) }}
+              </p>
             </div>
           </div>
 
-          <p v-else class="rounded-2xl bg-slate-950/40 border border-slate-800 px-4 py-8 text-center text-sm text-slate-400">
+          <p
+            v-else
+            class="rounded-2xl bg-slate-950/40 border border-slate-800 px-4 py-8 text-center text-sm text-slate-400"
+          >
             {{ t('dashboard.noDeviceTraffic') }}
           </p>
         </article>
 
-        <article class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl">
+        <article
+          class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl"
+        >
           <div class="mb-4 flex items-center justify-between">
             <h2 class="text-lg font-bold text-white">{{ t('dashboard.recentActivity') }}</h2>
-            <span class="text-xs uppercase tracking-[0.2em] font-semibold" :class="websocketState === 'ready' ? 'text-midori-400' : websocketState === 'error' ? 'text-amber-300' : 'text-slate-400'">{{ websocketState === 'ready' ? t('resourceStatus.realtimeLive') : websocketState === 'error' ? t('resourceStatus.realtimeUnavailable') : t('resourceStatus.realtimeConnecting') }}</span>
+            <span
+              class="text-xs uppercase tracking-[0.2em] font-semibold"
+              :class="
+                websocketState === 'ready'
+                  ? 'text-midori-400'
+                  : websocketState === 'error'
+                    ? 'text-amber-300'
+                    : 'text-slate-400'
+              "
+              >{{
+                websocketState === 'ready'
+                  ? t('resourceStatus.realtimeLive')
+                  : websocketState === 'error'
+                    ? t('resourceStatus.realtimeUnavailable')
+                    : t('resourceStatus.realtimeConnecting')
+              }}</span
+            >
           </div>
 
           <div v-if="connections.length > 0" class="space-y-3">
@@ -631,13 +810,18 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
                 <p class="text-sm font-mono text-midori-300">{{ conn.assigned_ip }}</p>
                 <span
                   class="rounded-full px-2.5 py-1 text-[11px] font-semibold border"
-                  :class="conn.is_active ? 'bg-midori-950/60 border-midori-700/50 text-midori-300' : 'bg-slate-800 border-slate-700 text-slate-400'"
+                  :class="
+                    conn.is_active
+                      ? 'bg-midori-950/60 border-midori-700/50 text-midori-300'
+                      : 'bg-slate-800 border-slate-700 text-slate-400'
+                  "
                 >
                   {{ conn.is_active ? t('common.active') : t('common.inactive') }}
                 </span>
               </div>
               <p class="mt-1 text-xs text-slate-300">
-                {{ conn.device_name || t('common.unnamed') }} · <span class="text-slate-500">{{ formatDateTime(conn.created_at) }}</span>
+                {{ conn.device_name || t('common.unnamed') }} ·
+                <span class="text-slate-500">{{ formatDateTime(conn.created_at) }}</span>
               </p>
               <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 ↑{{ formatBytes(conn.bytes_sent) }} · ↓{{ formatBytes(conn.bytes_received) }}
@@ -645,36 +829,53 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
             </div>
           </div>
 
-          <p v-else class="rounded-xl bg-slate-100 px-4 py-8 text-center text-sm text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+          <p
+            v-else
+            class="rounded-xl bg-slate-100 px-4 py-8 text-center text-sm text-slate-500 dark:bg-slate-800 dark:text-slate-300"
+          >
             {{ t('dashboard.noRecentConnections') }}
           </p>
         </article>
       </section>
 
-      <section v-if="auth.isAdmin && adminStats" class="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+      <section
+        v-if="auth.isAdmin && adminStats"
+        class="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
+      >
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ t('dashboard.platformMetrics') }}</h2>
-            <p class="text-sm text-slate-500 dark:text-slate-400">{{ t('dashboard.platformMetricsSubtitle') }}</p>
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              {{ t('dashboard.platformMetrics') }}
+            </h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400">
+              {{ t('dashboard.platformMetricsSubtitle') }}
+            </p>
           </div>
           <div class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
             <div class="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-800">
               <p class="text-xs text-slate-500">{{ t('common.users') }}</p>
-              <p class="font-semibold text-slate-800 dark:text-slate-100">{{ adminStats.total_users }}</p>
+              <p class="font-semibold text-slate-800 dark:text-slate-100">
+                {{ adminStats.total_users }}
+              </p>
             </div>
             <div class="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-800">
               <p class="text-xs text-slate-500">{{ t('common.servers') }}</p>
-              <p class="font-semibold text-slate-800 dark:text-slate-100">{{ adminStats.active_servers }}/{{ adminStats.total_servers }}</p>
+              <p class="font-semibold text-slate-800 dark:text-slate-100">
+                {{ adminStats.active_servers }}/{{ adminStats.total_servers }}
+              </p>
             </div>
             <div class="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-800">
               <p class="text-xs text-slate-500">{{ t('common.peers') }}</p>
-              <p class="font-semibold text-slate-800 dark:text-slate-100">{{ adminStats.active_peers }}/{{ adminStats.total_peers }}</p>
+              <p class="font-semibold text-slate-800 dark:text-slate-100">
+                {{ adminStats.active_peers }}/{{ adminStats.total_peers }}
+              </p>
             </div>
             <div class="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-800">
               <p class="text-xs text-slate-500">{{ t('dashboard.globalTraffic') }}</p>
               <p class="font-semibold text-slate-800 dark:text-slate-100">
-                ↑{{ formatBytes(adminStats.total_bytes_sent) }}
-                ↓{{ formatBytes(adminStats.total_bytes_received) }}
+                ↑{{ formatBytes(adminStats.total_bytes_sent) }} ↓{{
+                  formatBytes(adminStats.total_bytes_received)
+                }}
               </p>
             </div>
           </div>

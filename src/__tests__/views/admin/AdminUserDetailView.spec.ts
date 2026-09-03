@@ -5,7 +5,7 @@ import AdminUserDetailView from '@/views/admin/AdminUserDetailView.vue'
 import AsyncState from '@/components/AsyncState.vue'
 
 vi.mock('@/lib/api', () => ({
-  api: { get: vi.fn() },
+  api: { validated: vi.fn() },
 }))
 
 const user = {
@@ -15,6 +15,7 @@ const user = {
   display_name: 'Alice',
   groups: ['vpn-users'],
   is_banned: false,
+  ban_reason: '',
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
 }
@@ -39,7 +40,7 @@ describe('AdminUserDetailView', () => {
 
   it('renders localized account details after loading', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockResolvedValue({ user, peers: [] })
+    vi.mocked(api.validated).mockResolvedValue({ user, peers: [] })
 
     const wrapper = shallowMount(AdminUserDetailView, {
       global: { plugins: [await makeRouter()] },
@@ -53,7 +54,7 @@ describe('AdminUserDetailView', () => {
 
   it('shows a localized retryable error without logging backend details', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockRejectedValue(new Error('Internal detail'))
+    vi.mocked(api.validated).mockRejectedValue(new Error('Internal detail'))
 
     const wrapper = shallowMount(AdminUserDetailView, {
       global: { plugins: [await makeRouter()] },

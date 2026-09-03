@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import NavBar from './components/NavBar.vue'
+import ViewErrorBoundary from './components/ViewErrorBoundary.vue'
 import { useAuthStore } from './stores/auth'
 import { useLocale } from './lib/i18n'
 import { computed, watch } from 'vue'
@@ -36,7 +37,11 @@ watch(
 
 <template>
   <!-- OAuth callbacks are isolated full-page routes and cannot expose the shell. -->
-  <RouterView v-if="bypassesBootstrap" />
+  <RouterView v-if="bypassesBootstrap" v-slot="{ Component, route: viewRoute }">
+    <ViewErrorBoundary v-slot="{ retryKey }" :reset-key="viewRoute.fullPath">
+      <component :is="Component" :key="`${viewRoute.fullPath}:${retryKey}`" />
+    </ViewErrorBoundary>
+  </RouterView>
 
   <!-- No route or authenticated chrome mounts before token and profile validation. -->
   <div
@@ -46,9 +51,14 @@ watch(
     aria-live="polite"
   >
     <div class="max-w-md text-center">
-      <div class="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-slate-300 border-t-midori-600 dark:border-slate-700 dark:border-t-midori-400" aria-hidden="true"></div>
+      <div
+        class="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-slate-300 border-t-midori-600 dark:border-slate-700 dark:border-t-midori-400"
+        aria-hidden="true"
+      ></div>
       <h1 class="mt-5 text-lg font-semibold">{{ t('bootstrap.loadingTitle') }}</h1>
-      <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">{{ t('bootstrap.loadingDetail') }}</p>
+      <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">
+        {{ t('bootstrap.loadingDetail') }}
+      </p>
     </div>
   </div>
 
@@ -57,9 +67,13 @@ watch(
     class="min-h-screen app-shell-bg flex items-center justify-center p-6 text-slate-900 dark:text-slate-100"
     role="alert"
   >
-    <div class="w-full max-w-md rounded-3xl border border-rose-200 bg-white p-8 text-center shadow-xl dark:border-rose-900/70 dark:bg-slate-900">
+    <div
+      class="w-full max-w-md rounded-3xl border border-rose-200 bg-white p-8 text-center shadow-xl dark:border-rose-900/70 dark:bg-slate-900"
+    >
       <h1 class="text-xl font-semibold">{{ t('bootstrap.errorTitle') }}</h1>
-      <p class="mt-3 text-sm text-slate-600 dark:text-slate-400">{{ t('bootstrap.errorDetail') }}</p>
+      <p class="mt-3 text-sm text-slate-600 dark:text-slate-400">
+        {{ t('bootstrap.errorDetail') }}
+      </p>
       <button
         type="button"
         class="mt-6 rounded-xl bg-midori-600 px-5 py-3 font-semibold text-white transition-colors hover:bg-midori-500 disabled:cursor-wait disabled:opacity-60"
@@ -72,15 +86,24 @@ watch(
   </div>
 
   <!-- Full-page public routes render only after bootstrap resolves. -->
-  <RouterView v-else-if="isFullPage" />
+  <RouterView v-else-if="isFullPage" v-slot="{ Component, route: viewRoute }">
+    <ViewErrorBoundary v-slot="{ retryKey }" :reset-key="viewRoute.fullPath">
+      <component :is="Component" :key="`${viewRoute.fullPath}:${retryKey}`" />
+    </ViewErrorBoundary>
+  </RouterView>
 
   <!-- Authenticated routes mount only with a validated profile. -->
-  <div v-else-if="auth.isAuthenticated" class="min-h-screen app-shell-bg text-slate-900 dark:text-slate-100">
+  <div
+    v-else-if="auth.isAuthenticated"
+    class="min-h-screen app-shell-bg text-slate-900 dark:text-slate-100"
+  >
     <NavBar />
-    <main
-      class="mx-auto w-full max-w-[1800px] px-4 py-6 sm:px-6 lg:py-10 lg:pl-[19rem] lg:pr-10"
-    >
-      <RouterView />
+    <main class="mx-auto w-full max-w-[1800px] px-4 py-6 sm:px-6 lg:py-10 lg:pl-[19rem] lg:pr-10">
+      <RouterView v-slot="{ Component, route: viewRoute }">
+        <ViewErrorBoundary v-slot="{ retryKey }" :reset-key="viewRoute.fullPath">
+          <component :is="Component" :key="`${viewRoute.fullPath}:${retryKey}`" />
+        </ViewErrorBoundary>
+      </RouterView>
     </main>
   </div>
 

@@ -6,6 +6,11 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Changed
 
+- Every remote JSON value rendered by Control is now parsed through an explicit
+  Zod contract, including quota, device and session lists, dashboard data,
+  server latency, administrative resources, health and Desktop callback data.
+  Incomplete WebSocket statistics retain the last valid HTTP snapshot, and a
+  localized per-view error boundary provides a safe retry when rendering fails.
 - Control resources now use explicit idle, loading, ready, empty, error and
   refreshing states. Initial views render stable skeletons, background
   failures retain the last valid values with visible status, unavailable data

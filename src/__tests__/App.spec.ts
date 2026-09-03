@@ -18,7 +18,12 @@ async function render(path: string) {
     routes: [
       { path: '/', name: 'landing', component: Landing, meta: { public: true, fullPage: true } },
       { path: '/dashboard', name: 'dashboard', component: Protected },
-      { path: '/auth/callback', name: 'callback', component: Callback, meta: { public: true, fullPage: true, bootstrapBypass: true } },
+      {
+        path: '/auth/callback',
+        name: 'callback',
+        component: Callback,
+        meta: { public: true, fullPage: true, bootstrapBypass: true },
+      },
     ],
   })
   await router.push(path)
@@ -62,8 +67,14 @@ describe('application bootstrap boundary', () => {
     const { wrapper, auth } = await render('/dashboard')
     auth.accessToken = 'access-token'
     auth.user = {
-      id: 'user-id', authentik_uid: 'uid', email: 'user@example.com', display_name: 'User',
-      groups: ['users'], is_banned: false, created_at: '2026-09-03T00:00:00Z',
+      id: 'user-id',
+      authentik_uid: 'uid',
+      email: 'user@example.com',
+      display_name: 'User',
+      groups: ['users'],
+      is_banned: false,
+      ban_reason: '',
+      created_at: '2026-09-03T00:00:00Z',
     }
     auth.bootstrapState = 'ready'
     await wrapper.vm.$nextTick()
