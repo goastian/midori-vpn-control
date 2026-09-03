@@ -71,13 +71,14 @@ describe('localized user views', () => {
     const wrapper = mount(ServersView, { global: { plugins: [pinia, router] } })
     await flushPromises()
 
-    expect(wrapper.get('[role="alert"]').text()).toContain('No se pudieron cargar')
+    const serverError = wrapper.findAll('[role="alert"]').find((alert) => alert.text().includes('No se pudieron cargar'))
+    expect(serverError).toBeDefined()
 
     vi.mocked(api.get).mockImplementation(async (path: string) => {
       if (path.endsWith('/quota')) return null
       return []
     })
-    await wrapper.get('[role="alert"] button').trigger('click')
+    await serverError!.get('button').trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('No hay servidores disponibles')
   })

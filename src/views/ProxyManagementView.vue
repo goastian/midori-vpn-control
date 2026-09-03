@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import AsyncState from '../components/AsyncState.vue'
+import ResourceSkeleton from '../components/ResourceSkeleton.vue'
 import { api } from '../lib/api'
 import { useLocale } from '../lib/i18n'
 import { ProxyCredentialResponseSchema, ServerListSchema } from '../lib/schemas'
 import type { ProxyCredentialResponse, Server } from '../lib/schemas'
+import { beginResourceLoad, completeResourceLoad, type ResourceState } from '../lib/resource-state'
 
 const { t } = useLocale()
 const credential = ref<ProxyCredentialResponse | null>(null)
-const loading = ref(false)
 const copied = ref(false)
-const failed = ref(false)
+const serversState = ref<ResourceState>('idle')
+const credentialState = ref<ResourceState>('idle')
 const proxyServers = ref<Server[]>([])
 const selectedServerID = ref('')
 
@@ -28,32 +30,34 @@ function browserDeviceIdentity() {
   }
 }
 
-onMounted(async () => {
+async function loadServers() {
+  serversState.value = beginResourceLoad(proxyServers.value.length > 0 || serversState.value === 'empty')
   try {
     const servers = await api.validated('/api/v1/control/servers', ServerListSchema)
     proxyServers.value = servers.filter((server) => server.transports?.some(
       (transport) => transport.protocol === 'proxy' && transport.enabled && transport.health_status === 'healthy',
     ))
     selectedServerID.value = proxyServers.value[0]?.id ?? ''
+    serversState.value = completeResourceLoad(proxyServers.value.length > 0)
   } catch {
-    failed.value = true
+    serversState.value = 'error'
   }
-})
+}
+
+onMounted(loadServers)
 
 async function generateCredentials() {
-  if (loading.value || !selectedServerID.value) return
-  loading.value = true
-  failed.value = false
+  if (credentialState.value === 'loading' || credentialState.value === 'refreshing' || !selectedServerID.value) return
+  credentialState.value = beginResourceLoad(credential.value !== null)
   copied.value = false
   try {
     credential.value = await api.validated('/api/v1/control/proxy-credentials', ProxyCredentialResponseSchema, {
       method: 'POST',
       body: JSON.stringify({ server_id: selectedServerID.value, device: browserDeviceIdentity() }),
     })
+    credentialState.value = 'ready'
   } catch {
-    failed.value = true
-  } finally {
-    loading.value = false
+    credentialState.value = 'error'
   }
 }
 
@@ -64,7 +68,7 @@ async function copyToken() {
     copied.value = true
     window.setTimeout(() => (copied.value = false), 2000)
   } catch {
-    failed.value = true
+    credentialState.value = 'error'
   }
 }
 
@@ -87,7 +91,7 @@ function formatExpiresIn(seconds: number) {
         v-model="selectedServerID"
         class="glass-input min-w-56"
         :aria-label="t('proxyView.endpoints')"
-        :disabled="loading || proxyServers.length === 0"
+        :disabled="credentialState === 'loading' || credentialState === 'refreshing' || serversState !== 'ready'"
       >
         <option v-for="server in proxyServers" :key="server.id" :value="server.id">
           {{ server.name }} · {{ server.location }}
@@ -95,32 +99,38 @@ function formatExpiresIn(seconds: number) {
       </select>
       <button
         type="button"
-        :disabled="loading || !selectedServerID"
-        :aria-busy="loading"
+        :disabled="credentialState === 'loading' || credentialState === 'refreshing' || !selectedServerID || serversState !== 'ready'"
+        :aria-busy="credentialState === 'loading' || credentialState === 'refreshing'"
         class="btn-primary self-start disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
         @click="generateCredentials"
       >
-        <span v-if="loading" class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>
-        {{ loading ? t('proxyView.generating') : t('proxyView.generate') }}
+        <span v-if="credentialState === 'loading' || credentialState === 'refreshing'" class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>
+        {{ credentialState === 'loading' || credentialState === 'refreshing' ? t('proxyView.generating') : t('proxyView.generate') }}
       </button>
     </div>
 
+    <p v-if="serversState === 'error' && proxyServers.length > 0" role="alert" class="rounded-xl border border-rose-800/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-300">{{ t('common.refreshFailed') }}</p>
+
+    <ResourceSkeleton v-if="serversState === 'idle' || serversState === 'loading'" :title="t('serversView.loading')" :count="1" item-class="h-28" />
+
     <AsyncState
-      v-if="failed"
+      v-else-if="serversState === 'error' && proxyServers.length === 0"
       kind="error"
-      :title="t('proxyView.errorTitle')"
+      :title="t('serversView.loadErrorTitle')"
       :detail="t('proxyView.errorDetail')"
       :retry-label="t('common.retry')"
-      @retry="generateCredentials"
+      @retry="loadServers"
     />
 
-    <AsyncState
-      v-if="loading && !credential"
-      kind="loading"
-      :title="t('proxyView.loadingTitle')"
-    />
+    <AsyncState v-else-if="serversState === 'empty'" kind="empty" :title="t('proxyView.noEndpoints')" />
+
+    <ResourceSkeleton v-else-if="credentialState === 'loading' && !credential" :title="t('proxyView.loadingTitle')" :count="1" item-class="h-48" />
+
+    <AsyncState v-else-if="credentialState === 'error' && !credential" kind="error" :title="t('proxyView.errorTitle')" :detail="t('proxyView.errorDetail')" :retry-label="t('common.retry')" @retry="generateCredentials" />
 
     <div v-else-if="credential" class="space-y-6 rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl md:p-8">
+      <p v-if="credentialState === 'refreshing'" role="status" class="text-sm text-slate-400">{{ t('common.refreshing') }}</p>
+      <p v-else-if="credentialState === 'error'" role="alert" class="text-sm text-rose-300">{{ t('common.refreshFailed') }}</p>
       <div class="flex items-center justify-between gap-3">
         <span class="badge-active">
           <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-midori-400" aria-hidden="true"></span>
@@ -155,7 +165,7 @@ function formatExpiresIn(seconds: number) {
     </div>
 
     <AsyncState
-      v-else-if="!loading && !failed"
+      v-else-if="credentialState === 'idle' || credentialState === 'empty'"
       kind="empty"
       :title="t('proxyView.emptyTitle')"
       :detail="t('proxyView.emptyDetail')"

@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import AdminUsersView from '@/views/admin/AdminUsersView.vue'
 import AsyncState from '@/components/AsyncState.vue'
+import ResourceSkeleton from '@/components/ResourceSkeleton.vue'
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -74,7 +75,7 @@ describe('AdminUsersView', () => {
       global: { plugins: [createPinia(), makeRouter()] },
     })
 
-    expect(wrapper.findComponent(AsyncState).props('kind')).toBe('loading')
+    expect(wrapper.findComponent(ResourceSkeleton).props('title')).toBe('Cargando usuarios…')
   })
 
   it('renders user rows after successful load', async () => {

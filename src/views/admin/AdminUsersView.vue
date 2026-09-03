@@ -5,10 +5,11 @@ import { useLocale } from '../../lib/i18n'
 import { LifecycleStatusSchema } from '../../lib/schemas'
 import type { User } from '../../lib/schemas'
 import AsyncState from '../../components/AsyncState.vue'
+import ResourceSkeleton from '../../components/ResourceSkeleton.vue'
+import { beginResourceLoad, completeResourceLoad, type ResourceState } from '../../lib/resource-state'
 
 const users = ref<User[]>([])
-const loading = ref(true)
-const loadFailed = ref(false)
+const usersState = ref<ResourceState>('idle')
 const currentOffset = ref(0)
 const hasMore = ref(true)
 const PAGE_SIZE = 50
@@ -38,8 +39,7 @@ onMounted(async () => {
 })
 
 async function loadUsers(append = false) {
-  loading.value = true
-  loadFailed.value = false
+  usersState.value = beginResourceLoad(users.value.length > 0 || usersState.value === 'empty')
   try {
     const offset = append ? currentOffset.value : 0
     const page = (await api.get<User[]>(`/api/v1/admin/users?limit=${PAGE_SIZE}&offset=${offset}`)) || []
@@ -51,14 +51,12 @@ async function loadUsers(append = false) {
     }
     hasMore.value = page.length >= PAGE_SIZE
     currentOffset.value = (append ? currentOffset.value : 0) + page.length
+    usersState.value = completeResourceLoad(users.value.length > 0)
   } catch {
-    if (!append || users.value.length === 0) {
-      loadFailed.value = true
-    } else {
+    usersState.value = 'error'
+    if (append && users.value.length > 0) {
       feedback.value = { kind: 'error', message: t('adminUsers.loadError') }
     }
-  } finally {
-    loading.value = false
   }
 }
 
@@ -257,11 +255,13 @@ defineExpose({ deleteUser })
       {{ feedback.message }}
     </div>
 
-    <AsyncState v-if="loading && users.length === 0" kind="loading" :title="t('adminUsers.loading')" />
-    <AsyncState v-else-if="loadFailed" kind="error" :title="t('adminUsers.loadError')" :retry-label="t('common.retry')" @retry="loadUsers()" />
-    <AsyncState v-else-if="users.length === 0" kind="empty" :title="t('adminUsers.empty')" />
+    <ResourceSkeleton v-if="usersState === 'idle' || usersState === 'loading'" :title="t('adminUsers.loading')" item-class="h-20" />
+    <AsyncState v-else-if="usersState === 'error' && users.length === 0" kind="error" :title="t('adminUsers.loadError')" :retry-label="t('common.retry')" @retry="loadUsers()" />
+    <AsyncState v-else-if="usersState === 'empty'" kind="empty" :title="t('adminUsers.empty')" />
 
     <div v-else class="bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 overflow-hidden backdrop-blur-xl">
+      <p v-if="usersState === 'refreshing'" role="status" class="border-b border-slate-800 px-6 py-3 text-xs text-slate-400">{{ t('common.refreshing') }}</p>
+      <p v-else-if="usersState === 'error'" role="alert" class="border-b border-rose-900/50 bg-rose-950/30 px-6 py-3 text-xs text-rose-300">{{ t('common.refreshFailed') }}</p>
       <table class="w-full text-sm">
         <thead class="bg-slate-950/60 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
           <tr>
@@ -275,7 +275,7 @@ defineExpose({ deleteUser })
         <tbody class="divide-y divide-slate-800/60">
           <tr v-for="u in users" :key="u.id" class="hover:bg-slate-800/50 transition-colors">
             <td class="px-6 py-4 font-semibold text-white">{{ u.email }}</td>
-            <td class="px-6 py-4 text-slate-300">{{ u.display_name || '—' }}</td>
+            <td class="px-6 py-4 text-slate-300">{{ u.display_name || t('common.unavailable') }}</td>
             <td class="px-6 py-4 hidden md:table-cell">
               <span v-for="g in u.groups" :key="g" class="text-xs bg-slate-800 border border-slate-700 text-slate-300 px-2.5 py-0.5 rounded-md mr-1.5 font-medium">
                 {{ g }}
@@ -296,12 +296,12 @@ defineExpose({ deleteUser })
       <div v-if="hasMore" class="px-6 py-4 border-t border-slate-800 text-center">
         <button
           type="button"
-          :disabled="loading"
-          :aria-busy="loading"
+          :disabled="usersState === 'refreshing'"
+          :aria-busy="usersState === 'refreshing'"
           class="text-sm font-semibold text-midori-400 hover:text-midori-300 disabled:opacity-50 cursor-pointer"
           @click="loadMoreUsers"
         >
-          {{ loading ? t('common.loading') : t('common.loadMore') }}
+          {{ usersState === 'refreshing' ? t('common.loading') : t('common.loadMore') }}
         </button>
       </div>
     </div>

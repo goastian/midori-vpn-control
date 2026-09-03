@@ -4,10 +4,11 @@ import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
 import type { AdminMeshNetwork } from '../../lib/schemas'
 import AsyncState from '../../components/AsyncState.vue'
+import ResourceSkeleton from '../../components/ResourceSkeleton.vue'
+import { beginResourceLoad, completeResourceLoad, type ResourceState } from '../../lib/resource-state'
 
 const meshNetworks = ref<AdminMeshNetwork[]>([])
-const loading = ref(true)
-const loadFailed = ref(false)
+const meshState = ref<ResourceState>('idle')
 const expanded = ref<Set<string>>(new Set())
 const { t } = useLocale()
 let refreshTimer: number | undefined
@@ -15,7 +16,7 @@ let refreshTimer: number | undefined
 onMounted(() => {
   load()
   refreshTimer = window.setInterval(() => {
-    load(true)
+    load()
   }, 15000)
 })
 
@@ -23,15 +24,13 @@ onBeforeUnmount(() => {
   if (refreshTimer) window.clearInterval(refreshTimer)
 })
 
-async function load(silent = false) {
-  if (!silent) loading.value = true
-  loadFailed.value = false
+async function load() {
+  meshState.value = beginResourceLoad(meshNetworks.value.length > 0 || meshState.value === 'empty')
   try {
     meshNetworks.value = (await api.get<AdminMeshNetwork[]>('/api/v1/admin/mesh')) || []
+    meshState.value = completeResourceLoad(meshNetworks.value.length > 0)
   } catch {
-    if (!silent || meshNetworks.value.length === 0) loadFailed.value = true
-  } finally {
-    if (!silent) loading.value = false
+    meshState.value = 'error'
   }
 }
 
@@ -58,8 +57,8 @@ function connectedCount(net: AdminMeshNetwork) {
       <button
         type="button"
         class="inline-flex items-center gap-2 px-4 py-2 border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold rounded-xl transition-all cursor-pointer self-start sm:self-auto"
-        :disabled="loading"
-        :aria-busy="loading"
+        :disabled="meshState === 'loading' || meshState === 'refreshing'"
+        :aria-busy="meshState === 'loading' || meshState === 'refreshing'"
         @click="load()"
       >
         <svg class="w-4 h-4 text-midori-400" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
@@ -67,11 +66,13 @@ function connectedCount(net: AdminMeshNetwork) {
       </button>
     </div>
 
-    <AsyncState v-if="loading && meshNetworks.length === 0" kind="loading" :title="t('adminMesh.loading')" />
-    <AsyncState v-else-if="loadFailed" kind="error" :title="t('adminMesh.loadError')" :retry-label="t('common.retry')" @retry="load()" />
-    <AsyncState v-else-if="meshNetworks.length === 0" kind="empty" :title="t('adminMesh.empty')" />
+    <ResourceSkeleton v-if="meshState === 'idle' || meshState === 'loading'" :title="t('adminMesh.loading')" item-class="h-24" />
+    <AsyncState v-else-if="meshState === 'error' && meshNetworks.length === 0" kind="error" :title="t('adminMesh.loadError')" :retry-label="t('common.retry')" @retry="load()" />
+    <AsyncState v-else-if="meshState === 'empty'" kind="empty" :title="t('adminMesh.empty')" />
 
     <div v-else class="space-y-4">
+      <p v-if="meshState === 'refreshing'" role="status" class="text-sm text-slate-400">{{ t('common.refreshing') }}</p>
+      <p v-else-if="meshState === 'error'" role="alert" class="rounded-xl border border-rose-800/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-300">{{ t('common.refreshFailed') }}</p>
       <div
         v-for="net in meshNetworks"
         :key="net.id"

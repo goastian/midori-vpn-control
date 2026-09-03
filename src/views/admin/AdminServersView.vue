@@ -4,6 +4,8 @@ import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
 import type { Server, TransportCapability } from '../../lib/schemas'
 import AsyncState from '../../components/AsyncState.vue'
+import ResourceSkeleton from '../../components/ResourceSkeleton.vue'
+import { beginResourceLoad, completeResourceLoad, type ResourceState } from '../../lib/resource-state'
 
 type ServerPingResult = {
   server_id: string
@@ -13,8 +15,8 @@ type ServerPingResult = {
 
 const servers = ref<Server[]>([])
 const serverPing = ref<Record<string, ServerPingResult>>({})
-const loading = ref(true)
-const loadFailed = ref(false)
+const serversState = ref<ResourceState>('idle')
+const pingState = ref<ResourceState>('idle')
 const showForm = ref(false)
 const editingId = ref<string | null>(null)
 const saving = ref(false)
@@ -40,7 +42,7 @@ const formErrors = ref<Record<string, string>>({})
 onMounted(async () => {
   await loadServers()
   refreshTimer = setInterval(() => {
-    loadServers({ silent: true })
+    loadServers()
   }, 15000)
 })
 
@@ -51,24 +53,26 @@ onUnmounted(() => {
   }
 })
 
-async function loadServers(options: { silent?: boolean } = {}) {
-  if (!options.silent) {
-    loading.value = true
-    loadFailed.value = false
-  }
+async function loadServers() {
+  serversState.value = beginResourceLoad(servers.value.length > 0 || serversState.value === 'empty')
   try {
-    const [serverList, pings] = await Promise.all([
-      api.get<Server[]>('/api/v1/admin/servers'),
-      api.get<ServerPingResult[]>('/api/v1/admin/servers/ping').then((data) => data || null).catch(() => null),
-    ])
+    const serverList = await api.get<Server[]>('/api/v1/admin/servers')
     servers.value = serverList || []
-    if (pings) {
-      serverPing.value = Object.fromEntries((pings || []).map((item) => [item.server_id, item]))
-    }
+    serversState.value = completeResourceLoad(servers.value.length > 0)
+    void loadPings()
   } catch {
-    if (!options.silent) loadFailed.value = true
-  } finally {
-    if (!options.silent) loading.value = false
+    serversState.value = 'error'
+  }
+}
+
+async function loadPings() {
+  pingState.value = beginResourceLoad(Object.keys(serverPing.value).length > 0 || pingState.value === 'empty')
+  try {
+    const pings = (await api.get<ServerPingResult[]>('/api/v1/admin/servers/ping')) || []
+    serverPing.value = Object.fromEntries(pings.map((item) => [item.server_id, item]))
+    pingState.value = completeResourceLoad(pings.length > 0)
+  } catch {
+    pingState.value = 'error'
   }
 }
 
@@ -341,11 +345,15 @@ async function executeDeleteServer() {
       {{ feedback.message }}
     </div>
 
-    <AsyncState v-if="loading && servers.length === 0" kind="loading" :title="t('adminServers.loading')" />
-    <AsyncState v-else-if="loadFailed" kind="error" :title="t('adminServers.loadError')" :retry-label="t('common.retry')" @retry="loadServers()" />
-    <AsyncState v-else-if="servers.length === 0" kind="empty" :title="t('adminServers.empty')" />
+    <ResourceSkeleton v-if="serversState === 'idle' || serversState === 'loading'" :title="t('adminServers.loading')" item-class="h-20" />
+    <AsyncState v-else-if="serversState === 'error' && servers.length === 0" kind="error" :title="t('adminServers.loadError')" :retry-label="t('common.retry')" @retry="loadServers()" />
+    <AsyncState v-else-if="serversState === 'empty'" kind="empty" :title="t('adminServers.empty')" />
 
     <div v-else class="bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 overflow-hidden backdrop-blur-xl">
+      <p v-if="serversState === 'refreshing'" role="status" class="border-b border-slate-800 px-6 py-3 text-xs text-slate-400">{{ t('common.refreshing') }}</p>
+      <p v-else-if="serversState === 'error'" role="alert" class="border-b border-rose-900/50 bg-rose-950/30 px-6 py-3 text-xs text-rose-300">{{ t('common.refreshFailed') }}</p>
+      <p v-if="pingState === 'loading' || pingState === 'refreshing'" role="status" class="border-b border-slate-800 px-6 py-2 text-xs text-slate-400">{{ t('common.refreshing') }}</p>
+      <p v-else-if="pingState === 'error'" role="status" class="border-b border-amber-900/40 bg-amber-950/20 px-6 py-2 text-xs text-amber-300">{{ t('common.refreshFailed') }}</p>
       <table class="w-full text-sm">
         <thead class="bg-slate-950/60 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
           <tr>

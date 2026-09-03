@@ -3,6 +3,7 @@ import { shallowMount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import AdminPeersView from '@/views/admin/AdminPeersView.vue'
 import AsyncState from '@/components/AsyncState.vue'
+import ResourceSkeleton from '@/components/ResourceSkeleton.vue'
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -58,7 +59,7 @@ describe('AdminPeersView', () => {
       global: { plugins: [createPinia()] },
     })
 
-    expect(wrapper.findComponent(AsyncState).props('kind')).toBe('loading')
+    expect(wrapper.findComponent(ResourceSkeleton).props('title')).toBe('Cargando sesiones VPN…')
   })
 
   it('renders peer rows after successful load', async () => {

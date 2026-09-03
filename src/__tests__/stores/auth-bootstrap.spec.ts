@@ -45,6 +45,8 @@ describe('authentication bootstrap', () => {
     await auth.restoreSession()
 
     expect(auth.bootstrapState).toBe('ready')
+    expect(auth.profileState).toBe('empty')
+    expect(auth.quotaState).toBe('empty')
     expect(auth.isAuthenticated).toBe(false)
     expect(fetchMock).not.toHaveBeenCalled()
   })
@@ -71,8 +73,31 @@ describe('authentication bootstrap', () => {
     await restoration
 
     expect(auth.bootstrapState).toBe('ready')
+    expect(auth.profileState).toBe('ready')
     expect(auth.isAuthenticated).toBe(true)
     expect(auth.user?.email).toBe('user@example.com')
+    auth.stopSessionCheck()
+  })
+
+  it('keeps the last quota while reporting a refresh failure', async () => {
+    const quota = {
+      connected_devices: 1, max_devices: 5, available_devices: 4,
+      plan_slug: 'pro', plan_name: 'Pro', devices_by_type: { desktop: 1, extension: 0, wireguard: 0 },
+    }
+    localStorage.setItem('refresh_token', 'stored-refresh')
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(success({ access_token: 'access-token' }))
+      .mockResolvedValueOnce(success({ ...profile, quota })))
+    const auth = useAuthStore()
+    await auth.restoreSession()
+    expect(auth.quotaState).toBe('ready')
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(failure(503)))
+    const retained = await auth.fetchQuota()
+
+    expect(auth.quotaState).toBe('error')
+    expect(retained).toEqual(quota)
+    expect(auth.userQuota).toEqual(quota)
     auth.stopSessionCheck()
   })
 

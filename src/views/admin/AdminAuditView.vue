@@ -4,10 +4,11 @@ import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
 import type { AuditLog } from '../../lib/schemas'
 import AsyncState from '../../components/AsyncState.vue'
+import ResourceSkeleton from '../../components/ResourceSkeleton.vue'
+import { beginResourceLoad, completeResourceLoad, type ResourceState } from '../../lib/resource-state'
 
 const logs = ref<AuditLog[]>([])
-const loading = ref(true)
-const loadFailed = ref(false)
+const logsState = ref<ResourceState>('idle')
 const currentOffset = ref(0)
 const hasMore = ref(true)
 const PAGE_SIZE = 50
@@ -17,8 +18,7 @@ const { t, formatDateTime } = useLocale()
 onMounted(() => loadLogs())
 
 async function loadLogs(append = false) {
-  loading.value = true
-  loadFailed.value = false
+  logsState.value = beginResourceLoad(logs.value.length > 0 || logsState.value === 'empty')
   try {
     const offset = append ? currentOffset.value : 0
     const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) })
@@ -32,10 +32,9 @@ async function loadLogs(append = false) {
     }
     hasMore.value = page.length >= PAGE_SIZE
     currentOffset.value = (append ? currentOffset.value : 0) + page.length
+    logsState.value = completeResourceLoad(logs.value.length > 0)
   } catch {
-    loadFailed.value = true
-  } finally {
-    loading.value = false
+    logsState.value = 'error'
   }
 }
 
@@ -86,11 +85,13 @@ function actionColor(action: string): string {
       </div>
     </div>
 
-    <AsyncState v-if="loading && logs.length === 0" kind="loading" :title="t('adminAudit.loading')" />
-    <AsyncState v-else-if="loadFailed" kind="error" :title="t('adminAudit.loadError')" :retry-label="t('common.retry')" @retry="loadLogs()" />
-    <AsyncState v-else-if="logs.length === 0" kind="empty" :title="t('adminAudit.empty')" />
+    <ResourceSkeleton v-if="logsState === 'idle' || logsState === 'loading'" :title="t('adminAudit.loading')" item-class="h-20" />
+    <AsyncState v-else-if="logsState === 'error' && logs.length === 0" kind="error" :title="t('adminAudit.loadError')" :retry-label="t('common.retry')" @retry="loadLogs()" />
+    <AsyncState v-else-if="logsState === 'empty'" kind="empty" :title="t('adminAudit.empty')" />
 
     <div v-else class="bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 overflow-hidden backdrop-blur-xl">
+      <p v-if="logsState === 'refreshing'" role="status" class="border-b border-slate-800 px-6 py-3 text-xs text-slate-400">{{ t('common.refreshing') }}</p>
+      <p v-else-if="logsState === 'error'" role="alert" class="border-b border-rose-900/50 bg-rose-950/30 px-6 py-3 text-xs text-rose-300">{{ t('common.refreshFailed') }}</p>
       <table class="w-full text-sm">
         <thead class="bg-slate-950/60 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
           <tr>
@@ -112,7 +113,7 @@ function actionColor(action: string): string {
               </span>
             </td>
             <td class="px-6 py-4 hidden md:table-cell text-xs font-medium text-slate-300">
-              {{ log.user_email || (log.user_id ? log.user_id.slice(0, 8) + '…' : t('common.system')) }}
+              {{ log.user_email || (log.user_id ? t('common.unavailable') : t('common.system')) }}
             </td>
             <td class="px-6 py-4 font-mono text-midori-300 hidden md:table-cell text-xs">{{ log.ip_address }}</td>
             <td class="px-6 py-4 text-xs text-slate-400 hidden lg:table-cell font-mono max-w-xs truncate">
@@ -124,12 +125,12 @@ function actionColor(action: string): string {
       <div v-if="hasMore" class="px-6 py-4 border-t border-slate-800 text-center">
         <button
           type="button"
-          :disabled="loading"
-          :aria-busy="loading"
+          :disabled="logsState === 'refreshing'"
+          :aria-busy="logsState === 'refreshing'"
           class="text-sm font-semibold text-midori-400 hover:text-midori-300 disabled:opacity-50 cursor-pointer"
           @click="loadMoreLogs"
         >
-          {{ loading ? t('common.loading') : t('common.loadMore') }}
+          {{ logsState === 'refreshing' ? t('common.loading') : t('common.loadMore') }}
         </button>
       </div>
     </div>

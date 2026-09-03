@@ -6,6 +6,11 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Changed
 
+- Control resources now use explicit idle, loading, ready, empty, error and
+  refreshing states. Initial views render stable skeletons, background
+  failures retain the last valid values with visible status, unavailable data
+  is no longer presented as zero or a partial identifier, and device actions
+  disable incompatible operations while they converge.
 - Authenticated routes and navigation now remain unmounted until both the
   refreshed access token and validated profile are ready. Transient bootstrap
   failures preserve the refresh session behind a localized retry screen,
@@ -50,7 +55,7 @@ All notable changes to Midori VPN Control are documented here.
 - Added an administrator view for registered Firefox, Midori and Chromium extension origins, including explicit revoke and restore actions with localized status and timestamps.
 - Added a mandatory `npm run check` quality gate and cleaned test-router diagnostics so successful tests do not emit framework warnings.
 - Reworked the Control panel release line to 2.0.0.
-- Updated the JavaScript toolchain and direct dependencies to current compatible major versions, including Vite 8, Vitest 4, Vue Router 5, Pinia 4 and Zod 4.
+- Updated the JavaScript toolchain and direct dependencies to current compatible major versions, including Vite 8, Vitest 5, Vue Router 5, Pinia 4 and Zod 4.
 - Server administration now edits the normalized transport contract exclusively, including validated JSON metadata required by MASQUE, without sending retired proxy/WSS columns.
 - Runtime schemas and their tests now require the normalized `transports` array, preventing an older server payload from being accepted silently.
 - Release builds no longer embed production Authentik identifiers or environment-specific Vite build arguments.

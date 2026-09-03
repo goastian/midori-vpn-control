@@ -5,35 +5,35 @@ import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
 import type { User, AdminPeer } from '../../lib/schemas'
 import AsyncState from '../../components/AsyncState.vue'
+import ResourceSkeleton from '../../components/ResourceSkeleton.vue'
+import { beginResourceLoad, type ResourceState } from '../../lib/resource-state'
 
 const route = useRoute()
 const userId = route.params.id as string
 
 const user = ref<User | null>(null)
 const peers = ref<AdminPeer[]>([])
-const loading = ref(true)
-const loadFailed = ref(false)
+const userState = ref<ResourceState>('idle')
 const { t, formatDate } = useLocale()
 
 async function loadUser() {
-  loading.value = true
-  loadFailed.value = false
+  userState.value = beginResourceLoad(user.value !== null)
   try {
     const data = await api.get<{ user: User; peers: AdminPeer[] }>(
       `/api/v1/admin/users/${userId}`
     )
     user.value = data.user
     peers.value = data.peers || []
+    userState.value = 'ready'
   } catch {
-    loadFailed.value = true
-  } finally {
-    loading.value = false
+    userState.value = 'error'
   }
 }
 
 onMounted(loadUser)
 
 function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return t('common.unavailable')
   if (bytes === 0) return '0 B'
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
@@ -49,10 +49,12 @@ function formatBytes(bytes: number): string {
       <span>{{ t('adminUserDetail.back') }}</span>
     </router-link>
 
-    <AsyncState v-if="loading" kind="loading" :title="t('adminUserDetail.loading')" />
-    <AsyncState v-else-if="loadFailed" kind="error" :title="t('adminUserDetail.loadError')" :retry-label="t('common.retry')" @retry="loadUser" />
+    <ResourceSkeleton v-if="userState === 'idle' || userState === 'loading'" :title="t('adminUserDetail.loading')" :count="2" item-class="h-40" />
+    <AsyncState v-else-if="userState === 'error' && !user" kind="error" :title="t('adminUserDetail.loadError')" :retry-label="t('common.retry')" @retry="loadUser" />
 
     <template v-else-if="user">
+      <p v-if="userState === 'refreshing'" role="status" class="text-sm text-slate-400">{{ t('common.refreshing') }}</p>
+      <p v-else-if="userState === 'error'" role="alert" class="rounded-xl border border-rose-800/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-300">{{ t('common.refreshFailed') }}</p>
       <div class="flex items-center justify-between">
         <div>
           <h1 class="text-3xl font-bold tracking-tight text-white">{{ user.email }}</h1>
@@ -64,13 +66,13 @@ function formatBytes(bytes: number): string {
         <div class="bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 p-6 md:p-8 backdrop-blur-xl space-y-4">
           <h2 class="text-xl font-bold text-white">{{ t('adminUserDetail.info') }}</h2>
           <dl class="space-y-3 text-sm divide-y divide-slate-800/60">
-            <div class="flex justify-between pt-2"><dt class="text-slate-400 font-medium">{{ t('common.name') }}</dt><dd class="text-white font-semibold">{{ user.display_name || '—' }}</dd></div>
-            <div class="flex justify-between pt-3"><dt class="text-slate-400 font-medium">{{ t('common.groups') }}</dt><dd class="text-white">{{ user.groups?.join(', ') || '—' }}</dd></div>
+            <div class="flex justify-between pt-2"><dt class="text-slate-400 font-medium">{{ t('common.name') }}</dt><dd class="text-white font-semibold">{{ user.display_name || t('common.unavailable') }}</dd></div>
+            <div class="flex justify-between pt-3"><dt class="text-slate-400 font-medium">{{ t('common.groups') }}</dt><dd class="text-white">{{ user.groups?.join(', ') || t('common.unavailable') }}</dd></div>
             <div class="flex justify-between pt-3"><dt class="text-slate-400 font-medium">{{ t('adminUserDetail.registered') }}</dt><dd class="text-slate-300 font-mono text-xs">{{ formatDate(user.created_at) }}</dd></div>
             <div class="flex justify-between pt-3">
               <dt class="text-slate-400 font-medium">{{ t('common.status') }}</dt>
               <dd>
-                <span v-if="user.is_banned" class="text-rose-400 font-semibold bg-rose-950/60 border border-rose-800/50 px-2.5 py-0.5 rounded-full text-xs">{{ t('adminUserDetail.bannedWithReason', { reason: user.ban_reason || '—' }) }}</span>
+                <span v-if="user.is_banned" class="text-rose-400 font-semibold bg-rose-950/60 border border-rose-800/50 px-2.5 py-0.5 rounded-full text-xs">{{ t('adminUserDetail.bannedWithReason', { reason: user.ban_reason || t('common.unavailable') }) }}</span>
                 <span v-else class="text-midori-300 font-semibold bg-midori-950/60 border border-midori-700/50 px-2.5 py-0.5 rounded-full text-xs">{{ t('common.active') }}</span>
               </dd>
             </div>
@@ -94,7 +96,7 @@ function formatBytes(bytes: number): string {
           </thead>
           <tbody class="divide-y divide-slate-800/60">
             <tr v-for="p in peers" :key="p.id" class="hover:bg-slate-800/50 transition-colors">
-              <td class="px-6 py-4 font-semibold text-white">{{ p.device_name || '—' }}</td>
+              <td class="px-6 py-4 font-semibold text-white">{{ p.device_name || t('common.unavailable') }}</td>
               <td class="px-6 py-4 font-mono text-midori-300 text-xs">{{ p.assigned_ip }}</td>
               <td class="px-6 py-4 text-xs font-mono text-slate-400">↑{{ formatBytes(p.bytes_sent) }} · ↓{{ formatBytes(p.bytes_received) }}</td>
               <td class="px-6 py-4 text-right">

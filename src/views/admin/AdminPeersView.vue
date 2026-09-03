@@ -5,10 +5,11 @@ import { useLocale } from '../../lib/i18n'
 import { LifecycleStatusSchema } from '../../lib/schemas'
 import type { AdminPeer } from '../../lib/schemas'
 import AsyncState from '../../components/AsyncState.vue'
+import ResourceSkeleton from '../../components/ResourceSkeleton.vue'
+import { beginResourceLoad, completeResourceLoad, type ResourceState } from '../../lib/resource-state'
 
 const peers = ref<AdminPeer[]>([])
-const loading = ref(true)
-const loadFailed = ref(false)
+const peersState = ref<ResourceState>('idle')
 const disconnectingID = ref('')
 const feedback = ref<{ kind: 'success' | 'error'; message: string } | null>(null)
 const { t } = useLocale()
@@ -16,14 +17,12 @@ const { t } = useLocale()
 onMounted(() => loadPeers())
 
 async function loadPeers() {
-  loading.value = true
-  loadFailed.value = false
+  peersState.value = beginResourceLoad(peers.value.length > 0 || peersState.value === 'empty')
   try {
     peers.value = (await api.get<AdminPeer[]>('/api/v1/admin/peers')) || []
+    peersState.value = completeResourceLoad(peers.value.length > 0)
   } catch {
-    loadFailed.value = true
-  } finally {
-    loading.value = false
+    peersState.value = 'error'
   }
 }
 
@@ -45,6 +44,7 @@ async function forceDisconnect(id: string) {
 }
 
 function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return t('common.unavailable')
   if (bytes === 0) return '0 B'
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
@@ -69,11 +69,13 @@ function formatBytes(bytes: number): string {
       {{ feedback.message }}
     </div>
 
-    <AsyncState v-if="loading" kind="loading" :title="t('adminPeers.loading')" />
-    <AsyncState v-else-if="loadFailed" kind="error" :title="t('adminPeers.loadError')" :retry-label="t('common.retry')" @retry="loadPeers" />
-    <AsyncState v-else-if="peers.length === 0" kind="empty" :title="t('adminPeers.empty')" />
+    <ResourceSkeleton v-if="peersState === 'idle' || peersState === 'loading'" :title="t('adminPeers.loading')" item-class="h-20" />
+    <AsyncState v-else-if="peersState === 'error' && peers.length === 0" kind="error" :title="t('adminPeers.loadError')" :retry-label="t('common.retry')" @retry="loadPeers" />
+    <AsyncState v-else-if="peersState === 'empty'" kind="empty" :title="t('adminPeers.empty')" />
 
     <div v-else class="bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 overflow-hidden backdrop-blur-xl">
+      <p v-if="peersState === 'refreshing'" role="status" class="border-b border-slate-800 px-6 py-3 text-xs text-slate-400">{{ t('common.refreshing') }}</p>
+      <p v-else-if="peersState === 'error'" role="alert" class="border-b border-rose-900/50 bg-rose-950/30 px-6 py-3 text-xs text-rose-300">{{ t('common.refreshFailed') }}</p>
       <table class="w-full text-sm">
         <thead class="bg-slate-950/60 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
           <tr>
@@ -87,10 +89,10 @@ function formatBytes(bytes: number): string {
         </thead>
         <tbody class="divide-y divide-slate-800/60">
           <tr v-for="p in peers" :key="p.id" class="hover:bg-slate-800/50 transition-colors">
-            <td class="px-6 py-4 font-semibold text-white">{{ p.device_name || '—' }}</td>
+            <td class="px-6 py-4 font-semibold text-white">{{ p.device_name || t('common.unavailable') }}</td>
             <td class="px-6 py-4 font-mono text-xs text-midori-300">{{ p.assigned_ip }}</td>
             <td class="px-6 py-4 hidden md:table-cell text-xs text-slate-300">
-              {{ p.user_email || p.user_id.slice(0, 8) + '…' }}
+              {{ p.user_email || t('common.unavailable') }}
             </td>
             <td class="px-6 py-4 hidden md:table-cell text-xs text-slate-400 font-mono">
               ↑{{ formatBytes(p.bytes_sent) }} · ↓{{ formatBytes(p.bytes_received) }}

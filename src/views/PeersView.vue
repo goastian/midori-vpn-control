@@ -5,6 +5,7 @@ import QRCode from 'qrcode'
 
 import AsyncState from '../components/AsyncState.vue'
 import QuotaSummary from '../components/QuotaSummary.vue'
+import ResourceSkeleton from '../components/ResourceSkeleton.vue'
 import { api } from '../lib/api'
 import { generateClientKeypair } from '../lib/crypto'
 import { useLocale } from '../lib/i18n'
@@ -20,6 +21,7 @@ import {
 } from '../lib/schemas'
 import type { ConnectionConfig, Device, DeviceConnection, DeviceSessionPage, Server, ServerPingResult } from '../lib/schemas'
 import { PRIVATE_KEYS_STORAGE_KEY } from '../lib/storage-keys'
+import { beginResourceLoad, completeResourceLoad, type ResourceState } from '../lib/resource-state'
 import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
@@ -29,10 +31,12 @@ const { t } = useLocale()
 const servers = ref<Server[]>([])
 const devices = ref<Device[]>([])
 const serverPing = ref<Record<string, ServerPingResult>>({})
-const loading = ref(true)
-const failed = ref(false)
+const serversState = ref<ResourceState>('idle')
+const devicesState = ref<ResourceState>('idle')
+const pingState = ref<ResourceState>('idle')
 const connecting = ref(false)
 const pendingDeviceID = ref('')
+const pendingDeviceAction = ref<'disconnect' | 'delete' | ''>('')
 
 const form = ref({ server_id: '', device_name: '' })
 const userQuota = computed(() => auth.userQuota)
@@ -45,24 +49,24 @@ let clipboardTimer: ReturnType<typeof setTimeout> | null = null
 const deviceModal = ref<{
   open: boolean
   device: Device | null
-  loadingConfig: boolean
+  configState: ResourceState
   configText: string
   qrUrl: string
   copied: boolean
   historyOpen: boolean
-  historyLoading: boolean
+  historyState: ResourceState
   history: DeviceSessionPage | null
   aliasDraft: string
   savingAlias: boolean
 }>({
   open: false,
   device: null,
-  loadingConfig: false,
+  configState: 'idle',
   configText: '',
   qrUrl: '',
   copied: false,
   historyOpen: false,
-  historyLoading: false,
+  historyState: 'idle',
   history: null,
   aliasDraft: '',
   savingAlias: false,
@@ -91,17 +95,24 @@ function showNotification(type: 'success' | 'error', message: string) {
 }
 
 async function loadData() {
-  loading.value = true
-  failed.value = false
+  await Promise.all([loadServers(), loadDevices(), loadPings()])
+}
+
+async function loadServers() {
+  serversState.value = beginResourceLoad(servers.value.length > 0 || serversState.value === 'empty')
   try {
-    const [loadedServers, loadedDevices, pings] = await Promise.all([
-      api.validated('/api/v1/control/servers', ServerListSchema),
-      api.validated('/api/v1/control/devices', DeviceListSchema),
-      api.validated('/api/v1/control/servers/ping', ServerPingResultListSchema).catch(() => []),
-    ])
-    servers.value = loadedServers
-    devices.value = loadedDevices
-    serverPing.value = Object.fromEntries(pings.map((item) => [item.server_id, item]))
+    servers.value = await api.validated('/api/v1/control/servers', ServerListSchema)
+    serversState.value = completeResourceLoad(servers.value.length > 0)
+  } catch {
+    serversState.value = 'error'
+  }
+}
+
+async function loadDevices() {
+  devicesState.value = beginResourceLoad(devices.value.length > 0 || devicesState.value === 'empty')
+  try {
+    devices.value = await api.validated('/api/v1/control/devices', DeviceListSchema)
+    devicesState.value = completeResourceLoad(devices.value.length > 0)
 
     if (deviceModal.value.open && deviceModal.value.device) {
       const refreshed = devices.value.find((device) => device.id === deviceModal.value.device?.id)
@@ -111,9 +122,18 @@ async function loadData() {
       }
     }
   } catch {
-    failed.value = true
-  } finally {
-    loading.value = false
+    devicesState.value = 'error'
+  }
+}
+
+async function loadPings() {
+  pingState.value = beginResourceLoad(Object.keys(serverPing.value).length > 0 || pingState.value === 'empty')
+  try {
+    const pings = await api.validated('/api/v1/control/servers/ping', ServerPingResultListSchema)
+    serverPing.value = Object.fromEntries(pings.map((item) => [item.server_id, item]))
+    pingState.value = completeResourceLoad(pings.length > 0)
+  } catch {
+    pingState.value = 'error'
   }
 }
 
@@ -151,20 +171,21 @@ function statusTone(status: Device['status']): string {
 
 function effectiveStatus(device: Device): Device['status'] {
   if (pendingDeviceID.value !== device.id) return device.status
-  return device.status === 'connected' ? 'disconnecting' : 'cleanup_pending'
+  return pendingDeviceAction.value === 'disconnect' ? 'disconnecting' : 'cleanup_pending'
 }
 
 function serverName(id?: string): string {
-  if (!id) return '—'
-  return servers.value.find((server) => server.id === id)?.name || id.slice(0, 8)
+  if (!id) return t('common.unavailable')
+  return servers.value.find((server) => server.id === id)?.name || t('common.unavailable')
 }
 
 function sessionIP(session?: DeviceConnection | null): string {
-  return session?.assigned_ip ? session.assigned_ip.replace(/\/32$/, '') : '—'
+  return session?.assigned_ip ? session.assigned_ip.replace(/\/32$/, '') : t('common.unavailable')
 }
 
 function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
+  if (!Number.isFinite(bytes) || bytes < 0) return t('common.unavailable')
+  if (bytes === 0) return '0 B'
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
   const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), sizes.length - 1)
   return `${Number((bytes / Math.pow(1024, index)).toFixed(1))} ${sizes[index]}`
@@ -172,7 +193,7 @@ function formatBytes(bytes: number): string {
 
 function formatDate(value: string): string {
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString()
+  return Number.isNaN(date.getTime()) ? t('common.unavailable') : date.toLocaleString()
 }
 
 function readStoredPrivateKeys(): Record<string, string> {
@@ -249,12 +270,12 @@ async function openDeviceDetail(device: Device, prepared?: { configText: string;
   deviceModal.value = {
     open: true,
     device,
-    loadingConfig: Boolean(device.active_connection && !prepared),
+    configState: device.active_connection && !prepared ? 'loading' : prepared ? 'ready' : 'empty',
     configText: prepared?.configText || '',
     qrUrl: prepared?.qrUrl || '',
     copied: false,
     historyOpen: false,
-    historyLoading: false,
+    historyState: 'idle',
     history: null,
     aliasDraft: device.alias,
     savingAlias: false,
@@ -269,10 +290,10 @@ async function openDeviceDetail(device: Device, prepared?: { configText: string;
     if (privateKey) configText = configText.replace('PrivateKey = <YOUR_PRIVATE_KEY>', `PrivateKey = ${privateKey}`)
     deviceModal.value.configText = configText
     deviceModal.value.qrUrl = await QRCode.toDataURL(configText, { errorCorrectionLevel: 'L', scale: 5 })
+    deviceModal.value.configState = 'ready'
   } catch (error) {
+    deviceModal.value.configState = 'error'
     showNotification('error', error instanceof Error ? error.message : t('connectionsView.configLoadError', { status: '?' }))
-  } finally {
-    deviceModal.value.loadingConfig = false
   }
 }
 
@@ -282,6 +303,8 @@ function closeDeviceModal() {
   deviceModal.value.configText = ''
   deviceModal.value.qrUrl = ''
   deviceModal.value.history = null
+  deviceModal.value.configState = 'idle'
+  deviceModal.value.historyState = 'idle'
 }
 
 async function toggleHistory() {
@@ -292,13 +315,13 @@ async function toggleHistory() {
 async function loadHistory(page: number) {
   const device = deviceModal.value.device
   if (!device) return
-  deviceModal.value.historyLoading = true
+  deviceModal.value.historyState = beginResourceLoad(deviceModal.value.history !== null)
   try {
     deviceModal.value.history = await api.validated(`/api/v1/control/devices/${device.id}/sessions?page=${page}&page_size=10`, DeviceSessionPageSchema)
+    deviceModal.value.historyState = completeResourceLoad(deviceModal.value.history.items.length > 0)
   } catch (error) {
+    deviceModal.value.historyState = 'error'
     showNotification('error', error instanceof Error ? error.message : t('connectionsView.historyLoadError'))
-  } finally {
-    deviceModal.value.historyLoading = false
   }
 }
 
@@ -326,6 +349,7 @@ async function disconnectDevice(device: Device) {
   const peerID = device.active_connection?.id
   if (!peerID || !confirm(t('connectionsView.disconnectConfirm'))) return
   pendingDeviceID.value = device.id
+  pendingDeviceAction.value = 'disconnect'
   try {
     const outcome = await api.validated(`/api/v1/control/connections/${peerID}`, LifecycleStatusSchema, { method: 'DELETE' })
     if (outcome.status === 'disconnect_pending') {
@@ -339,12 +363,14 @@ async function disconnectDevice(device: Device) {
     showNotification('error', error instanceof Error ? error.message : t('connectionsView.loadError'))
   } finally {
     pendingDeviceID.value = ''
+    pendingDeviceAction.value = ''
   }
 }
 
 async function deleteDevice(device: Device) {
   if (!confirm(t('connectionsView.deleteConfirm'))) return
   pendingDeviceID.value = device.id
+  pendingDeviceAction.value = 'delete'
   try {
     const outcome = await api.validated(`/api/v1/control/devices/${device.id}`, DeviceDeleteResponseSchema, { method: 'DELETE' })
     if ('status' in outcome && outcome.status === 'device_cleanup_pending') {
@@ -359,6 +385,7 @@ async function deleteDevice(device: Device) {
     await loadData()
   } finally {
     pendingDeviceID.value = ''
+    pendingDeviceAction.value = ''
   }
 }
 
@@ -403,7 +430,9 @@ function downloadQR() {
       <p class="mt-1 text-sm text-slate-400">{{ t('connectionsView.subtitle') }}</p>
     </header>
 
-    <QuotaSummary v-if="userQuota" :quota="userQuota" />
+    <ResourceSkeleton v-if="auth.quotaState === 'loading' && !userQuota" :title="t('quota.loading')" :count="1" item-class="h-28" />
+    <QuotaSummary v-else-if="userQuota" :quota="userQuota" />
+    <p v-if="auth.quotaState === 'error'" role="alert" class="rounded-xl border border-rose-800/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-300">{{ userQuota ? t('common.refreshFailed') : t('quota.loadError') }}</p>
 
     <Transition name="fade">
       <div v-if="notification" :role="notification.type === 'error' ? 'alert' : 'status'" :class="notification.type === 'success' ? 'border-midori-700/60 bg-midori-950/50 text-midori-200' : 'border-rose-700/60 bg-rose-950/50 text-rose-200'" class="flex items-center justify-between rounded-2xl border px-5 py-4 text-sm shadow-lg">
@@ -419,7 +448,7 @@ function downloadQR() {
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label for="connection-server" class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">{{ t('common.server') }}</label>
-            <select id="connection-server" v-model="form.server_id" class="w-full rounded-xl border border-slate-700/80 bg-slate-950/60 px-4 py-2.5 text-sm text-white outline-none focus:border-midori-500">
+            <select id="connection-server" v-model="form.server_id" :disabled="serversState === 'idle' || serversState === 'loading' || serversState === 'error'" class="w-full rounded-xl border border-slate-700/80 bg-slate-950/60 px-4 py-2.5 text-sm text-white outline-none focus:border-midori-500 disabled:opacity-50">
               <option value="">{{ t('connectionsView.autoServer') }}</option>
               <option v-for="server in servers" :key="server.id" :value="server.id">{{ server.name }} ({{ server.location }}){{ serverPing[server.id] ? (serverPing[server.id].available ? ` · ${serverPing[server.id].latency_ms}ms` : ` · ${t('connectionsView.unavailableLabel')}`) : '' }}</option>
             </select>
@@ -429,23 +458,30 @@ function downloadQR() {
             <input id="connection-device-name" v-model="form.device_name" required maxlength="64" :placeholder="t('connectionsView.deviceNamePlaceholder')" class="w-full rounded-xl border border-slate-700/80 bg-slate-950/60 px-4 py-2.5 text-sm text-white outline-none focus:border-midori-500" />
           </div>
         </div>
-        <p v-if="isQuotaReached" role="alert" class="rounded-xl border border-rose-800/60 bg-rose-950/40 px-4 py-3 text-xs font-medium text-rose-300">{{ t('connectionsView.quotaReached', { maximum: userQuota?.max_devices || 0 }) }}</p>
-        <p v-if="servers.length === 0" role="status" class="rounded-xl border border-amber-800/40 bg-amber-950/30 px-4 py-3 text-xs text-amber-300">{{ t('connectionsView.noActiveServers') }}</p>
+        <p v-if="isQuotaReached" role="alert" class="rounded-xl border border-rose-800/60 bg-rose-950/40 px-4 py-3 text-xs font-medium text-rose-300">{{ t('connectionsView.quotaReached', { maximum: userQuota?.max_devices ?? t('common.unavailable') }) }}</p>
+        <p v-if="serversState === 'idle' || serversState === 'loading'" role="status" class="rounded-xl border border-slate-800 bg-slate-950/30 px-4 py-3 text-xs text-slate-400">{{ t('serversView.loading') }}</p>
+        <p v-else-if="serversState === 'error'" role="alert" class="rounded-xl border border-rose-800/40 bg-rose-950/30 px-4 py-3 text-xs text-rose-300">{{ t('serversView.loadErrorTitle') }}</p>
+        <p v-else-if="serversState === 'empty'" role="status" class="rounded-xl border border-amber-800/40 bg-amber-950/30 px-4 py-3 text-xs text-amber-300">{{ t('connectionsView.noActiveServers') }}</p>
+        <p v-if="pingState === 'loading' || pingState === 'refreshing'" role="status" class="text-xs text-slate-500">{{ t('common.refreshing') }}</p>
+        <p v-else-if="pingState === 'error'" role="status" class="text-xs text-amber-300">{{ t('common.refreshFailed') }}</p>
         <p v-else-if="availableServerCount() === 0" role="status" class="rounded-xl border border-amber-800/40 bg-amber-950/30 px-4 py-3 text-xs text-amber-300">{{ t('connectionsView.noRespondingServers') }}</p>
         <p v-if="selectedServerUnavailable()" role="alert" class="rounded-xl border border-rose-800/40 bg-rose-950/30 px-4 py-3 text-xs text-rose-300">{{ t('connectionsView.serverUnavailable') }}</p>
         <div class="flex justify-end pt-2">
-          <button type="submit" :aria-busy="connecting" :disabled="connecting || !form.device_name.trim() || availableServerCount() === 0 || isQuotaReached" class="inline-flex items-center gap-2 rounded-xl bg-midori-600 px-8 py-2.5 text-sm font-semibold text-white shadow-lg shadow-midori-900/30 transition-all hover:bg-midori-500 disabled:opacity-50">
+          <button type="submit" :aria-busy="connecting" :disabled="connecting || !form.device_name.trim() || availableServerCount() === 0 || isQuotaReached || !userQuota || auth.quotaState === 'error' || serversState !== 'ready'" class="inline-flex items-center gap-2 rounded-xl bg-midori-600 px-8 py-2.5 text-sm font-semibold text-white shadow-lg shadow-midori-900/30 transition-all hover:bg-midori-500 disabled:opacity-50">
             <span v-if="connecting" aria-hidden="true" class="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>{{ connecting ? t('connectionsView.creating') : t('common.create') }}
           </button>
         </div>
       </form>
     </section>
 
-    <AsyncState v-if="loading" kind="loading" :title="t('common.loading')" />
-    <AsyncState v-else-if="failed" kind="error" :title="t('connectionsView.loadError')" :retry-label="t('common.retry')" @retry="loadData" />
-    <AsyncState v-else-if="devices.length === 0" kind="empty" :title="t('connectionsView.emptyDevices')" />
+    <ResourceSkeleton v-if="devicesState === 'idle' || devicesState === 'loading'" :title="t('common.loading')" item-class="h-24" />
+    <AsyncState v-else-if="devicesState === 'error' && devices.length === 0" kind="error" :title="t('connectionsView.loadError')" :retry-label="t('common.retry')" @retry="loadData" />
+    <AsyncState v-else-if="devicesState === 'empty'" kind="empty" :title="t('connectionsView.emptyDevices')" />
 
     <section v-else class="overflow-hidden rounded-3xl border border-slate-800/80 bg-slate-900/80 shadow-xl shadow-black/30 backdrop-blur-xl">
+      <p v-if="devicesState === 'refreshing'" class="border-b border-slate-800 px-6 py-3 text-xs text-slate-400" role="status">{{ t('common.refreshing') }}</p>
+      <p v-else-if="devicesState === 'error'" class="border-b border-rose-900/50 bg-rose-950/30 px-6 py-3 text-xs text-rose-300" role="alert">{{ t('common.refreshFailed') }}</p>
+      <p v-if="pingState === 'error'" class="border-b border-amber-900/40 bg-amber-950/20 px-6 py-2 text-xs text-amber-300" role="status">{{ t('common.refreshFailed') }}</p>
       <div class="border-b border-slate-800 px-6 py-4 text-xs text-slate-400">{{ t('connectionsView.listHint') }}</div>
       <div class="divide-y divide-slate-800/70">
         <article v-for="device in devices" :key="device.id" class="grid gap-4 px-5 py-5 transition-colors hover:bg-slate-800/40 md:grid-cols-[minmax(13rem,1.3fr)_minmax(10rem,1fr)_minmax(8rem,.8fr)_auto] md:items-center md:px-6">
@@ -458,7 +494,7 @@ function downloadQR() {
           <div class="text-xs text-slate-400"><p v-if="device.active_connection" class="font-mono">↑{{ formatBytes(device.active_connection.bytes_sent) }} · ↓{{ formatBytes(device.active_connection.bytes_received) }}</p><p class="mt-1">{{ t('connectionsView.lastSeen') }}: {{ formatDate(device.last_seen_at) }}</p></div>
           <div class="flex flex-wrap items-center gap-2 md:justify-end">
             <span :class="statusTone(effectiveStatus(device))" class="rounded-full border px-2.5 py-1 text-xs font-semibold">{{ statusLabel(effectiveStatus(device)) }}</span>
-            <button type="button" class="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1 text-xs font-medium text-cyan-400 hover:text-white" @click="openDeviceDetail(device)">{{ t('common.details') }}</button>
+            <button type="button" :disabled="pendingDeviceID === device.id" class="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1 text-xs font-medium text-cyan-400 hover:text-white disabled:opacity-50" @click="openDeviceDetail(device)">{{ t('common.details') }}</button>
             <button v-if="device.active_connection && device.status !== 'revoked'" type="button" :disabled="pendingDeviceID === device.id" class="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1 text-xs font-medium text-amber-400 hover:text-white disabled:opacity-50" @click="disconnectDevice(device)">{{ t('common.disconnect') }}</button>
             <button v-if="device.status !== 'revoked'" type="button" :disabled="pendingDeviceID === device.id" class="rounded-lg px-2.5 py-1 text-xs font-medium text-rose-400 hover:bg-rose-950/30 disabled:opacity-50" @click="deleteDevice(device)">{{ t('connectionsView.deleteDevice') }}</button>
           </div>
@@ -475,13 +511,14 @@ function downloadQR() {
             <div class="pr-10"><div class="flex flex-wrap items-center gap-2"><h3 id="device-modal-title" class="text-2xl font-bold text-white">{{ deviceModal.device.display_name }}</h3><span :class="statusTone(effectiveStatus(deviceModal.device))" class="rounded-full border px-2.5 py-0.5 text-xs font-semibold">{{ statusLabel(effectiveStatus(deviceModal.device)) }}</span></div><p class="mt-1 text-xs text-slate-400">{{ deviceModal.device.reported_name }}<span v-if="deviceModal.device.adapter_label"> · {{ deviceModal.device.adapter_label }}</span></p></div>
 
             <div class="mt-6 grid gap-3 sm:grid-cols-[1fr_auto]">
-              <div><label for="device-alias" class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">{{ t('connectionsView.aliasLabel') }}</label><input id="device-alias" v-model="deviceModal.aliasDraft" maxlength="64" :disabled="deviceModal.savingAlias" :placeholder="t('connectionsView.aliasPlaceholder')" class="w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-2 text-sm text-white outline-none focus:border-midori-500 disabled:opacity-50" /></div>
-              <button type="button" :disabled="deviceModal.savingAlias" class="self-end rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-midori-300 hover:bg-slate-700 disabled:opacity-50" @click="saveAlias">{{ t('common.save') }}</button>
+              <div><label for="device-alias" class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">{{ t('connectionsView.aliasLabel') }}</label><input id="device-alias" v-model="deviceModal.aliasDraft" maxlength="64" :disabled="deviceModal.savingAlias || pendingDeviceID === deviceModal.device.id" :placeholder="t('connectionsView.aliasPlaceholder')" class="w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-2 text-sm text-white outline-none focus:border-midori-500 disabled:opacity-50" /></div>
+              <button type="button" :disabled="deviceModal.savingAlias || pendingDeviceID === deviceModal.device.id" class="self-end rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-midori-300 hover:bg-slate-700 disabled:opacity-50" @click="saveAlias">{{ t('common.save') }}</button>
             </div>
 
             <div v-if="deviceModal.device.active_connection" class="mt-6 rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
               <div class="flex flex-wrap justify-between gap-3 text-xs text-slate-400"><span>{{ t('connectionsView.serverLabel') }}: <strong class="text-slate-200">{{ serverName(deviceModal.device.active_connection.server_id) }}</strong></span><span>{{ t('common.ip') }}: <strong class="font-mono text-midori-300">{{ sessionIP(deviceModal.device.active_connection) }}</strong></span><span>{{ t('connectionsView.trafficLabel') }}: ↑{{ formatBytes(deviceModal.device.active_connection.bytes_sent) }} · ↓{{ formatBytes(deviceModal.device.active_connection.bytes_received) }}</span></div>
-              <AsyncState v-if="deviceModal.loadingConfig" kind="loading" :title="t('common.loading')" />
+              <ResourceSkeleton v-if="deviceModal.configState === 'loading'" :title="t('common.loading')" :count="1" item-class="h-44" />
+              <AsyncState v-else-if="deviceModal.configState === 'error'" kind="error" :title="t('connectionsView.configLoadError', { status: t('common.unavailable') })" />
               <div v-else-if="deviceModal.configText" class="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
                 <div class="min-w-0"><pre class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950 p-4 text-xs leading-relaxed text-midori-200">{{ deviceModal.configText }}</pre><div class="mt-3 flex flex-wrap gap-2"><button type="button" class="rounded-lg border border-midori-700/50 bg-midori-900/40 px-3 py-1.5 text-xs font-semibold text-midori-300" @click="copyDeviceModalConfig">{{ deviceModal.copied ? t('connectionsView.copiedShort') : t('common.copy') }}</button><button type="button" class="rounded-lg border border-midori-700/50 bg-midori-900/40 px-3 py-1.5 text-xs font-semibold text-midori-300" @click="downloadConfig">.conf</button><button v-if="deviceModal.qrUrl" type="button" class="rounded-lg border border-cyan-700/50 bg-cyan-950/40 px-3 py-1.5 text-xs font-semibold text-cyan-300" @click="downloadQR">QR</button></div></div>
                 <img v-if="deviceModal.qrUrl" :src="deviceModal.qrUrl" :alt="t('connectionsView.qrAlt')" class="h-44 w-44 rounded-xl bg-white p-2" />
@@ -489,11 +526,14 @@ function downloadQR() {
             </div>
 
             <div class="mt-6 border-t border-slate-800 pt-5">
-              <button type="button" :aria-expanded="deviceModal.historyOpen" class="flex w-full items-center justify-between text-left text-sm font-semibold text-slate-200" @click="toggleHistory"><span>{{ t('connectionsView.sessionHistory') }}</span><span aria-hidden="true">{{ deviceModal.historyOpen ? '−' : '+' }}</span></button>
+              <button type="button" :disabled="pendingDeviceID === deviceModal.device.id" :aria-expanded="deviceModal.historyOpen" class="flex w-full items-center justify-between text-left text-sm font-semibold text-slate-200 disabled:opacity-50" @click="toggleHistory"><span>{{ t('connectionsView.sessionHistory') }}</span><span aria-hidden="true">{{ deviceModal.historyOpen ? '−' : '+' }}</span></button>
               <div v-if="deviceModal.historyOpen" class="mt-4">
-                <AsyncState v-if="deviceModal.historyLoading" kind="loading" :title="t('common.loading')" />
-                <p v-else-if="!deviceModal.history?.items.length" class="text-sm text-slate-400">{{ t('connectionsView.noHistory') }}</p>
-                <div v-else class="space-y-2">
+                <ResourceSkeleton v-if="deviceModal.historyState === 'loading'" :title="t('common.loading')" :count="2" item-class="h-16" />
+                <AsyncState v-else-if="deviceModal.historyState === 'error' && !deviceModal.history" kind="error" :title="t('connectionsView.historyLoadError')" :retry-label="t('common.retry')" @retry="loadHistory(1)" />
+                <p v-else-if="deviceModal.historyState === 'empty'" class="text-sm text-slate-400">{{ t('connectionsView.noHistory') }}</p>
+                <div v-else-if="deviceModal.history" class="space-y-2">
+                  <p v-if="deviceModal.historyState === 'refreshing'" class="text-xs text-slate-400" role="status">{{ t('common.refreshing') }}</p>
+                  <p v-else-if="deviceModal.historyState === 'error'" class="text-xs text-rose-300" role="alert">{{ t('common.refreshFailed') }}</p>
                   <div v-for="session in deviceModal.history.items" :key="session.id" class="grid gap-2 rounded-xl border border-slate-800 bg-slate-950/50 p-3 text-xs text-slate-400 sm:grid-cols-4"><span>{{ formatDate(session.created_at) }}</span><span>{{ serverName(session.server_id) }}</span><span class="font-mono text-midori-300">{{ sessionIP(session) }}</span><span>{{ session.is_active ? t('common.active') : t('common.inactive') }}</span></div>
                   <div class="flex items-center justify-between pt-2 text-xs text-slate-400"><button type="button" :disabled="deviceModal.history.page <= 1" class="rounded-lg border border-slate-700 px-3 py-1 disabled:opacity-40" @click="loadHistory(deviceModal.history.page - 1)">{{ t('connectionsView.previousPage') }}</button><span>{{ deviceModal.history.page }} · {{ deviceModal.history.total }} {{ t('connectionsView.sessions') }}</span><button type="button" :disabled="deviceModal.history.page * deviceModal.history.page_size >= deviceModal.history.total" class="rounded-lg border border-slate-700 px-3 py-1 disabled:opacity-40" @click="loadHistory(deviceModal.history.page + 1)">{{ t('connectionsView.nextPage') }}</button></div>
                 </div>

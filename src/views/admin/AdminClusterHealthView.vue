@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import AsyncState from '../../components/AsyncState.vue'
+import ResourceSkeleton from '../../components/ResourceSkeleton.vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
+import { beginResourceLoad, type ResourceState } from '../../lib/resource-state'
 
 interface HealthCheck {
   status: string
@@ -26,24 +28,24 @@ interface HealthEnvelope {
 
 const { t, formatDate } = useLocale()
 const healthData = ref<HealthResponse | null>(null)
-const loading = ref(false)
-const failed = ref(false)
+const healthState = ref<ResourceState>('idle')
 const lastChecked = ref('')
 
 function statusLabel(status?: string) {
+  if (!status) return t('clusterHealth.unavailable')
   return status === 'ok' ? t('clusterHealth.statusOk') : t('clusterHealth.statusError')
 }
 
 function statusClass(status?: string) {
+  if (!status) return 'bg-slate-800 border-slate-700 text-slate-400'
   return status === 'ok'
     ? 'bg-midori-950/60 border-midori-700/50 text-midori-300'
     : 'bg-rose-950/60 border-rose-700/50 text-rose-300'
 }
 
 async function fetchHealth() {
-  if (loading.value) return
-  loading.value = true
-  failed.value = false
+  if (healthState.value === 'loading' || healthState.value === 'refreshing') return
+  healthState.value = beginResourceLoad(healthData.value !== null)
   try {
     // The protected readiness endpoint intentionally returns HTTP 503 with an
     // ok envelope when dependencies are degraded. Preserve that useful body.
@@ -52,10 +54,9 @@ async function fetchHealth() {
     if (!envelope.ok || !envelope.data) throw new Error('invalid health response')
     healthData.value = envelope.data
     lastChecked.value = formatDate(new Date(), { timeStyle: 'medium' })
+    healthState.value = 'ready'
   } catch {
-    failed.value = true
-  } finally {
-    loading.value = false
+    healthState.value = 'error'
   }
 }
 
@@ -71,25 +72,25 @@ onMounted(fetchHealth)
       </div>
       <button
         type="button"
-        :disabled="loading"
-        :aria-busy="loading"
+        :disabled="healthState === 'loading' || healthState === 'refreshing'"
+        :aria-busy="healthState === 'loading' || healthState === 'refreshing'"
         class="btn-primary self-start disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
         @click="fetchHealth"
       >
-        <span v-if="loading" class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>
-        {{ loading ? t('clusterHealth.refreshing') : t('clusterHealth.refresh') }}
+        <span v-if="healthState === 'loading' || healthState === 'refreshing'" class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>
+        {{ healthState === 'loading' || healthState === 'refreshing' ? t('clusterHealth.refreshing') : t('clusterHealth.refresh') }}
       </button>
     </div>
 
-    <AsyncState
-      v-if="loading && !healthData"
-      kind="loading"
+    <ResourceSkeleton
+      v-if="healthState === 'idle' || healthState === 'loading'"
       :title="t('clusterHealth.loadingTitle')"
-      :detail="t('clusterHealth.loadingDetail')"
+      :count="3"
+      item-class="h-32"
     />
 
     <AsyncState
-      v-else-if="failed"
+      v-else-if="healthState === 'error' && !healthData"
       kind="error"
       :title="t('clusterHealth.errorTitle')"
       :detail="t('clusterHealth.errorDetail')"
@@ -98,6 +99,8 @@ onMounted(fetchHealth)
     />
 
     <template v-else-if="healthData">
+      <p v-if="healthState === 'refreshing'" role="status" class="text-sm text-slate-400">{{ t('common.refreshing') }}</p>
+      <p v-else-if="healthState === 'error'" role="alert" class="rounded-xl border border-rose-800/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-300">{{ t('common.refreshFailed') }}</p>
       <div
         role="status"
         :class="[
@@ -124,7 +127,7 @@ onMounted(fetchHealth)
               {{ statusLabel(healthData.checks.postgres?.status) }}
             </span>
           </div>
-          <p class="font-mono text-xs text-slate-400">{{ t('clusterHealth.pingLatency') }}: <span class="text-midori-300">{{ healthData.checks.postgres?.latency_ms ?? 0 }} ms</span></p>
+          <p class="font-mono text-xs text-slate-400">{{ t('clusterHealth.pingLatency') }}: <span class="text-midori-300">{{ Number.isFinite(healthData.checks.postgres?.latency_ms) ? `${healthData.checks.postgres?.latency_ms} ms` : t('clusterHealth.unavailable') }}</span></p>
         </div>
 
         <div class="glass-card space-y-4 p-6">
@@ -144,7 +147,7 @@ onMounted(fetchHealth)
               {{ statusLabel(healthData.checks.redis?.status) }}
             </span>
           </div>
-          <p class="font-mono text-xs text-slate-400">{{ t('clusterHealth.pingLatency') }}: <span class="text-midori-300">{{ healthData.checks.redis?.latency_ms ?? 0 }} ms</span></p>
+          <p class="font-mono text-xs text-slate-400">{{ t('clusterHealth.pingLatency') }}: <span class="text-midori-300">{{ Number.isFinite(healthData.checks.redis?.latency_ms) ? `${healthData.checks.redis?.latency_ms} ms` : t('clusterHealth.unavailable') }}</span></p>
         </div>
       </div>
     </template>

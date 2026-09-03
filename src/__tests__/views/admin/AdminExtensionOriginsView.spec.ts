@@ -89,4 +89,20 @@ describe('AdminExtensionOriginsView', () => {
     expect(wrapper.find('[role="alert"]').text()).toContain('No se pudo actualizar')
     expect(wrapper.text()).not.toContain('Internal detail')
   })
+
+  it('keeps registered origins visible when refresh fails', async () => {
+    const { api } = await import('@/lib/api')
+    vi.mocked(api.get)
+      .mockResolvedValueOnce([{ ...registeredOrigin }])
+      .mockRejectedValueOnce(new Error('offline'))
+
+    const wrapper = shallowMount(AdminExtensionOriginsView)
+    await flushPromises()
+    await wrapper.find('button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain(registeredOrigin.origin)
+    expect(wrapper.text()).toContain('No se pudo actualizar')
+    expect(wrapper.find('table').exists()).toBe(true)
+  })
 })

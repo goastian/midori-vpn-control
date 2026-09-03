@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { generateCodeVerifier, generateCodeChallenge } from '../lib/pkce'
 import { APIError, exchangeCode, api, setAccessToken, clearAccessToken, onAccessTokenChanged, initFromStoredRefreshToken } from '../lib/api'
 import { UserSchema, type User, type UserQuota } from '../lib/schemas'
+import { beginResourceLoad, completeResourceLoad, type ResourceState } from '../lib/resource-state'
 import { SENSITIVE_SESSION_KEYS } from '../lib/storage-keys'
 
 /** Event name dispatched on `window` right before the logout redirect.
@@ -100,6 +101,8 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(false)
   const error = ref('')
   const bootstrapState = ref<BootstrapState>('idle')
+  const profileState = ref<ResourceState>('idle')
+  const quotaState = ref<ResourceState>('idle')
   let restorePromise: Promise<void> | null = null
 
   const initialized = computed(() => bootstrapState.value === 'ready')
@@ -186,9 +189,18 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function fetchProfile(): Promise<User> {
-    const profile = await api.validated('/api/v1/control/me', UserSchema)
-    user.value = profile
-    return profile
+    profileState.value = beginResourceLoad(user.value !== null)
+    try {
+      const profile = await api.validated('/api/v1/control/me', UserSchema)
+      const previousQuota = user.value?.quota
+      user.value = { ...profile, quota: profile.quota ?? previousQuota }
+      profileState.value = 'ready'
+      quotaState.value = user.value.quota ? 'ready' : 'idle'
+      return profile
+    } catch (error) {
+      profileState.value = 'error'
+      throw error
+    }
   }
 
   function clearLocalSession(options: { preserveRefreshToken?: boolean } = {}) {
@@ -202,6 +214,8 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.removeItem('refresh_token')
       localStorage.removeItem('token_expires_at')
     }
+    profileState.value = 'empty'
+    quotaState.value = 'empty'
   }
 
   async function logout() {
@@ -270,6 +284,7 @@ export const useAuthStore = defineStore('auth', () => {
           clearLocalSession({ preserveRefreshToken: true })
           refreshToken.value = localStorage.getItem('refresh_token') || savedRefresh
           error.value = e?.message || 'Session restoration failed'
+          profileState.value = 'error'
           bootstrapState.value = 'error'
         }
       } finally {
@@ -325,13 +340,16 @@ export const useAuthStore = defineStore('auth', () => {
   const userQuota = computed(() => user.value?.quota ?? null)
 
   async function fetchQuota() {
+    quotaState.value = beginResourceLoad(userQuota.value !== null)
     try {
       const quota = await api.get<UserQuota>('/api/v1/control/quota')
       if (quota && user.value) {
         user.value.quota = quota
       }
+      quotaState.value = completeResourceLoad(quota !== null && quota !== undefined)
       return quota
     } catch {
+      quotaState.value = 'error'
       return userQuota.value
     }
   }
@@ -344,6 +362,8 @@ export const useAuthStore = defineStore('auth', () => {
     loading,
     error,
     bootstrapState,
+    profileState,
+    quotaState,
     initialized,
     isAuthenticated,
     isAdmin,

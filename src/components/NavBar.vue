@@ -152,10 +152,12 @@ onBeforeUnmount(() => document.removeEventListener('keydown', handleEscape))
       </section>
 
       <div class="rounded-2xl border border-slate-700/60 bg-slate-800/80 p-4 shadow-sm">
-        <p class="truncate text-sm font-semibold text-slate-100">{{ auth.user?.email }}</p>
+        <p class="truncate text-sm font-semibold text-slate-100">{{ auth.user?.email || t('common.unavailable') }}</p>
         <p class="mt-1 text-xs text-slate-400">
           {{ auth.isAdmin ? t('common.roleAdmin') : t('common.roleUser') }}
         </p>
+        <p v-if="auth.profileState === 'refreshing'" class="mt-2 text-xs text-slate-400" role="status">{{ t('common.refreshing') }}</p>
+        <p v-else-if="auth.profileState === 'error'" class="mt-2 text-xs text-rose-300" role="alert">{{ t('common.refreshFailed') }}</p>
         <button
           class="mt-3 w-full rounded-xl border border-rose-700/60 bg-rose-950/20 px-3 py-2 text-sm font-medium text-rose-300 transition hover:bg-rose-900/40"
           @click="auth.logout()"

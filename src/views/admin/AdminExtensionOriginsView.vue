@@ -3,6 +3,8 @@ import { onMounted, ref } from 'vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
 import AsyncState from '../../components/AsyncState.vue'
+import ResourceSkeleton from '../../components/ResourceSkeleton.vue'
+import { beginResourceLoad, completeResourceLoad, type ResourceState } from '../../lib/resource-state'
 
 interface ExtensionOrigin {
   id: string
@@ -13,8 +15,7 @@ interface ExtensionOrigin {
 }
 
 const origins = ref<ExtensionOrigin[]>([])
-const loading = ref(true)
-const loadFailed = ref(false)
+const originsState = ref<ResourceState>('idle')
 const updatingID = ref('')
 const feedback = ref<{ kind: 'success' | 'error'; message: string } | null>(null)
 const { t, formatDateTime } = useLocale()
@@ -26,15 +27,13 @@ function browserName(origin: string): string {
 }
 
 async function loadOrigins() {
-  loading.value = true
-  loadFailed.value = false
+  originsState.value = beginResourceLoad(origins.value.length > 0 || originsState.value === 'empty')
   try {
     origins.value =
       (await api.get<ExtensionOrigin[]>('/api/v1/admin/trusted-extension-origins')) || []
+    originsState.value = completeResourceLoad(origins.value.length > 0)
   } catch {
-    loadFailed.value = true
-  } finally {
-    loading.value = false
+    originsState.value = 'error'
   }
 }
 
@@ -79,8 +78,8 @@ onMounted(loadOrigins)
       <button
         type="button"
         class="rounded-xl bg-midori-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-midori-500 disabled:opacity-50"
-        :disabled="loading"
-        :aria-busy="loading"
+        :disabled="originsState === 'loading' || originsState === 'refreshing'"
+        :aria-busy="originsState === 'loading' || originsState === 'refreshing'"
         @click="loadOrigins"
       >
         {{ t('adminExtensions.refresh') }}
@@ -96,14 +95,16 @@ onMounted(loadOrigins)
       {{ feedback.message }}
     </div>
 
-    <AsyncState v-if="loading" kind="loading" :title="t('adminExtensions.loading')" />
-    <AsyncState v-else-if="loadFailed" kind="error" :title="t('adminExtensions.loadError')" :retry-label="t('common.retry')" @retry="loadOrigins" />
-    <AsyncState v-else-if="origins.length === 0" kind="empty" :title="t('adminExtensions.empty')" />
+    <ResourceSkeleton v-if="originsState === 'idle' || originsState === 'loading'" :title="t('adminExtensions.loading')" item-class="h-20" />
+    <AsyncState v-else-if="originsState === 'error' && origins.length === 0" kind="error" :title="t('adminExtensions.loadError')" :retry-label="t('common.retry')" @retry="loadOrigins" />
+    <AsyncState v-else-if="originsState === 'empty'" kind="empty" :title="t('adminExtensions.empty')" />
 
     <div
       v-else
       class="overflow-x-auto rounded-3xl border border-slate-800/80 bg-slate-900/80 shadow-xl shadow-black/30"
     >
+      <p v-if="originsState === 'refreshing'" role="status" class="border-b border-slate-800 px-6 py-3 text-xs text-slate-400">{{ t('common.refreshing') }}</p>
+      <p v-else-if="originsState === 'error'" role="alert" class="border-b border-rose-900/50 bg-rose-950/30 px-6 py-3 text-xs text-rose-300">{{ t('common.refreshFailed') }}</p>
       <table class="w-full text-sm">
         <thead
           class="border-b border-slate-800 bg-slate-950/60 text-left text-xs font-semibold uppercase tracking-wider text-slate-400"

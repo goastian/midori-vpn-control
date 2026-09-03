@@ -3,6 +3,7 @@ import { shallowMount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import AdminServersView from '@/views/admin/AdminServersView.vue'
 import AsyncState from '@/components/AsyncState.vue'
+import ResourceSkeleton from '@/components/ResourceSkeleton.vue'
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -74,7 +75,7 @@ describe('AdminServersView', () => {
       global: { plugins: [createPinia()] },
     })
 
-    expect(wrapper.findComponent(AsyncState).props('kind')).toBe('loading')
+    expect(wrapper.findComponent(ResourceSkeleton).props('title')).toBe('Cargando servidores…')
   })
 
   it('renders server names after successful load', async () => {

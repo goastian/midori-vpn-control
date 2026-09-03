@@ -87,5 +87,34 @@ describe('operational view states', () => {
     const redisCard = wrapper.findAll('.glass-card')[2]
     expect(redisCard.text()).toContain('Redis')
     expect(redisCard.text()).toContain('Error')
+    expect(redisCard.text()).toContain('No disponible')
+    expect(redisCard.text()).not.toContain('0 ms')
+  })
+
+  it('keeps the last health snapshot visible when refresh fails', async () => {
+    vi.mocked(api.fetchRaw)
+      .mockResolvedValueOnce({
+        json: async () => ({
+          ok: true,
+          data: {
+            status: 'ready',
+            checks: {
+              postgres: { status: 'ok', latency_ms: 4 },
+              wireguard: { status: 'ok', interface: 'wg0' },
+              redis: { status: 'ok', latency_ms: 2 },
+            },
+          },
+        }),
+      } as Response)
+      .mockRejectedValueOnce(new Error('offline'))
+
+    const wrapper = mount(AdminClusterHealthView)
+    await flushPromises()
+    await wrapper.get('.btn-primary').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Estado global: Disponible')
+    expect(wrapper.text()).toContain('No se pudo actualizar')
+    expect(wrapper.findAll('.glass-card')).toHaveLength(3)
   })
 })

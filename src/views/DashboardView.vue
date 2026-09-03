@@ -5,6 +5,9 @@ import { AUTH_LOGOUT_EVENT } from '../stores/auth'
 import { api } from '../lib/api'
 import { useLocale } from '../lib/i18n'
 import { detectDesktopEnvironment } from '../lib/platform'
+import { beginResourceLoad, completeResourceLoad, type ResourceState } from '../lib/resource-state'
+import AsyncState from '../components/AsyncState.vue'
+import ResourceSkeleton from '../components/ResourceSkeleton.vue'
 import type { AdminStats, Connection } from '../lib/schemas'
 import type { DesktopPlatform, LinuxPackageFormat, DetectionConfidence } from '../lib/platform'
 
@@ -22,8 +25,23 @@ const { t, formatDateTime, formatWeekdayShort } = useLocale()
 
 const connections = ref<Connection[]>([])
 const adminStats = ref<AdminStats | null>(null)
-const loading = ref(true)
+const connectionsState = ref<ResourceState>('idle')
+const adminStatsState = ref<ResourceState>('idle')
+const websocketState = ref<ResourceState>('idle')
+const hasConnectionSnapshot = ref(false)
 let ws: WebSocket | null = null
+let unmounting = false
+
+const dashboardLoading = computed(() =>
+  connectionsState.value === 'idle' || connectionsState.value === 'loading' ||
+  auth.quotaState === 'idle' || auth.quotaState === 'loading' ||
+  (auth.isAdmin && (adminStatsState.value === 'idle' || adminStatsState.value === 'loading'))
+)
+
+const dashboardHasError = computed(() =>
+  connectionsState.value === 'error' || auth.quotaState === 'error' ||
+  (auth.isAdmin && adminStatsState.value === 'error')
+)
 
 const desktopReleaseBase = 'https://github.com/goastian/midori-vpn-desktop/releases/latest/download'
 const detectedDesktopPlatform = ref<DesktopPlatform>('unknown')
@@ -42,6 +60,7 @@ const connectionTotals = computed(() => {
 })
 
 const activePercent = computed(() => {
+  if (!hasConnectionSnapshot.value) return null
   if (!connectionTotals.value.total) return 0
   return Math.round((connectionTotals.value.active / connectionTotals.value.total) * 100)
 })
@@ -50,45 +69,46 @@ const dashboardCards = computed(() => {
   const quota = auth.userQuota
   const cards = [
     {
-      title: 'Dispositivos Conectados',
-      value: quota ? `${quota.connected_devices} / ${quota.max_devices}` : String(connectionTotals.value.active),
+      title: t('dashboard.cards.activeConnections'),
+      value: quota ? `${quota.connected_devices} / ${quota.max_devices}` : t('common.unavailable'),
       subtitle: quota
-        ? `${quota.available_devices} cupos libres · Plan ${quota.plan_name}`
-        : t('common.totalConnections', { count: connectionTotals.value.total }),
+        ? `${t('quota.available', { count: quota.available_devices })} · ${t('quota.plan', { name: quota.plan_name })}`
+        : t('common.unavailable'),
       tone: 'emerald',
     },
     {
       title: t('dashboard.cards.networkUsage'),
-      value: formatBytes(totalTransferredBytes.value),
-      subtitle: `↑${formatBytes(totalSentBytes.value)} / ↓${formatBytes(totalReceivedBytes.value)}`,
+      value: hasConnectionSnapshot.value ? formatBytes(totalTransferredBytes.value) : t('common.unavailable'),
+      subtitle: hasConnectionSnapshot.value ? `↑${formatBytes(totalSentBytes.value)} / ↓${formatBytes(totalReceivedBytes.value)}` : t('common.unavailable'),
       tone: 'cyan',
     },
     {
       title: t('dashboard.cards.currentStatus'),
-      value: `${activePercent.value}%`,
+      value: activePercent.value === null ? t('common.unavailable') : `${activePercent.value}%`,
       subtitle: t('common.peersConnected'),
       tone: 'violet',
     },
   ]
 
-  if (auth.isAdmin && adminStats.value) {
+  if (auth.isAdmin) {
+    const stats = adminStats.value
     cards.unshift(
       {
         title: t('common.users'),
-        value: String(adminStats.value.total_users),
+        value: stats ? String(stats.total_users) : t('common.unavailable'),
         subtitle: t('common.registeredAccounts'),
         tone: 'midori',
       },
       {
         title: t('common.servers'),
-        value: String(adminStats.value.active_servers),
-        subtitle: t('common.available', { count: adminStats.value.total_servers }),
+        value: stats ? String(stats.active_servers) : t('common.unavailable'),
+        subtitle: stats ? t('common.available', { count: stats.total_servers }) : t('common.unavailable'),
         tone: 'amber',
       },
       {
         title: t('common.peers'),
-        value: String(adminStats.value.active_peers),
-        subtitle: t('common.provisioned', { count: adminStats.value.total_peers }),
+        value: stats ? String(stats.active_peers) : t('common.unavailable'),
+        subtitle: stats ? t('common.provisioned', { count: stats.total_peers }) : t('common.unavailable'),
         tone: 'rose',
       },
     )
@@ -286,11 +306,58 @@ function desktopPlatformLabel(platform: DesktopPlatform): string {
 }
 
 function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return t('common.unavailable')
   if (bytes === 0) return '0 B'
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+}
+
+async function loadConnections() {
+  connectionsState.value = beginResourceLoad(hasConnectionSnapshot.value)
+  try {
+    connections.value = (await api.get<Connection[]>('/api/v1/control/connections')) || []
+    hasConnectionSnapshot.value = true
+    connectionsState.value = completeResourceLoad(connections.value.length > 0)
+  } catch {
+    connectionsState.value = 'error'
+  }
+}
+
+async function loadAdminStats() {
+  adminStatsState.value = beginResourceLoad(adminStats.value !== null)
+  try {
+    adminStats.value = await api.get<AdminStats>('/api/v1/admin/dashboard/stats')
+    adminStatsState.value = adminStats.value ? 'ready' : 'empty'
+  } catch {
+    adminStatsState.value = 'error'
+  }
+}
+
+function connectWebSocket() {
+  websocketState.value = 'loading'
+  try {
+    const wsUrl = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`
+    ws = new WebSocket(wsUrl)
+    ws.onopen = () => {
+      websocketState.value = 'ready'
+      ws?.send(JSON.stringify({ token: auth.accessToken }))
+    }
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data)
+      if (msg.type === 'stats' && auth.isAdmin) {
+        adminStats.value = msg.data
+        adminStatsState.value = 'ready'
+      }
+    }
+    ws.onerror = () => { websocketState.value = 'error' }
+    ws.onclose = () => {
+      if (!unmounting) websocketState.value = 'error'
+    }
+  } catch {
+    websocketState.value = 'error'
+  }
 }
 
 onMounted(async () => {
@@ -300,49 +367,17 @@ onMounted(async () => {
   detectedLinuxPackageFormat.value = desktopEnvironment.linuxPackageFormat
   detectedConfidence.value = desktopEnvironment.confidence
 
-  try {
-    const promises: Promise<any>[] = [
-      api.get<Connection[]>('/api/v1/control/connections'),
-      auth.fetchQuota(),
-    ]
-    if (auth.isAdmin) {
-      promises.push(api.get<AdminStats>('/api/v1/admin/dashboard/stats'))
-    }
+  await Promise.all([
+    loadConnections(),
+    auth.fetchQuota(),
+    auth.isAdmin ? loadAdminStats() : Promise.resolve(),
+  ])
 
-    const results = await Promise.all(promises)
-    connections.value = results[0] || []
-    if (results[1]) adminStats.value = results[1]
-  } catch (e) {
-    console.error('Failed to load dashboard data', e)
-  } finally {
-    loading.value = false
-  }
-
-  // Connect WebSocket for real-time stats (JWT authenticated via first message)
-  try {
-    const wsUrl = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`
-    ws = new WebSocket(wsUrl)
-    ws.onopen = () => {
-      ws?.send(JSON.stringify({ token: auth.accessToken }))
-    }
-    ws.onmessage = (event) => {
-      const msg = JSON.parse(event.data)
-      if (msg.type === 'stats' && auth.isAdmin) {
-        adminStats.value = msg.data
-      }
-    }
-    ws.onerror = () => {
-      // WebSocket is optional — silently ignore transport errors
-    }
-    ws.onclose = () => {
-      // Connection closed normally or after an error — no reconnect needed here
-    }
-  } catch {
-    // WebSocket is optional
-  }
+  connectWebSocket()
 })
 
 onUnmounted(() => {
+  unmounting = true
   ws?.close(1000, 'unmount')
   window.removeEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
 })
@@ -353,6 +388,7 @@ function closeWsForLogout() {
   // with the access_token — is not left lingering during the redirect.
   try { ws?.close(1000, 'logout') } catch { /* already closed */ }
   ws = null
+  websocketState.value = 'idle'
 }
 window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
 </script>
@@ -370,16 +406,16 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
         </div>
         <div class="rounded-2xl border border-slate-700/60 bg-slate-800/80 px-4 py-3 shadow-inner">
           <p class="text-xs text-slate-400">{{ t('common.sessionActive') }}</p>
-          <p class="text-sm font-semibold text-slate-200">{{ auth.user?.email }}</p>
+          <p class="text-sm font-semibold text-slate-200">{{ auth.user?.email || t('common.unavailable') }}</p>
         </div>
       </div>
     </section>
 
-    <div v-if="loading" class="flex justify-center py-16">
-      <div class="h-9 w-9 animate-spin rounded-full border-b-2 border-midori-600"></div>
-    </div>
+    <ResourceSkeleton v-if="dashboardLoading" :title="t('common.loading')" :count="auth.isAdmin ? 6 : 3" item-class="h-36" />
 
     <template v-else>
+      <p v-if="dashboardHasError" role="alert" class="rounded-xl border border-rose-800/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-300">{{ t('resourceStatus.dashboardError') }}</p>
+      <p v-else-if="connectionsState === 'refreshing' || auth.quotaState === 'refreshing' || adminStatsState === 'refreshing'" role="status" class="text-sm text-slate-400">{{ t('common.refreshing') }}</p>
       <section v-if="detectedConfidence !== 'mobile'" class="relative overflow-hidden rounded-[2rem] border border-cyan-400/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(15,23,42,0.9))] p-6 shadow-xl shadow-cyan-950/10 lg:p-8">
         <div class="absolute right-0 top-0 h-56 w-56 rounded-full bg-midori-500/10 blur-3xl"></div>
         <div class="absolute bottom-0 left-1/4 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl"></div>
@@ -478,7 +514,7 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
         </article>
       </section>
 
-      <section class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+      <section v-if="hasConnectionSnapshot" class="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <article class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl xl:col-span-2">
           <div class="mb-4 flex items-center justify-between">
             <div>
@@ -526,11 +562,11 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
                   fill="none"
                   class="text-midori-500"
                   stroke-linecap="round"
-                  :stroke-dasharray="`${(activePercent / 100) * 301.6} 301.6`"
+                  :stroke-dasharray="`${((activePercent ?? 0) / 100) * 301.6} 301.6`"
                 />
               </svg>
               <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <p class="text-3xl font-bold text-white">{{ activePercent }}%</p>
+                <p class="text-3xl font-bold text-white">{{ activePercent ?? t('common.unavailable') }}<span v-if="activePercent !== null">%</span></p>
                 <p class="text-xs uppercase tracking-[0.2em] text-midori-400">{{ t('dashboard.activeLabel') }}</p>
               </div>
             </div>
@@ -549,7 +585,9 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
         </article>
       </section>
 
-      <section class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <AsyncState v-else kind="error" :title="t('resourceStatus.dashboardError')" />
+
+      <section v-if="hasConnectionSnapshot" class="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <article class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl">
           <div class="mb-4 flex items-center justify-between">
             <h2 class="text-lg font-bold text-white">{{ t('dashboard.performanceByDevice') }}</h2>
@@ -580,7 +618,7 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
         <article class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl">
           <div class="mb-4 flex items-center justify-between">
             <h2 class="text-lg font-bold text-white">{{ t('dashboard.recentActivity') }}</h2>
-            <span class="text-xs uppercase tracking-[0.2em] text-midori-400 font-semibold">{{ t('common.live') }}</span>
+            <span class="text-xs uppercase tracking-[0.2em] font-semibold" :class="websocketState === 'ready' ? 'text-midori-400' : websocketState === 'error' ? 'text-amber-300' : 'text-slate-400'">{{ websocketState === 'ready' ? t('resourceStatus.realtimeLive') : websocketState === 'error' ? t('resourceStatus.realtimeUnavailable') : t('resourceStatus.realtimeConnecting') }}</span>
           </div>
 
           <div v-if="connections.length > 0" class="space-y-3">

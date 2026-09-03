@@ -7,6 +7,8 @@ import { useAuthStore } from '../stores/auth'
 import type { Server } from '../lib/schemas'
 import AsyncState from '../components/AsyncState.vue'
 import QuotaSummary from '../components/QuotaSummary.vue'
+import ResourceSkeleton from '../components/ResourceSkeleton.vue'
+import { beginResourceLoad, completeResourceLoad, type ResourceState } from '../lib/resource-state'
 
 type ServerPingResult = {
   server_id: string
@@ -18,8 +20,8 @@ const router = useRouter()
 const auth = useAuthStore()
 const servers = ref<Server[]>([])
 const serverPing = ref<Record<string, ServerPingResult>>({})
-const loading = ref(true)
-const failed = ref(false)
+const serversState = ref<ResourceState>('idle')
+const pingState = ref<ResourceState>('idle')
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 const { t } = useLocale()
 
@@ -31,7 +33,7 @@ onMounted(async () => {
     auth.fetchQuota(),
   ])
   refreshTimer = setInterval(() => {
-    loadServers({ silent: true })
+    loadServers()
     auth.fetchQuota()
   }, 15000)
 })
@@ -43,26 +45,24 @@ onUnmounted(() => {
   }
 })
 
-async function loadServers(options: { silent?: boolean } = {}) {
-  if (!options.silent) loading.value = true
-  if (!options.silent) failed.value = false
+async function loadServers() {
+  serversState.value = beginResourceLoad(servers.value.length > 0 || serversState.value === 'empty')
   try {
     const serverList = await api.get<Server[]>('/api/v1/control/servers')
     servers.value = serverList || []
-    if (!options.silent) loading.value = false
+    serversState.value = completeResourceLoad(servers.value.length > 0)
 
     // Fetch latency pings in background non-blockingly
+    pingState.value = beginResourceLoad(Object.keys(serverPing.value).length > 0 || pingState.value === 'empty')
     api.get<ServerPingResult[]>('/api/v1/control/servers/ping')
       .then((pings) => {
-        if (pings) {
-          serverPing.value = Object.fromEntries(pings.map((item) => [item.server_id, item]))
-        }
+        const values = pings || []
+        serverPing.value = Object.fromEntries(values.map((item) => [item.server_id, item]))
+        pingState.value = completeResourceLoad(values.length > 0)
       })
-      .catch((e) => console.warn('Background server ping error:', e))
+      .catch(() => { pingState.value = 'error' })
   } catch {
-    if (!options.silent) failed.value = true
-  } finally {
-    if (!options.silent) loading.value = false
+    serversState.value = 'error'
   }
 }
 
@@ -70,8 +70,8 @@ async function retryLoad() {
   await Promise.all([loadServers(), auth.fetchQuota()])
 }
 
-function isServerOnline(server: Server): boolean {
-  return serverPing.value[server.id]?.available === true
+function isServerOnline(server: Server): boolean | null {
+  return server.id in serverPing.value ? serverPing.value[server.id].available : null
 }
 
 function connectToServer(serverId: string) {
@@ -84,20 +84,26 @@ function connectToServer(serverId: string) {
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold tracking-tight text-white">{{ t('serversView.title') }}</h1>
-        <p class="text-sm text-slate-400 mt-1">{{ t('serversView.subtitle', { count: servers.length }) }}</p>
+        <p class="text-sm text-slate-400 mt-1">{{ t('serversView.subtitle', { count: serversState === 'loading' || serversState === 'idle' ? t('common.unavailable') : servers.length }) }}</p>
       </div>
     </div>
 
     <!-- Global User Quota Bar -->
-    <QuotaSummary v-if="userQuota" :quota="userQuota" />
+    <ResourceSkeleton v-if="auth.quotaState === 'loading' && !userQuota" :title="t('quota.loading')" :count="1" item-class="h-28" />
+    <QuotaSummary v-else-if="userQuota" :quota="userQuota" />
+    <p v-if="auth.quotaState === 'error'" role="alert" class="rounded-xl border border-rose-800/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-300">{{ userQuota ? t('common.refreshFailed') : t('quota.loadError') }}</p>
 
-    <AsyncState v-if="loading" kind="loading" :title="t('serversView.loading')" />
+    <ResourceSkeleton v-if="serversState === 'idle' || serversState === 'loading'" :title="t('serversView.loading')" />
 
-    <AsyncState v-else-if="failed" kind="error" :title="t('serversView.loadErrorTitle')" :detail="t('serversView.loadErrorDetail')" :retry-label="t('common.retry')" @retry="retryLoad" />
+    <AsyncState v-else-if="serversState === 'error' && servers.length === 0" kind="error" :title="t('serversView.loadErrorTitle')" :detail="t('serversView.loadErrorDetail')" :retry-label="t('common.retry')" @retry="retryLoad" />
 
-    <AsyncState v-else-if="servers.length === 0" kind="empty" :title="t('serversView.empty')" />
+    <AsyncState v-else-if="serversState === 'empty'" kind="empty" :title="t('serversView.empty')" />
 
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <p v-if="serversState === 'refreshing'" class="col-span-full text-sm text-slate-400" role="status">{{ t('common.refreshing') }}</p>
+      <p v-else-if="serversState === 'error'" class="col-span-full rounded-xl border border-rose-800/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-300" role="alert">{{ t('common.refreshFailed') }}</p>
+      <p v-if="pingState === 'loading' || pingState === 'refreshing'" class="col-span-full text-xs text-slate-500" role="status">{{ t('common.refreshing') }}</p>
+      <p v-else-if="pingState === 'error'" class="col-span-full text-xs text-amber-300" role="status">{{ t('common.refreshFailed') }}</p>
       <div
         v-for="server in servers"
         :key="server.id"
@@ -113,13 +119,15 @@ function connectToServer(serverId: string) {
               <p class="text-xs text-slate-400 mt-0.5">{{ server.location }} {{ server.country_code ? `· ${server.country_code}` : '' }}</p>
             </div>
             <span
-              :class="isServerOnline(server)
+              :class="isServerOnline(server) === true
                 ? 'bg-midori-950/60 border-midori-700/50 text-midori-300'
-                : 'bg-rose-950/60 border-rose-700/50 text-rose-300'"
+                : isServerOnline(server) === false
+                  ? 'bg-rose-950/60 border-rose-700/50 text-rose-300'
+                  : 'bg-slate-800 border-slate-700 text-slate-400'"
               class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border"
             >
-              <span class="w-1.5 h-1.5 rounded-full" :class="isServerOnline(server) ? 'bg-midori-400 animate-pulse' : 'bg-rose-400'"></span>
-              {{ isServerOnline(server) ? (serverPing[server.id]?.latency_ms ? `${serverPing[server.id].latency_ms}ms` : t('common.active')) : t('common.inactive') }}
+              <span class="w-1.5 h-1.5 rounded-full" :class="isServerOnline(server) === true ? 'bg-midori-400 animate-pulse' : isServerOnline(server) === false ? 'bg-rose-400' : 'bg-slate-500'"></span>
+              {{ isServerOnline(server) === true ? (Number.isFinite(serverPing[server.id]?.latency_ms) ? `${serverPing[server.id].latency_ms}ms` : t('common.active')) : isServerOnline(server) === false ? t('common.inactive') : t('common.unavailable') }}
             </span>
           </div>
 
@@ -144,17 +152,19 @@ function connectToServer(serverId: string) {
         <!-- Action button -->
         <button
           type="button"
-          :class="userQuota && userQuota.available_devices === 0
+          :class="!userQuota || userQuota.available_devices === 0
             ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
             : 'bg-slate-800 hover:bg-midori-600 border-slate-700/80 hover:border-midori-500 text-white'"
           class="w-full py-2.5 px-4 rounded-xl font-semibold text-xs border shadow-md transition-all cursor-pointer inline-flex items-center justify-center gap-2 group-hover:shadow-midori-950/40"
+          :disabled="!userQuota || auth.quotaState === 'loading' || auth.quotaState === 'error'"
           @click="connectToServer(server.id)"
         >
           <svg class="w-4 h-4 text-midori-400 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
           </svg>
           <span v-if="userQuota && userQuota.available_devices === 0">{{ t('serversView.manageLimit', { connected: userQuota.connected_devices, maximum: userQuota.max_devices }) }}</span>
-          <span v-else>{{ t('serversView.connectHere') }}</span>
+          <span v-else-if="userQuota">{{ t('serversView.connectHere') }}</span>
+          <span v-else>{{ t('common.unavailable') }}</span>
         </button>
       </div>
     </div>

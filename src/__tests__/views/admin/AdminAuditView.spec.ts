@@ -3,6 +3,7 @@ import { shallowMount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import AdminAuditView from '@/views/admin/AdminAuditView.vue'
 import AsyncState from '@/components/AsyncState.vue'
+import ResourceSkeleton from '@/components/ResourceSkeleton.vue'
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -52,7 +53,7 @@ describe('AdminAuditView', () => {
       global: { plugins: [createPinia()] },
     })
 
-    expect(wrapper.findComponent(AsyncState).props('kind')).toBe('loading')
+    expect(wrapper.findComponent(ResourceSkeleton).props('title')).toBe('Cargando el historial de auditoría…')
   })
 
   it('renders audit log rows after successful load', async () => {
