@@ -6,6 +6,10 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Changed
 
+- Dashboard now consumes one validated summary built from registered devices,
+  active sessions, quota, preserved traffic and recent session history. It no
+  longer treats peer rows or repeated device names as devices, and it removes
+  the misleading chart that assigned cumulative traffic to provisioning dates.
 - Every remote JSON value rendered by Control is now parsed through an explicit
   Zod contract, including quota, device and session lists, dashboard data,
   server latency, administrative resources, health and Desktop callback data.

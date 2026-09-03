@@ -240,6 +240,51 @@ export const WebSocketStatsMessageSchema = z.object({
 })
 export type WebSocketStatsMessage = z.infer<typeof WebSocketStatsMessageSchema>
 
+export const DashboardRecentSessionSchema = z.object({
+  id: z.string().uuid(),
+  device_id: z.string().uuid().nullable(),
+  device_name: NonEmptyStringSchema.max(64),
+  server_id: z.string().uuid(),
+  server_name: NonEmptyStringSchema,
+  protocol: z.enum(['wireguard', 'openvpn', 'ikev2', 'wss', 'masque', 'proxy']),
+  assigned_ip: NonEmptyStringSchema,
+  is_active: z.boolean(),
+  bytes_sent: NonNegativeIntegerSchema,
+  bytes_received: NonNegativeIntegerSchema,
+  last_handshake: TimestampSchema.nullable(),
+  created_at: TimestampSchema,
+})
+
+export const DashboardSummarySchema = z
+  .object({
+    registered_devices: NonNegativeIntegerSchema,
+    connected_devices: NonNegativeIntegerSchema,
+    max_devices: z.number().int().positive(),
+    available_devices: NonNegativeIntegerSchema,
+    plan_slug: NonEmptyStringSchema,
+    plan_name: NonEmptyStringSchema,
+    traffic: z.object({
+      bytes_sent: NonNegativeIntegerSchema,
+      bytes_received: NonNegativeIntegerSchema,
+    }),
+    recent_sessions: z.array(DashboardRecentSessionSchema).max(6),
+    infrastructure: AdminStatsSchema.nullish().transform((value) => value ?? null),
+  })
+  .refine((summary) => summary.connected_devices <= summary.registered_devices, {
+    message: 'Connected devices cannot exceed registered devices',
+    path: ['connected_devices'],
+  })
+  .refine(
+    (summary) =>
+      summary.available_devices === Math.max(summary.max_devices - summary.connected_devices, 0),
+    {
+      message: 'Available devices must match the current quota snapshot',
+      path: ['available_devices'],
+    },
+  )
+
+export type DashboardSummary = z.infer<typeof DashboardSummarySchema>
+
 // ─── Audit Log ────────────────────────────────────────────
 
 export const AuditLogSchema = z.object({

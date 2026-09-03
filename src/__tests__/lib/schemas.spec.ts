@@ -12,6 +12,7 @@ import {
   DeviceSchema,
   DeviceSessionPageSchema,
   AdminStatsSchema,
+  DashboardSummarySchema,
   AuditLogSchema,
   AdminPeerSchema,
   AdminUserDetailSchema,
@@ -309,6 +310,74 @@ describe('Zod API schemas', () => {
         WebSocketStatsMessageSchema.safeParse({
           type: 'stats',
           data: { total_users: 1 },
+        }).success,
+      ).toBe(false)
+    })
+  })
+
+  describe('DashboardSummarySchema', () => {
+    const summary = {
+      registered_devices: 1,
+      connected_devices: 1,
+      max_devices: 5,
+      available_devices: 4,
+      plan_slug: 'pro',
+      plan_name: 'Pro',
+      traffic: { bytes_sent: 10, bytes_received: 20 },
+      recent_sessions: [
+        {
+          id: '6c5575e8-c212-4df5-b44f-e12ea5b1ec8e',
+          device_id: 'bd2c610d-5e38-4eeb-a460-30eddb4f20c5',
+          device_name: 'Work laptop',
+          server_id: 'd1a60c46-9294-407a-90a4-7c0f29bda831',
+          server_name: 'Santo Domingo',
+          protocol: 'wireguard',
+          assigned_ip: '10.8.0.2/32',
+          is_active: true,
+          bytes_sent: 10,
+          bytes_received: 20,
+          last_handshake: null,
+          created_at: '2026-09-03T00:00:00Z',
+        },
+      ],
+    }
+
+    it('parses a coherent user summary and normalizes absent infrastructure', () => {
+      const parsed = DashboardSummarySchema.parse(summary)
+      expect(parsed.infrastructure).toBeNull()
+      expect(parsed.recent_sessions).toHaveLength(1)
+    })
+
+    it('rejects session counts masquerading as device counts', () => {
+      expect(
+        DashboardSummarySchema.safeParse({
+          ...summary,
+          registered_devices: 1,
+          connected_devices: 2,
+        }).success,
+      ).toBe(false)
+    })
+
+    it('rejects an available-device count from a different snapshot', () => {
+      expect(
+        DashboardSummarySchema.safeParse({
+          ...summary,
+          available_devices: 3,
+        }).success,
+      ).toBe(false)
+    })
+
+    it('rejects partial traffic and recent-session payloads', () => {
+      expect(
+        DashboardSummarySchema.safeParse({
+          ...summary,
+          traffic: { bytes_sent: 10 },
+        }).success,
+      ).toBe(false)
+      expect(
+        DashboardSummarySchema.safeParse({
+          ...summary,
+          recent_sessions: [{ id: summary.recent_sessions[0].id }],
         }).success,
       ).toBe(false)
     })

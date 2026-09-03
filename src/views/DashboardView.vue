@@ -5,15 +5,13 @@ import { AUTH_LOGOUT_EVENT } from '../stores/auth'
 import { api } from '../lib/api'
 import { useLocale } from '../lib/i18n'
 import { detectDesktopEnvironment } from '../lib/platform'
-import { beginResourceLoad, completeResourceLoad, type ResourceState } from '../lib/resource-state'
+import { beginResourceLoad, type ResourceState } from '../lib/resource-state'
 import AsyncState from '../components/AsyncState.vue'
 import ResourceSkeleton from '../components/ResourceSkeleton.vue'
 import {
-  AdminStatsSchema,
-  ConnectionListSchema,
+  DashboardSummarySchema,
   WebSocketStatsMessageSchema,
-  type AdminStats,
-  type Connection,
+  type DashboardSummary,
 } from '../lib/schemas'
 import type { DesktopPlatform, LinuxPackageFormat, DetectionConfidence } from '../lib/platform'
 
@@ -27,32 +25,19 @@ type DesktopDownload = {
 }
 
 const auth = useAuthStore()
-const { t, formatDateTime, formatWeekdayShort } = useLocale()
+const { t, formatDateTime } = useLocale()
 
-const connections = ref<Connection[]>([])
-const adminStats = ref<AdminStats | null>(null)
-const connectionsState = ref<ResourceState>('idle')
-const adminStatsState = ref<ResourceState>('idle')
+const summary = ref<DashboardSummary | null>(null)
+const summaryState = ref<ResourceState>('idle')
 const websocketState = ref<ResourceState>('idle')
-const hasConnectionSnapshot = ref(false)
 let ws: WebSocket | null = null
 let unmounting = false
 
 const dashboardLoading = computed(
-  () =>
-    connectionsState.value === 'idle' ||
-    connectionsState.value === 'loading' ||
-    auth.quotaState === 'idle' ||
-    auth.quotaState === 'loading' ||
-    (auth.isAdmin && (adminStatsState.value === 'idle' || adminStatsState.value === 'loading')),
+  () => summary.value === null && ['idle', 'loading'].includes(summaryState.value),
 )
 
-const dashboardHasError = computed(
-  () =>
-    connectionsState.value === 'error' ||
-    auth.quotaState === 'error' ||
-    (auth.isAdmin && adminStatsState.value === 'error'),
-)
+const dashboardHasError = computed(() => summaryState.value === 'error')
 
 const desktopReleaseBase = 'https://github.com/goastian/midori-vpn-desktop/releases/latest/download'
 const detectedDesktopPlatform = ref<DesktopPlatform>('unknown')
@@ -60,74 +45,56 @@ const detectedDesktopArchitecture = ref('unknown')
 const detectedLinuxPackageFormat = ref<LinuxPackageFormat>('unknown')
 const detectedConfidence = ref<DetectionConfidence>('unknown')
 
-const connectionTotals = computed(() => {
-  const active = connections.value.filter((c) => c.is_active).length
-  const inactive = Math.max(connections.value.length - active, 0)
-  return {
-    total: connections.value.length,
-    active,
-    inactive,
-  }
-})
-
 const activePercent = computed(() => {
-  if (!hasConnectionSnapshot.value) return null
-  if (!connectionTotals.value.total) return 0
-  return Math.round((connectionTotals.value.active / connectionTotals.value.total) * 100)
+  if (!summary.value) return null
+  if (!summary.value.registered_devices) return 0
+  return Math.round((summary.value.connected_devices / summary.value.registered_devices) * 100)
 })
+const activeStroke = computed(() => `${((activePercent.value ?? 0) / 100) * 301.6} 301.6`)
 
 const dashboardCards = computed(() => {
-  const quota = auth.userQuota
+  const snapshot = summary.value
+  if (!snapshot) return []
   const cards = [
     {
-      title: t('dashboard.cards.activeConnections'),
-      value: quota ? `${quota.connected_devices} / ${quota.max_devices}` : t('common.unavailable'),
-      subtitle: quota
-        ? `${t('quota.available', { count: quota.available_devices })} · ${t('quota.plan', { name: quota.plan_name })}`
-        : t('common.unavailable'),
+      title: t('dashboard.cards.registeredDevices'),
+      value: String(snapshot.registered_devices),
+      subtitle: t('dashboard.cards.registeredDevicesDetail'),
       tone: 'emerald',
     },
     {
-      title: t('dashboard.cards.networkUsage'),
-      value: hasConnectionSnapshot.value
-        ? formatBytes(totalTransferredBytes.value)
-        : t('common.unavailable'),
-      subtitle: hasConnectionSnapshot.value
-        ? `↑${formatBytes(totalSentBytes.value)} / ↓${formatBytes(totalReceivedBytes.value)}`
-        : t('common.unavailable'),
-      tone: 'cyan',
+      title: t('dashboard.cards.connectedDevices'),
+      value: String(snapshot.connected_devices),
+      subtitle: t('dashboard.cards.connectedDevicesDetail'),
+      tone: 'midori',
     },
     {
-      title: t('dashboard.cards.currentStatus'),
-      value: activePercent.value === null ? t('common.unavailable') : `${activePercent.value}%`,
-      subtitle: t('common.peersConnected'),
+      title: t('dashboard.cards.availableSlots'),
+      value: `${snapshot.available_devices} / ${snapshot.max_devices}`,
+      subtitle: t('quota.plan', { name: snapshot.plan_name }),
       tone: 'violet',
+    },
+    {
+      title: t('dashboard.cards.networkUsage'),
+      value: formatBytes(snapshot.traffic.bytes_sent + snapshot.traffic.bytes_received),
+      subtitle: `↑${formatBytes(snapshot.traffic.bytes_sent)} / ↓${formatBytes(snapshot.traffic.bytes_received)}`,
+      tone: 'cyan',
     },
   ]
 
-  if (auth.isAdmin) {
-    const stats = adminStats.value
+  if (snapshot.infrastructure) {
+    const stats = snapshot.infrastructure
     cards.unshift(
       {
         title: t('common.users'),
-        value: stats ? String(stats.total_users) : t('common.unavailable'),
+        value: String(stats.total_users),
         subtitle: t('common.registeredAccounts'),
-        tone: 'midori',
-      },
-      {
-        title: t('common.servers'),
-        value: stats ? String(stats.active_servers) : t('common.unavailable'),
-        subtitle: stats
-          ? t('common.available', { count: stats.total_servers })
-          : t('common.unavailable'),
         tone: 'amber',
       },
       {
-        title: t('common.peers'),
-        value: stats ? String(stats.active_peers) : t('common.unavailable'),
-        subtitle: stats
-          ? t('common.provisioned', { count: stats.total_peers })
-          : t('common.unavailable'),
+        title: t('common.servers'),
+        value: `${stats.active_servers} / ${stats.total_servers}`,
+        subtitle: t('dashboard.cards.infrastructureServers'),
         tone: 'rose',
       },
     )
@@ -136,70 +103,7 @@ const dashboardCards = computed(() => {
   return cards
 })
 
-const totalSentBytes = computed(() =>
-  connections.value.reduce((sum, conn) => sum + conn.bytes_sent, 0),
-)
-const totalReceivedBytes = computed(() =>
-  connections.value.reduce((sum, conn) => sum + conn.bytes_received, 0),
-)
-const totalTransferredBytes = computed(() => totalSentBytes.value + totalReceivedBytes.value)
-
-const trafficByDay = computed(() => {
-  const now = new Date()
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const date = new Date(now)
-    date.setDate(now.getDate() - (6 - i))
-    date.setHours(0, 0, 0, 0)
-    return {
-      key: date.toISOString().slice(0, 10),
-      label: formatWeekdayShort(date),
-      value: 0,
-    }
-  })
-
-  const map = new Map(days.map((d) => [d.key, d]))
-
-  for (const conn of connections.value) {
-    const key = conn.created_at.slice(0, 10)
-    const bucket = map.get(key)
-    if (!bucket) continue
-    bucket.value += conn.bytes_sent + conn.bytes_received
-  }
-
-  return days
-})
-
-const maxTrafficDay = computed(() => Math.max(...trafficByDay.value.map((d) => d.value), 1))
-
-const trafficSparkline = computed(() => {
-  const values = trafficByDay.value.map((d) => d.value)
-  const max = Math.max(...values, 1)
-  return values
-    .map((value, index) => {
-      const x = (index / Math.max(values.length - 1, 1)) * 100
-      const y = 100 - (value / max) * 100
-      return `${x},${y}`
-    })
-    .join(' ')
-})
-
-const deviceUsage = computed(() => {
-  const deviceMap = new Map<string, { device: string; total: number; active: number }>()
-
-  for (const conn of connections.value) {
-    const name = (conn.device_name || t('common.noNamedDevice')).trim() || t('common.noNamedDevice')
-    const current = deviceMap.get(name) || { device: name, total: 0, active: 0 }
-    current.total += conn.bytes_sent + conn.bytes_received
-    if (conn.is_active) current.active += 1
-    deviceMap.set(name, current)
-  }
-
-  return Array.from(deviceMap.values())
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 5)
-})
-
-const mostUsedDeviceBytes = computed(() => Math.max(...deviceUsage.value.map((d) => d.total), 1))
+const adminStats = computed(() => summary.value?.infrastructure ?? null)
 
 const desktopDownloads = computed<DesktopDownload[]>(() => {
   const platform = detectedDesktopPlatform.value
@@ -335,24 +239,20 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
-async function loadConnections() {
-  connectionsState.value = beginResourceLoad(hasConnectionSnapshot.value)
+async function loadDashboard() {
+  summaryState.value = beginResourceLoad(summary.value !== null)
   try {
-    connections.value = await api.validated('/api/v1/control/connections', ConnectionListSchema)
-    hasConnectionSnapshot.value = true
-    connectionsState.value = completeResourceLoad(connections.value.length > 0)
+    const nextSummary = await api.validated(
+      '/api/v1/control/dashboard/summary',
+      DashboardSummarySchema,
+    )
+    if (auth.isAdmin && !nextSummary.infrastructure) {
+      throw new Error('Administrator dashboard summary omitted infrastructure')
+    }
+    summary.value = nextSummary
+    summaryState.value = 'ready'
   } catch {
-    connectionsState.value = 'error'
-  }
-}
-
-async function loadAdminStats() {
-  adminStatsState.value = beginResourceLoad(adminStats.value !== null)
-  try {
-    adminStats.value = await api.validated('/api/v1/admin/dashboard/stats', AdminStatsSchema)
-    adminStatsState.value = 'ready'
-  } catch {
-    adminStatsState.value = 'error'
+    summaryState.value = 'error'
   }
 }
 
@@ -378,9 +278,11 @@ function connectWebSocket() {
         websocketState.value = 'error'
         return
       }
-      if (!auth.isAdmin) return
-      adminStats.value = parsed.data.data
-      adminStatsState.value = 'ready'
+      if (!auth.isAdmin || !summary.value) return
+      summary.value = {
+        ...summary.value,
+        infrastructure: parsed.data.data,
+      }
     }
     ws.onerror = () => {
       websocketState.value = 'error'
@@ -400,13 +302,8 @@ onMounted(async () => {
   detectedLinuxPackageFormat.value = desktopEnvironment.linuxPackageFormat
   detectedConfidence.value = desktopEnvironment.confidence
 
-  await Promise.all([
-    loadConnections(),
-    auth.fetchQuota(),
-    auth.isAdmin ? loadAdminStats() : Promise.resolve(),
-  ])
-
-  connectWebSocket()
+  await loadDashboard()
+  if (auth.isAdmin) connectWebSocket()
 })
 
 onUnmounted(() => {
@@ -451,11 +348,23 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
           </h1>
           <p class="mt-2 text-sm text-slate-400">{{ t('dashboard.subtitle') }}</p>
         </div>
-        <div class="rounded-2xl border border-slate-700/60 bg-slate-800/80 px-4 py-3 shadow-inner">
-          <p class="text-xs text-slate-400">{{ t('common.sessionActive') }}</p>
-          <p class="text-sm font-semibold text-slate-200">
-            {{ auth.user?.email || t('common.unavailable') }}
-          </p>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div
+            class="rounded-2xl border border-slate-700/60 bg-slate-800/80 px-4 py-3 shadow-inner"
+          >
+            <p class="text-xs text-slate-400">{{ t('common.sessionActive') }}</p>
+            <p class="text-sm font-semibold text-slate-200">
+              {{ auth.user?.email || t('common.unavailable') }}
+            </p>
+          </div>
+          <button
+            type="button"
+            class="rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-midori-600 hover:text-white disabled:cursor-wait disabled:opacity-60"
+            :disabled="summaryState === 'loading' || summaryState === 'refreshing'"
+            @click="loadDashboard"
+          >
+            {{ summaryState === 'refreshing' ? t('common.refreshing') : t('dashboard.refresh') }}
+          </button>
         </div>
       </div>
     </section>
@@ -463,27 +372,19 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
     <ResourceSkeleton
       v-if="dashboardLoading"
       :title="t('common.loading')"
-      :count="auth.isAdmin ? 6 : 3"
+      :count="auth.isAdmin ? 6 : 4"
       item-class="h-36"
     />
 
     <template v-else>
       <p
-        v-if="dashboardHasError"
+        v-if="dashboardHasError && summary"
         role="alert"
         class="rounded-xl border border-rose-800/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-300"
       >
         {{ t('resourceStatus.dashboardError') }}
       </p>
-      <p
-        v-else-if="
-          connectionsState === 'refreshing' ||
-          auth.quotaState === 'refreshing' ||
-          adminStatsState === 'refreshing'
-        "
-        role="status"
-        class="text-sm text-slate-400"
-      >
+      <p v-else-if="summaryState === 'refreshing'" role="status" class="text-sm text-slate-400">
         {{ t('common.refreshing') }}
       </p>
       <section
@@ -620,54 +521,36 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
         </article>
       </section>
 
-      <section v-if="hasConnectionSnapshot" class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+      <section v-if="summary" class="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <article
           class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl xl:col-span-2"
         >
-          <div class="mb-4 flex items-center justify-between">
-            <div>
-              <h2 class="text-lg font-bold text-white">{{ t('dashboard.weeklyTraffic') }}</h2>
-              <p class="text-sm text-slate-400">{{ t('dashboard.weeklyTrafficSubtitle') }}</p>
-            </div>
-            <div class="text-right">
-              <p class="text-xs uppercase tracking-widest text-slate-400">
+          <h2 class="text-lg font-bold text-white">{{ t('dashboard.aggregateTraffic') }}</h2>
+          <p class="text-sm text-slate-400">{{ t('dashboard.aggregateTrafficSubtitle') }}</p>
+          <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+              <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
                 {{ t('common.total') }}
               </p>
-              <p class="text-sm font-semibold text-midori-400">
-                {{ formatBytes(totalTransferredBytes) }}
+              <p class="mt-2 text-2xl font-bold text-white">
+                {{ formatBytes(summary.traffic.bytes_sent + summary.traffic.bytes_received) }}
               </p>
             </div>
-          </div>
-          <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 shadow-inner">
-            <svg viewBox="0 0 100 100" class="h-28 w-full">
-              <polyline
-                points="0,100 100,100"
-                fill="none"
-                class="stroke-slate-800"
-                stroke-width="1"
-              />
-              <polyline
-                :points="trafficSparkline"
-                fill="none"
-                class="stroke-midori-400"
-                stroke-width="2.5"
-                stroke-linecap="round"
-              />
-            </svg>
-            <div class="mt-3 grid grid-cols-7 gap-2">
-              <div v-for="day in trafficByDay" :key="day.key" class="space-y-1 text-center">
-                <div class="mx-auto flex h-16 w-6 items-end rounded-full bg-slate-800/80 p-1">
-                  <div
-                    class="w-full rounded-full bg-gradient-to-t from-midori-600 to-cyan-400 shadow-sm"
-                    :style="{
-                      height: `${Math.max((day.value / maxTrafficDay) * 100, day.value > 0 ? 14 : 3)}%`,
-                    }"
-                  ></div>
-                </div>
-                <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                  {{ day.label }}
-                </p>
-              </div>
+            <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+              <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                {{ t('dashboard.sentTraffic') }}
+              </p>
+              <p class="mt-2 text-2xl font-bold text-cyan-300">
+                {{ formatBytes(summary.traffic.bytes_sent) }}
+              </p>
+            </div>
+            <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+              <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                {{ t('dashboard.receivedTraffic') }}
+              </p>
+              <p class="mt-2 text-2xl font-bold text-midori-300">
+                {{ formatBytes(summary.traffic.bytes_received) }}
+              </p>
             </div>
           </div>
         </article>
@@ -675,12 +558,11 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
         <article
           class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl"
         >
-          <h2 class="text-lg font-bold text-white">{{ t('dashboard.connectionHealth') }}</h2>
-          <p class="mt-1 text-sm text-slate-400">{{ t('dashboard.connectionHealthSubtitle') }}</p>
-
+          <h2 class="text-lg font-bold text-white">{{ t('dashboard.deviceStatus') }}</h2>
+          <p class="mt-1 text-sm text-slate-400">{{ t('dashboard.deviceStatusSubtitle') }}</p>
           <div class="mt-6 flex items-center justify-center">
             <div class="relative">
-              <svg viewBox="0 0 120 120" class="h-44 w-44 -rotate-90">
+              <svg viewBox="0 0 120 120" class="h-44 w-44 -rotate-90" aria-hidden="true">
                 <circle
                   cx="60"
                   cy="60"
@@ -699,143 +581,109 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
                   fill="none"
                   class="text-midori-500"
                   stroke-linecap="round"
-                  :stroke-dasharray="`${((activePercent ?? 0) / 100) * 301.6} 301.6`"
+                  :stroke-dasharray="activeStroke"
                 />
               </svg>
               <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <p class="text-3xl font-bold text-white">
-                  {{ activePercent ?? t('common.unavailable')
-                  }}<span v-if="activePercent !== null">%</span>
-                </p>
+                <p class="text-3xl font-bold text-white">{{ activePercent }}%</p>
                 <p class="text-xs uppercase tracking-[0.2em] text-midori-400">
-                  {{ t('dashboard.activeLabel') }}
+                  {{ t('dashboard.connectedLabel') }}
                 </p>
               </div>
             </div>
           </div>
-
           <div class="mt-4 space-y-2 text-sm">
             <div
-              class="flex items-center justify-between rounded-xl bg-slate-800/80 px-4 py-2.5 border border-slate-700/50"
+              class="flex items-center justify-between rounded-xl border border-slate-700/50 bg-slate-800/80 px-4 py-2.5"
             >
-              <span class="text-slate-300">{{ t('dashboard.activeLabel') }}</span>
-              <span class="font-bold text-midori-400">{{ connectionTotals.active }}</span>
+              <span class="text-slate-300">{{ t('dashboard.registeredLabel') }}</span>
+              <span class="font-bold text-white">{{ summary.registered_devices }}</span>
             </div>
             <div
-              class="flex items-center justify-between rounded-xl bg-slate-800/80 px-4 py-2.5 border border-slate-700/50"
+              class="flex items-center justify-between rounded-xl border border-slate-700/50 bg-slate-800/80 px-4 py-2.5"
             >
-              <span class="text-slate-300">{{ t('dashboard.inactiveLabel') }}</span>
-              <span class="font-bold text-slate-400">{{ connectionTotals.inactive }}</span>
+              <span class="text-slate-300">{{ t('dashboard.connectedLabel') }}</span>
+              <span class="font-bold text-midori-400">{{ summary.connected_devices }}</span>
             </div>
           </div>
         </article>
       </section>
 
-      <AsyncState v-else kind="error" :title="t('resourceStatus.dashboardError')" />
+      <AsyncState
+        v-else
+        kind="error"
+        :title="t('resourceStatus.dashboardError')"
+        :retry-label="t('common.retry')"
+        @retry="loadDashboard"
+      />
 
-      <section v-if="hasConnectionSnapshot" class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <article
-          class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl"
-        >
-          <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-lg font-bold text-white">{{ t('dashboard.performanceByDevice') }}</h2>
-            <span class="text-xs uppercase tracking-[0.2em] text-midori-400 font-semibold">{{
-              t('common.topFive')
-            }}</span>
+      <section
+        v-if="summary"
+        class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl"
+      >
+        <div class="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <h2 class="text-lg font-bold text-white">{{ t('dashboard.recentSessions') }}</h2>
+            <p class="text-sm text-slate-400">{{ t('dashboard.recentSessionsSubtitle') }}</p>
           </div>
-
-          <div v-if="deviceUsage.length" class="space-y-3">
-            <div
-              v-for="device in deviceUsage"
-              :key="device.device"
-              class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 shadow-sm"
-            >
-              <div class="mb-2 flex items-center justify-between gap-4">
-                <p class="truncate text-sm font-semibold text-white">{{ device.device }}</p>
-                <span class="text-xs text-midori-400 font-mono">{{
-                  formatBytes(device.total)
-                }}</span>
-              </div>
-              <div class="h-2 w-full overflow-hidden rounded-full bg-slate-800">
-                <div
-                  class="h-full rounded-full bg-gradient-to-r from-cyan-500 to-midori-500"
-                  :style="{ width: `${Math.max((device.total / mostUsedDeviceBytes) * 100, 10)}%` }"
-                ></div>
-              </div>
-              <p class="mt-2 text-xs text-slate-400">
-                {{ t('dashboard.connectionsActiveSuffix', { count: device.active }) }}
-              </p>
-            </div>
-          </div>
-
-          <p
-            v-else
-            class="rounded-2xl bg-slate-950/40 border border-slate-800 px-4 py-8 text-center text-sm text-slate-400"
+          <span
+            v-if="auth.isAdmin"
+            class="text-xs font-semibold uppercase tracking-[0.2em]"
+            :class="
+              websocketState === 'ready'
+                ? 'text-midori-400'
+                : websocketState === 'error'
+                  ? 'text-amber-300'
+                  : 'text-slate-400'
+            "
+            >{{
+              websocketState === 'ready'
+                ? t('resourceStatus.realtimeLive')
+                : websocketState === 'error'
+                  ? t('resourceStatus.realtimeUnavailable')
+                  : t('resourceStatus.realtimeConnecting')
+            }}</span
           >
-            {{ t('dashboard.noDeviceTraffic') }}
-          </p>
-        </article>
-
-        <article
-          class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl"
-        >
-          <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-lg font-bold text-white">{{ t('dashboard.recentActivity') }}</h2>
-            <span
-              class="text-xs uppercase tracking-[0.2em] font-semibold"
-              :class="
-                websocketState === 'ready'
-                  ? 'text-midori-400'
-                  : websocketState === 'error'
-                    ? 'text-amber-300'
-                    : 'text-slate-400'
-              "
-              >{{
-                websocketState === 'ready'
-                  ? t('resourceStatus.realtimeLive')
-                  : websocketState === 'error'
-                    ? t('resourceStatus.realtimeUnavailable')
-                    : t('resourceStatus.realtimeConnecting')
-              }}</span
-            >
-          </div>
-
-          <div v-if="connections.length > 0" class="space-y-3">
-            <div
-              v-for="conn in connections.slice(0, 6)"
-              :key="conn.id"
-              class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 shadow-sm"
-            >
-              <div class="flex items-center justify-between gap-3">
-                <p class="text-sm font-mono text-midori-300">{{ conn.assigned_ip }}</p>
-                <span
-                  class="rounded-full px-2.5 py-1 text-[11px] font-semibold border"
-                  :class="
-                    conn.is_active
-                      ? 'bg-midori-950/60 border-midori-700/50 text-midori-300'
-                      : 'bg-slate-800 border-slate-700 text-slate-400'
-                  "
-                >
-                  {{ conn.is_active ? t('common.active') : t('common.inactive') }}
-                </span>
-              </div>
-              <p class="mt-1 text-xs text-slate-300">
-                {{ conn.device_name || t('common.unnamed') }} ·
-                <span class="text-slate-500">{{ formatDateTime(conn.created_at) }}</span>
-              </p>
-              <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                ↑{{ formatBytes(conn.bytes_sent) }} · ↓{{ formatBytes(conn.bytes_received) }}
-              </p>
-            </div>
-          </div>
-
-          <p
-            v-else
-            class="rounded-xl bg-slate-100 px-4 py-8 text-center text-sm text-slate-500 dark:bg-slate-800 dark:text-slate-300"
+        </div>
+        <div v-if="summary.recent_sessions.length" class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <div
+            v-for="session in summary.recent_sessions"
+            :key="session.id"
+            class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 shadow-sm"
           >
-            {{ t('dashboard.noRecentConnections') }}
-          </p>
-        </article>
+            <div class="flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold text-white">{{ session.device_name }}</p>
+                <p class="mt-1 text-xs text-slate-400">
+                  {{ session.server_name }} · {{ session.protocol.toUpperCase() }}
+                </p>
+              </div>
+              <span
+                class="rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+                :class="
+                  session.is_active
+                    ? 'border-midori-700/50 bg-midori-950/60 text-midori-300'
+                    : 'border-slate-700 bg-slate-800 text-slate-400'
+                "
+              >
+                {{ session.is_active ? t('common.active') : t('common.inactive') }}
+              </span>
+            </div>
+            <p class="mt-3 text-xs font-mono text-midori-300">{{ session.assigned_ip }}</p>
+            <p class="mt-1 text-xs text-slate-500">
+              {{ formatDateTime(session.last_handshake ?? session.created_at) }} · ↑{{
+                formatBytes(session.bytes_sent)
+              }}
+              · ↓{{ formatBytes(session.bytes_received) }}
+            </p>
+          </div>
+        </div>
+        <p
+          v-else
+          class="rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-8 text-center text-sm text-slate-400"
+        >
+          {{ t('dashboard.noRecentConnections') }}
+        </p>
       </section>
 
       <section

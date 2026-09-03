@@ -4,12 +4,9 @@ import { flushPromises, mount } from '@vue/test-utils'
 const state = vi.hoisted(() => ({
   websocket: null as FakeWebSocket | null,
   auth: {
-    user: { email: 'admin@example.com' } as { email: string; quota?: Record<string, unknown> },
-    userQuota: null as Record<string, unknown> | null,
-    quotaState: 'idle',
+    user: { email: 'admin@example.com' },
     isAdmin: true,
     accessToken: 'access-token',
-    fetchQuota: vi.fn(),
   },
 }))
 
@@ -46,21 +43,6 @@ vi.mock('@/lib/platform', () => ({
 import { api } from '@/lib/api'
 import DashboardView from '@/views/DashboardView.vue'
 
-const connection = {
-  id: 'peer-1',
-  user_id: 'user-1',
-  server_id: 'server-1',
-  device_name: 'Laptop',
-  public_key: 'public-key',
-  assigned_ip: '10.8.0.2',
-  bytes_received: 1024,
-  bytes_sent: 2048,
-  last_handshake: null,
-  is_active: true,
-  created_at: '2026-09-03T00:00:00Z',
-  updated_at: '2026-09-03T00:00:00Z',
-}
-
 const adminStats = {
   total_users: 7,
   total_servers: 3,
@@ -71,17 +53,42 @@ const adminStats = {
   total_bytes_received: 8192,
 }
 
+const dashboardSummary = {
+  registered_devices: 1,
+  connected_devices: 1,
+  max_devices: 5,
+  available_devices: 4,
+  plan_slug: 'pro',
+  plan_name: 'Pro',
+  traffic: {
+    bytes_sent: 2048,
+    bytes_received: 1024,
+  },
+  recent_sessions: [
+    {
+      id: '6c5575e8-c212-4df5-b44f-e12ea5b1ec8e',
+      device_id: 'bd2c610d-5e38-4eeb-a460-30eddb4f20c5',
+      server_id: 'd1a60c46-9294-407a-90a4-7c0f29bda831',
+      server_name: 'Santo Domingo',
+      device_name: 'Work laptop',
+      protocol: 'wireguard',
+      assigned_ip: '10.8.0.2',
+      bytes_received: 1024,
+      bytes_sent: 2048,
+      last_handshake: null,
+      is_active: true,
+      created_at: '2026-09-03T00:00:00Z',
+    },
+  ],
+  infrastructure: adminStats,
+}
+
 describe('dashboard resource states', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     state.websocket = null
     state.auth.user = { email: 'admin@example.com' }
-    state.auth.userQuota = null
-    state.auth.quotaState = 'idle'
-    state.auth.fetchQuota.mockImplementation(async () => {
-      state.auth.quotaState = 'error'
-      return null
-    })
+    state.auth.isAdmin = true
     vi.stubGlobal('WebSocket', FakeWebSocket)
   })
 
@@ -92,54 +99,46 @@ describe('dashboard resource states', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Parte del Dashboard no está disponible')
-    expect(wrapper.text()).toContain('No disponible')
     expect(wrapper.text()).not.toContain('0 B')
     expect(wrapper.text()).not.toContain('0%')
   })
 
-  it('keeps quota and administrative statistics as separate resources', async () => {
-    const quota = {
-      connected_devices: 1,
-      max_devices: 5,
-      available_devices: 4,
-      plan_slug: 'pro',
-      plan_name: 'Pro',
-      devices_by_type: { desktop: 1, extension: 0, wireguard: 0 },
-    }
-    state.auth.fetchQuota.mockImplementation(async () => {
-      state.auth.userQuota = quota
-      state.auth.quotaState = 'ready'
-      return quota
-    })
-    vi.mocked(api.validated).mockImplementation(async (path: string) =>
-      path.includes('/admin/dashboard/stats') ? adminStats : [connection],
-    )
+  it('renders the coherent HTTP summary without counting sessions as devices', async () => {
+    vi.mocked(api.validated).mockResolvedValue(dashboardSummary)
 
     const wrapper = mount(DashboardView)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('1 / 5')
+    expect(api.validated).toHaveBeenCalledTimes(1)
+    expect(api.validated).toHaveBeenCalledWith(
+      '/api/v1/control/dashboard/summary',
+      expect.anything(),
+    )
+    expect(wrapper.text()).toContain('Dispositivos registrados')
+    expect(wrapper.text()).toContain('Dispositivos conectados')
+    expect(wrapper.text()).toContain('4 / 5')
+    expect(wrapper.text()).toContain('Work laptop')
     expect(wrapper.text()).toContain('7')
     expect(wrapper.text()).toContain('2/3')
     expect(wrapper.text()).toContain('1/5')
   })
 
+  it('accepts a user summary without administrator infrastructure or WebSocket', async () => {
+    state.auth.isAdmin = false
+    const { infrastructure: _infrastructure, ...userSummary } = dashboardSummary
+    vi.mocked(api.validated).mockResolvedValue(userSummary)
+
+    const wrapper = mount(DashboardView)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Dispositivos registrados')
+    expect(wrapper.text()).toContain('Work laptop')
+    expect(wrapper.text()).not.toContain('Métricas de plataforma')
+    expect(state.websocket).toBeNull()
+  })
+
   it('keeps HTTP statistics when real-time transport is lost', async () => {
-    state.auth.fetchQuota.mockImplementation(async () => {
-      state.auth.userQuota = {
-        connected_devices: 1,
-        max_devices: 5,
-        available_devices: 4,
-        plan_slug: 'pro',
-        plan_name: 'Pro',
-        devices_by_type: { desktop: 1, extension: 0, wireguard: 0 },
-      }
-      state.auth.quotaState = 'ready'
-      return state.auth.userQuota
-    })
-    vi.mocked(api.validated).mockImplementation(async (path: string) =>
-      path.includes('/admin/dashboard/stats') ? adminStats : [connection],
-    )
+    vi.mocked(api.validated).mockResolvedValue(dashboardSummary)
     const wrapper = mount(DashboardView)
     await flushPromises()
 
@@ -155,22 +154,27 @@ describe('dashboard resource states', () => {
     expect(wrapper.text()).toContain('1/5')
   })
 
+  it('keeps the last validated summary when a manual refresh fails', async () => {
+    vi.mocked(api.validated)
+      .mockResolvedValueOnce(dashboardSummary)
+      .mockRejectedValueOnce(new Error('offline'))
+
+    const wrapper = mount(DashboardView)
+    await flushPromises()
+
+    const refresh = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Actualizar resumen'))
+    await refresh?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Parte del Dashboard no está disponible')
+    expect(wrapper.text()).toContain('Work laptop')
+    expect(wrapper.text()).toContain('4 / 5')
+  })
+
   it('rejects incomplete WebSocket statistics and retains the HTTP snapshot', async () => {
-    state.auth.fetchQuota.mockImplementation(async () => {
-      state.auth.userQuota = {
-        connected_devices: 1,
-        max_devices: 5,
-        available_devices: 4,
-        plan_slug: 'pro',
-        plan_name: 'Pro',
-        devices_by_type: { desktop: 1, extension: 0, wireguard: 0 },
-      }
-      state.auth.quotaState = 'ready'
-      return state.auth.userQuota
-    })
-    vi.mocked(api.validated).mockImplementation(async (path: string) =>
-      path.includes('/admin/dashboard/stats') ? adminStats : [connection],
-    )
+    vi.mocked(api.validated).mockResolvedValue(dashboardSummary)
     const wrapper = mount(DashboardView)
     await flushPromises()
 
