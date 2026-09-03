@@ -26,4 +26,21 @@ describe('API errors', () => {
       message: 'The account quota is exhausted',
     })
   })
+
+  it('preserves Retry-After for a pending device cleanup', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      ok: false,
+      error: 'Device cleanup did not converge',
+      code: 'device_cleanup_pending',
+    }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': '5' },
+    })))
+
+    await expect(api.delete('/api/v1/control/devices/device-1')).rejects.toMatchObject({
+      status: 503,
+      code: 'device_cleanup_pending',
+      retryAfter: 5,
+    })
+  })
 })

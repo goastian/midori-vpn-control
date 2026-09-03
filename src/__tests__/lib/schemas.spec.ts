@@ -5,6 +5,8 @@ import {
   ServerSchema,
   ConnectionSchema,
   ConnectionConfigSchema,
+  DeviceSchema,
+  DeviceSessionPageSchema,
   AdminStatsSchema,
   AuditLogSchema,
   AdminPeerSchema,
@@ -145,6 +147,7 @@ describe('Zod API schemas', () => {
     it('parses a valid config', () => {
       const cfg = {
         peer_id: 'uuid-4',
+        device_id: 'device-4',
         peer_ip: '10.8.0.5',
         server_public_key: 'spk',
         server_endpoint: '1.2.3.4:51820',
@@ -152,6 +155,66 @@ describe('Zod API schemas', () => {
         allowed_ips: '0.0.0.0/0',
       }
       expect(() => ConnectionConfigSchema.parse(cfg)).not.toThrow()
+    })
+  })
+
+  describe('DeviceSchema', () => {
+    const connection = {
+      id: 'peer-1',
+      device_id: 'device-1',
+      server_id: 'server-1',
+      protocol: 'wireguard' as const,
+      public_key: 'public-key',
+      assigned_ip: '10.8.0.2/32',
+      is_active: true,
+      bytes_sent: 10,
+      bytes_received: 20,
+      last_handshake: null,
+      created_at: '2026-09-03T00:00:00Z',
+      expires_at: null,
+    }
+
+    it('parses one stable device with its active session', () => {
+      const parsed = DeviceSchema.parse({
+        id: 'device-1',
+        client_instance_id: 'client-1',
+        reported_name: 'Tecno-09',
+        alias: 'Laptop',
+        display_name: 'Laptop',
+        device_type: 'desktop',
+        adapter_reference: 'net-v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+        adapter_label: 'LAN · 7F3A91C2',
+        first_seen_at: '2026-09-02T00:00:00Z',
+        last_seen_at: '2026-09-03T00:00:00Z',
+        revoked_at: null,
+        status: 'connected',
+        active_connection: connection,
+      })
+      expect(parsed.active_connection?.id).toBe('peer-1')
+      expect(parsed.display_name).toBe('Laptop')
+    })
+
+    it('rejects a partial active session without replacing valid data', () => {
+      expect(() => DeviceSchema.parse({
+        id: 'device-1',
+        client_instance_id: null,
+        reported_name: 'Legacy',
+        alias: '',
+        display_name: 'Legacy',
+        device_type: 'manual',
+        adapter_reference: '',
+        adapter_label: '',
+        first_seen_at: '2026-09-02T00:00:00Z',
+        last_seen_at: '2026-09-03T00:00:00Z',
+        revoked_at: null,
+        status: 'connected',
+        active_connection: { id: 'partial' },
+      })).toThrow()
+    })
+
+    it('parses paginated history', () => {
+      const parsed = DeviceSessionPageSchema.parse({ items: [connection], page: 1, page_size: 10, total: 1 })
+      expect(parsed.items).toHaveLength(1)
     })
   })
 

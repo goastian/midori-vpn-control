@@ -6,6 +6,11 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Changed
 
+- Connections now render one stable row per registered device with its current
+  session, explicit client type, private adapter label and lifecycle state.
+  Historical sessions are fetched as a validated, paginated detail only when
+  expanded; alias, disconnect and device-revocation actions preserve visible
+  progress and cleanup failures.
 - Administrative user, user-detail, and server workflows now use localized
   accessible loading, empty, validation, dialog, and retry states. Create,
   update, suspend, and delete operations report outcomes inline, destructive

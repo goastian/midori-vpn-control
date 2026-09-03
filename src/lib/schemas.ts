@@ -80,6 +80,16 @@ export const ServerSchema = z.object({
 })
 
 export type Server = z.infer<typeof ServerSchema>
+export const ServerListSchema = z.array(ServerSchema)
+
+export const ServerPingResultSchema = z.object({
+  server_id: z.string(),
+  latency_ms: z.number(),
+  available: z.boolean(),
+})
+
+export type ServerPingResult = z.infer<typeof ServerPingResultSchema>
+export const ServerPingResultListSchema = z.array(ServerPingResultSchema)
 
 // ─── Connection / Peer ────────────────────────────────────
 
@@ -89,6 +99,7 @@ export const ConnectionSchema = z.object({
   public_key: z.string(),
   assigned_ip: z.string(),
   device_name: z.string(),
+  device_id: z.string().nullable().optional(),
   is_active: z.boolean(),
   bytes_sent: z.number(),
   bytes_received: z.number(),
@@ -97,9 +108,56 @@ export const ConnectionSchema = z.object({
 })
 
 export type Connection = z.infer<typeof ConnectionSchema>
+export const ConnectionListSchema = z.array(ConnectionSchema)
+
+export const DeviceConnectionSchema = z.object({
+  id: z.string(),
+  device_id: z.string(),
+  server_id: z.string(),
+  protocol: z.enum(['wireguard', 'openvpn', 'ikev2', 'wss', 'masque', 'proxy']),
+  public_key: z.string(),
+  assigned_ip: z.string(),
+  is_active: z.boolean(),
+  bytes_sent: z.number(),
+  bytes_received: z.number(),
+  last_handshake: z.string().nullable(),
+  created_at: z.string(),
+  expires_at: z.string().nullable(),
+})
+
+export type DeviceConnection = z.infer<typeof DeviceConnectionSchema>
+
+export const DeviceSchema = z.object({
+  id: z.string(),
+  client_instance_id: z.string().nullable(),
+  reported_name: z.string(),
+  alias: z.string(),
+  display_name: z.string(),
+  device_type: z.enum(['desktop', 'extension', 'manual', 'mobile']),
+  adapter_reference: z.string(),
+  adapter_label: z.string(),
+  first_seen_at: z.string(),
+  last_seen_at: z.string(),
+  revoked_at: z.string().nullable(),
+  status: z.enum(['connected', 'disconnected', 'connecting', 'disconnecting', 'cleanup_pending', 'revoked']),
+  active_connection: DeviceConnectionSchema.nullable(),
+})
+
+export type Device = z.infer<typeof DeviceSchema>
+export const DeviceListSchema = z.array(DeviceSchema)
+
+export const DeviceSessionPageSchema = z.object({
+  items: z.array(DeviceConnectionSchema),
+  page: z.number().int().min(1),
+  page_size: z.number().int().min(1).max(100),
+  total: z.number().int().min(0),
+})
+
+export type DeviceSessionPage = z.infer<typeof DeviceSessionPageSchema>
 
 export const ConnectionConfigSchema = z.object({
   peer_id: z.string(),
+  device_id: z.string(),
   peer_ip: z.string(),
   server_public_key: z.string(),
   server_endpoint: z.string(),

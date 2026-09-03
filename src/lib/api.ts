@@ -38,9 +38,9 @@ async function responseError(res: Response, fallback: string): Promise<APIError>
   }
   const retryAfterHeader = res.headers.get('Retry-After')
   const parsedRetryAfter = retryAfterHeader ? Number.parseInt(retryAfterHeader, 10) : Number.NaN
-  const retryAfter = res.status === 429
-    ? (Number.isNaN(parsedRetryAfter) ? 60 : Math.min(parsedRetryAfter, 120))
-    : undefined
+  const retryAfter = Number.isNaN(parsedRetryAfter)
+    ? (res.status === 429 ? 60 : undefined)
+    : Math.max(1, Math.min(parsedRetryAfter, 120))
   return new APIError(
     res.status,
     typeof payload.code === 'string' && payload.code ? payload.code : 'request_failed',

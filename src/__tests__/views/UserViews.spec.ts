@@ -84,17 +84,30 @@ describe('localized user views', () => {
 
   it('opens a named device dialog through an explicit configuration action', async () => {
     vi.mocked(api.get).mockImplementation(async (path: string) => {
+      if (path.endsWith('/quota')) return null
+      return []
+    })
+    vi.mocked(api.validated).mockImplementation(async (path: string) => {
       if (path.endsWith('/servers')) return [{
         id: 'server-1', name: 'Main', host: 'vpn.example', endpoint: '', port: 443,
         wg_port: 51820, public_key: 'public', location: 'Santo Domingo', country_code: 'DO',
-        max_peers: 100, current_peers: 1, is_active: true, transports: [],
-      }]
-      if (path.endsWith('/connections')) return [{
-        id: 'peer-1', server_id: 'server-1', public_key: 'peer-public', assigned_ip: '10.0.0.2/32',
-        device_name: 'Laptop', is_active: true, bytes_sent: 10, bytes_received: 20,
-        last_handshake: null, created_at: '2026-09-02T00:00:00Z',
-      }]
-      return []
+        max_peers: 100, current_peers: 1, is_active: true, supports_wireguard: true,
+        supports_proxy: false, supports_mesh_exit: false, transports: [],
+      }] as never
+      if (path.endsWith('/devices')) return [{
+        id: 'device-1', client_instance_id: 'client-1', reported_name: 'Laptop', alias: '',
+        display_name: 'Laptop', device_type: 'desktop', adapter_reference: '', adapter_label: '',
+        first_seen_at: '2026-09-02T00:00:00Z', last_seen_at: '2026-09-02T00:00:00Z',
+        revoked_at: null, status: 'connected',
+        active_connection: {
+          id: 'peer-1', device_id: 'device-1', server_id: 'server-1', protocol: 'wireguard',
+          public_key: 'peer-public', assigned_ip: '10.0.0.2/32', is_active: true,
+          bytes_sent: 10, bytes_received: 20, last_handshake: null,
+          created_at: '2026-09-02T00:00:00Z', expires_at: null,
+        },
+      }] as never
+      if (path.includes('/sessions?')) return { items: [], page: 1, page_size: 10, total: 0 } as never
+      return [] as never
     })
     vi.mocked(api.fetchRaw).mockResolvedValue({
       ok: true,
@@ -113,7 +126,7 @@ describe('localized user views', () => {
 
     expect(wrapper.find('label[for="connection-server"]').exists()).toBe(true)
     expect(wrapper.find('label[for="connection-device-name"]').exists()).toBe(true)
-    const viewAction = wrapper.findAll('button').find((button) => button.text().includes('Ver QR'))
+    const viewAction = wrapper.findAll('button').find((button) => button.text().includes('Detalles'))
     expect(viewAction).toBeDefined()
     await viewAction!.trigger('click')
     await flushPromises()
@@ -122,5 +135,15 @@ describe('localized user views', () => {
     expect(dialog.attributes('aria-modal')).toBe('true')
     expect(dialog.text()).toContain('Laptop')
     expect(dialog.find('button[aria-label="Cerrar"]').exists()).toBe(true)
+    const historyAction = dialog.findAll('button').find((button) => button.text().includes('Historial de sesiones'))
+    expect(historyAction).toBeDefined()
+    expect(historyAction!.attributes('aria-expanded')).toBe('false')
+    await historyAction!.trigger('click')
+    await flushPromises()
+    expect(historyAction!.attributes('aria-expanded')).toBe('true')
+    expect(api.validated).toHaveBeenCalledWith(
+      '/api/v1/control/devices/device-1/sessions?page=1&page_size=10',
+      expect.anything(),
+    )
   })
 })
