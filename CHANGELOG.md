@@ -4,6 +4,12 @@ All notable changes to Midori VPN Control are documented here.
 
 ## 2.0.0 - Unreleased
 
+### Governance
+
+- Added a repository-local AGPL-3.0-or-later license, private vulnerability
+  reporting policy and contribution guide; the README now separates
+  implemented behavior, deployment certification and pending release gates.
+
 ### Changed
 
 - Dashboard now consumes one validated summary built from registered devices,

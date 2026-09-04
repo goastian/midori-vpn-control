@@ -2,12 +2,20 @@
 
 Vue administration and user SPA for MidoriVPN Core. Runtime identity configuration is obtained from Core; release bundles do not embed staging or production Authentik identifiers.
 
+## Release status
+
+| Category | Current state |
+|---|---|
+| Implemented | Authenticated user and administration views, validated API contracts, explicit resource states and multicluster administration are present and covered by the repository checks. |
+| Certified | Integrated principal-staging workflows have been validated; that evidence does not certify an arbitrary deployment or regional server. |
+| Pending | 2.0.0 remains **Unreleased**. Regional acceptance and final coordinated artifact validation are still required. |
+
 ## Stack
 
 - Node.js 24 LTS and npm 12.
 - Vue 3, Pinia 4 and Vue Router 5.
 - TypeScript 6.0.3 and vue-tsc 3.
-- Vite 8, Vitest 4, ESLint 10 and Zod 4.
+- Vite 8, Vitest 5, ESLint 10 and Zod 4.
 
 TypeScript 7 is intentionally not installed while `typescript-eslint` declares a `<6.1` peer range.
 
@@ -54,4 +62,7 @@ Serve `dist/` behind the host HTTPS virtual host. The Nginx image/config provide
 ## License
 
 AGPL-3.0-or-later; see the
-[project license](https://github.com/goastian/midori-vpn-core/blob/main/LICENSE).
+[repository license](LICENSE).
+
+Security reports and contributions are governed by [SECURITY.md](SECURITY.md)
+and [CONTRIBUTING.md](CONTRIBUTING.md).
