@@ -220,11 +220,7 @@ export const fr = {
     trustTitle: 'Construit sur la transparence',
     trustSubtitle: 'Source ouverte. Vérifié. Aucun compromis sur la confidentialité.',
     downloadTitle: 'Téléchargez le client de bureau',
-    downloadSubtitle:
-      "Connectez-vous à MidoriVPN depuis votre ordinateur. Choisissez votre système d'exploitation.",
-    osLinux: 'Linux',
-    osWindows: 'Fenêtres',
-    osMacOS: 'macOS',
+    downloadSubtitle: 'La cible de la version 2.0 est le paquet RPM pour Linux x86_64.',
     ctaTitle: 'Prêt à prendre le contrôle de votre vie privée ?',
     ctaSubtitle:
       "Rejoignez des milliers d'utilisateurs qui font confiance à MidoriVPN pour une mise en réseau rapide, sécurisée et transparente.",
@@ -398,20 +394,10 @@ export const fr = {
         unknown: 'Non détecté',
       },
       actions: {
-        windows: 'Windows x64',
-        macosArm: 'macOS Apple Silicium',
-        macosIntel: 'macOS Intel',
-        linuxDeb: 'Paquet Linux (.deb)',
         linuxRpm: 'Paquet Linux (.rpm)',
-        linuxAppImage: "Image d'application Linux",
       },
       hints: {
-        windows: "Programme d'installation MSI pour Windows 10 et 11.",
-        macosArm: 'DMG pour Mac avec Apple Silicon.',
-        macosIntel: 'DMG pour Mac équipés de processeurs Intel.',
-        linuxDeb: 'Package recommandé pour Debian, Ubuntu et leurs dérivés.',
         linuxRpm: 'Package recommandé pour Fedora, RHEL, SUSE et dérivés.',
-        linuxAppImage: "Version portable qui ne nécessite pas d'installation.",
       },
     },
   },

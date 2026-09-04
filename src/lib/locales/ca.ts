@@ -216,11 +216,7 @@ export const ca = {
     trustTitle: 'Construït sobre la transparència',
     trustSubtitle: 'codi obert. Auditat. Sense compromís de privadesa.',
     downloadTitle: "Baixeu el client d'escriptori",
-    downloadSubtitle:
-      'Connecteu-vos a MidoriVPN des del vostre ordinador. Trieu el vostre sistema operatiu.',
-    osLinux: 'Linux',
-    osWindows: 'Windows',
-    osMacOS: 'macOS',
+    downloadSubtitle: 'L’objectiu de la versió 2.0 és el paquet RPM per a Linux x86_64.',
     ctaTitle: 'Estàs preparat per prendre el control de la teva privadesa?',
     ctaSubtitle:
       "Uneix-te a milers d'usuaris que confien en MidoriVPN per a una xarxa ràpida, segura i transparent.",
@@ -396,20 +392,10 @@ export const ca = {
         unknown: 'No detectat',
       },
       actions: {
-        windows: 'Windows x64',
-        macosArm: 'macOS Apple Silicon',
-        macosIntel: 'macOS Intel',
-        linuxDeb: 'Paquet Linux (.deb)',
         linuxRpm: 'Paquet Linux (.rpm)',
-        linuxAppImage: 'Linux AppImage',
       },
       hints: {
-        windows: 'Instal·lador MSI per a Windows 10 i 11.',
-        macosArm: 'DMG per a Mac amb Apple Silicon.',
-        macosIntel: 'DMG per a Mac amb processadors Intel.',
-        linuxDeb: 'Paquet recomanat per a Debian, Ubuntu i derivats.',
         linuxRpm: 'Paquet recomanat per a Fedora, RHEL, SUSE i derivats.',
-        linuxAppImage: 'Versió portàtil que no requereix instal·lació.',
       },
     },
   },

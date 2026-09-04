@@ -221,11 +221,7 @@ export const ru = {
     trustSubtitle:
       'Открытый исходный код. Проверено. Никаких компромиссов в отношении конфиденциальности.',
     downloadTitle: 'Загрузите настольный клиент',
-    downloadSubtitle:
-      'Подключитесь к MidoriVPN со своего компьютера. Выберите свою операционную систему.',
-    osLinux: 'Линукс',
-    osWindows: 'Окна',
-    osMacOS: 'macOS',
+    downloadSubtitle: 'Цель выпуска 2.0 — пакет RPM для Linux x86_64.',
     ctaTitle: 'Готовы взять под контроль вашу конфиденциальность?',
     ctaSubtitle:
       'Присоединяйтесь к тысячам пользователей, которые доверяют MidoriVPN для быстрого, безопасного и прозрачного подключения к сети.',
@@ -399,20 +395,10 @@ export const ru = {
         unknown: 'Не обнаружено',
       },
       actions: {
-        windows: 'Windows х64',
-        macosArm: 'macOS Apple Кремний',
-        macosIntel: 'macOS Intel',
-        linuxDeb: 'Пакет Linux (.deb)',
         linuxRpm: 'Пакет Linux (.rpm)',
-        linuxAppImage: 'Изображение приложения Linux',
       },
       hints: {
-        windows: 'Установщик MSI для Windows 10 и 11.',
-        macosArm: 'DMG для Mac с Apple Silicon.',
-        macosIntel: 'DMG для Mac с процессорами Intel.',
-        linuxDeb: 'Рекомендуемый пакет для Debian, Ubuntu и производных.',
         linuxRpm: 'Рекомендуемый пакет для Fedora, RHEL, SUSE и производных.',
-        linuxAppImage: 'Портативная версия, не требующая установки.',
       },
     },
   },

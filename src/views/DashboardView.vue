@@ -13,7 +13,7 @@ import {
   WebSocketStatsMessageSchema,
   type DashboardSummary,
 } from '../lib/schemas'
-import type { DesktopPlatform, LinuxPackageFormat, DetectionConfidence } from '../lib/platform'
+import type { DesktopPlatform, DetectionConfidence } from '../lib/platform'
 
 type DesktopDownload = {
   key: string
@@ -21,7 +21,6 @@ type DesktopDownload = {
   filename: string
   hintKey: string
   primary?: boolean
-  visible?: boolean
 }
 
 const auth = useAuthStore()
@@ -41,8 +40,6 @@ const dashboardHasError = computed(() => summaryState.value === 'error')
 
 const desktopReleaseBase = 'https://github.com/goastian/midori-vpn-desktop/releases/latest/download'
 const detectedDesktopPlatform = ref<DesktopPlatform>('unknown')
-const detectedDesktopArchitecture = ref('unknown')
-const detectedLinuxPackageFormat = ref<LinuxPackageFormat>('unknown')
 const detectedConfidence = ref<DetectionConfidence>('unknown')
 
 const activePercent = computed(() => {
@@ -106,105 +103,14 @@ const dashboardCards = computed(() => {
 const adminStats = computed(() => summary.value?.infrastructure ?? null)
 
 const desktopDownloads = computed<DesktopDownload[]>(() => {
-  const platform = detectedDesktopPlatform.value
-  const architecture = detectedDesktopArchitecture.value
-  const linuxPackageFormat = detectedLinuxPackageFormat.value
-  // Only mark a primary when confidence is 'detected' — avoids false recommendations.
-  const canRecommend = detectedConfidence.value === 'detected'
-
-  if (platform === 'windows') {
-    return [
-      {
-        key: 'windows',
-        label: t('dashboard.desktopDownload.actions.windows'),
-        filename: 'MidoriVPN-windows-x64.msi',
-        hintKey: 'dashboard.desktopDownload.hints.windows',
-        primary: canRecommend,
-      },
-    ]
-  }
-
-  if (platform === 'linux') {
-    return [
-      {
-        key: 'linux-rpm',
-        label: t('dashboard.desktopDownload.actions.linuxRpm'),
-        filename: 'MidoriVPN-linux-x64.rpm',
-        hintKey: 'dashboard.desktopDownload.hints.linuxRpm',
-        primary: canRecommend && linuxPackageFormat === 'rpm',
-      },
-      {
-        key: 'linux-deb',
-        label: t('dashboard.desktopDownload.actions.linuxDeb'),
-        filename: 'MidoriVPN-linux-x64.deb',
-        hintKey: 'dashboard.desktopDownload.hints.linuxDeb',
-        primary: canRecommend && linuxPackageFormat === 'deb',
-      },
-      {
-        key: 'linux-appimage',
-        label: t('dashboard.desktopDownload.actions.linuxAppImage'),
-        filename: 'MidoriVPN-linux-x64.AppImage',
-        hintKey: 'dashboard.desktopDownload.hints.linuxAppImage',
-      },
-    ]
-  }
-
-  if (platform === 'macos') {
-    return [
-      {
-        key: 'macos-arm64',
-        label: t('dashboard.desktopDownload.actions.macosArm'),
-        filename: 'MidoriVPN-macos-arm64.dmg',
-        hintKey: 'dashboard.desktopDownload.hints.macosArm',
-        primary: canRecommend && architecture === 'arm64',
-      },
-      {
-        key: 'macos-x64',
-        label: t('dashboard.desktopDownload.actions.macosIntel'),
-        filename: 'MidoriVPN-macos-x64.dmg',
-        hintKey: 'dashboard.desktopDownload.hints.macosIntel',
-        primary: canRecommend && architecture === 'x64',
-      },
-    ]
-  }
-
-  // unknown platform — show all options without recommendation
   return [
-    {
-      key: 'windows',
-      label: t('dashboard.desktopDownload.actions.windows'),
-      filename: 'MidoriVPN-windows-x64.msi',
-      hintKey: 'dashboard.desktopDownload.hints.windows',
-    },
-    {
-      key: 'macos-arm64',
-      label: t('dashboard.desktopDownload.actions.macosArm'),
-      filename: 'MidoriVPN-macos-arm64.dmg',
-      hintKey: 'dashboard.desktopDownload.hints.macosArm',
-    },
-    {
-      key: 'macos-x64',
-      label: t('dashboard.desktopDownload.actions.macosIntel'),
-      filename: 'MidoriVPN-macos-x64.dmg',
-      hintKey: 'dashboard.desktopDownload.hints.macosIntel',
-    },
     {
       key: 'linux-rpm',
       label: t('dashboard.desktopDownload.actions.linuxRpm'),
-      filename: 'MidoriVPN-linux-x64.rpm',
+      filename: 'midori-vpn-2.0.0-1.x86_64.rpm',
       hintKey: 'dashboard.desktopDownload.hints.linuxRpm',
-    },
-    {
-      key: 'linux-deb',
-      label: t('dashboard.desktopDownload.actions.linuxDeb'),
-      filename: 'MidoriVPN-linux-x64.deb',
-      hintKey: 'dashboard.desktopDownload.hints.linuxDeb',
-    },
-    {
-      key: 'linux-appimage',
-      label: t('dashboard.desktopDownload.actions.linuxAppImage'),
-      filename: 'MidoriVPN-linux-x64.AppImage',
-      hintKey: 'dashboard.desktopDownload.hints.linuxAppImage',
+      primary:
+        detectedDesktopPlatform.value === 'linux' && detectedConfidence.value === 'detected',
     },
   ]
 })
@@ -298,8 +204,6 @@ function connectWebSocket() {
 onMounted(async () => {
   const desktopEnvironment = await detectDesktopEnvironment()
   detectedDesktopPlatform.value = desktopEnvironment.platform
-  detectedDesktopArchitecture.value = desktopEnvironment.architecture
-  detectedLinuxPackageFormat.value = desktopEnvironment.linuxPackageFormat
   detectedConfidence.value = desktopEnvironment.confidence
 
   await loadDashboard()

@@ -8,6 +8,12 @@ const state = vi.hoisted(() => ({
     isAdmin: true,
     accessToken: 'access-token',
   },
+  desktopEnvironment: {
+    platform: 'unknown',
+    architecture: 'unknown',
+    linuxPackageFormat: 'unknown',
+    confidence: 'mobile',
+  },
 }))
 
 class FakeWebSocket {
@@ -32,12 +38,7 @@ vi.mock('@/stores/auth', () => ({
 vi.mock('@/lib/api', () => ({ api: { validated: vi.fn() } }))
 
 vi.mock('@/lib/platform', () => ({
-  detectDesktopEnvironment: vi.fn().mockResolvedValue({
-    platform: 'unknown',
-    architecture: 'unknown',
-    linuxPackageFormat: 'unknown',
-    confidence: 'mobile',
-  }),
+  detectDesktopEnvironment: vi.fn(() => Promise.resolve(state.desktopEnvironment)),
 }))
 
 import { api } from '@/lib/api'
@@ -89,7 +90,37 @@ describe('dashboard resource states', () => {
     state.websocket = null
     state.auth.user = { email: 'admin@example.com' }
     state.auth.isAdmin = true
+    state.desktopEnvironment = {
+      platform: 'unknown',
+      architecture: 'unknown',
+      linuxPackageFormat: 'unknown',
+      confidence: 'mobile',
+    }
     vi.stubGlobal('WebSocket', FakeWebSocket)
+  })
+
+  it('offers only the supported Linux x86_64 RPM artifact', async () => {
+    state.auth.isAdmin = false
+    state.desktopEnvironment = {
+      platform: 'linux',
+      architecture: 'x64',
+      linuxPackageFormat: 'rpm',
+      confidence: 'detected',
+    }
+    const { infrastructure: _infrastructure, ...userSummary } = dashboardSummary
+    vi.mocked(api.validated).mockResolvedValue(userSummary)
+
+    const wrapper = mount(DashboardView)
+    await flushPromises()
+
+    const artifactLinks = wrapper.findAll('a').filter((link) =>
+      link.attributes('href')?.includes('/releases/latest/download/'),
+    )
+    expect(artifactLinks).toHaveLength(2)
+    expect(artifactLinks.every((link) =>
+      link.attributes('href')?.endsWith('/midori-vpn-2.0.0-1.x86_64.rpm'),
+    )).toBe(true)
+    expect(wrapper.html()).not.toMatch(/\.(?:deb|AppImage|msi|exe|dmg)/)
   })
 
   it('renders unavailable values instead of zero when initial resources fail', async () => {

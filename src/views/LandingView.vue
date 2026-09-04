@@ -154,43 +154,11 @@ const trustCards = computed(() => [
   { key: 'gdpr', title: t('landing.trustCards.gdpr.title'), desc: t('landing.trustCards.gdpr.desc') },
 ])
 
-// Desktop client download: OS tabs with auto-detection
-type DesktopOS = 'linux' | 'windows' | 'macos'
+const DESKTOP_RELEASES_URL = 'https://github.com/goastian/midori-vpn-desktop/releases/latest'
 
-function detectOS(): DesktopOS {
-  if (typeof navigator === 'undefined') return 'linux'
-  const ua = (navigator.userAgent || '').toLowerCase()
-  const platform = (navigator.platform || '').toLowerCase()
-  if (ua.includes('win') || platform.includes('win')) return 'windows'
-  if (ua.includes('mac') || platform.includes('mac') || ua.includes('darwin')) return 'macos'
-  return 'linux'
-}
-
-const selectedOS = ref<DesktopOS>(detectOS())
-
-const DESKTOP_RELEASES_URL = 'https://github.com/astian/midorivpn-desktop/releases/latest'
-
-const desktopDownloads = computed<Record<DesktopOS, { label: string; ext: string; url: string }[]>>(() => ({
-  linux: [
-    { label: 'AppImage', ext: '.AppImage', url: DESKTOP_RELEASES_URL },
-    { label: 'Debian / Ubuntu', ext: '.deb', url: DESKTOP_RELEASES_URL },
-    { label: 'Fedora / RHEL', ext: '.rpm', url: DESKTOP_RELEASES_URL },
-    { label: 'openSUSE / SUSE', ext: '.rpm', url: DESKTOP_RELEASES_URL },
-  ],
-  windows: [
-    { label: 'Installer', ext: '.msi', url: DESKTOP_RELEASES_URL },
-    { label: 'Setup', ext: '.exe', url: DESKTOP_RELEASES_URL },
-  ],
-  macos: [
-    { label: 'macOS', ext: '.dmg', url: DESKTOP_RELEASES_URL },
-  ],
-}))
-
-const osTabs = computed<{ key: DesktopOS; label: string }[]>(() => [
-  { key: 'linux', label: t('landing.osLinux') },
-  { key: 'windows', label: t('landing.osWindows') },
-  { key: 'macos', label: t('landing.osMacOS') },
-])
+const desktopDownloads = [
+  { label: 'Linux x86_64', ext: '.rpm', url: DESKTOP_RELEASES_URL },
+]
 
 function formatNumber(n: number): string {
   if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
@@ -542,7 +510,7 @@ class="w-11 h-11 rounded-xl flex items-center justify-center mb-4 transition-col
           </div>
         </div>
 
-        <!-- Desktop client download with OS tabs -->
+        <!-- Supported Desktop release target -->
         <div class="mt-16">
           <div class="text-center">
             <h3 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
@@ -554,38 +522,10 @@ class="w-11 h-11 rounded-xl flex items-center justify-center mb-4 transition-col
           </div>
 
           <div class="mt-8 max-w-3xl mx-auto">
-            <!-- Tabs -->
-            <div role="tablist" class="flex items-center justify-center gap-2 p-1 bg-gray-800/60 border border-gray-700 rounded-xl w-fit mx-auto">
-              <button
-                v-for="tab in osTabs"
-                :key="tab.key"
-                role="tab"
-                :aria-selected="selectedOS === tab.key"
-                class="px-4 py-2 text-sm font-semibold rounded-lg transition-colors"
-                :class="selectedOS === tab.key
-                  ? 'bg-midori-500 text-white shadow'
-                  : 'text-gray-300 hover:text-white hover:bg-gray-700/60'"
-                @click="selectedOS = tab.key"
-              >
-                <span class="inline-flex items-center gap-2">
-                  <svg v-if="tab.key === 'linux'" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M12 2C8.5 2 7 5 7 8c0 1.5.4 2.8 1 3.7-.7.6-1.4 1.6-2.1 3-.7 1.6-2.5 2-2.7 3.4-.2 1.1.7 1.6 1.8 1.4 1.1-.2 1.3.4 2 1.3.6.8 2.1 1.2 4 1.2s3.4-.4 4-1.2c.7-.9.9-1.5 2-1.3 1.1.2 2-.3 1.8-1.4-.2-1.4-2-1.8-2.7-3.4-.7-1.4-1.4-2.4-2.1-3 .6-.9 1-2.2 1-3.7 0-3-1.5-6-5-6zm-1.5 4.5c.4 0 .7.4.7 1s-.3 1-.7 1-.7-.4-.7-1 .3-1 .7-1zm3 0c.4 0 .7.4.7 1s-.3 1-.7 1-.7-.4-.7-1 .3-1 .7-1z"/>
-                  </svg>
-                  <svg v-else-if="tab.key === 'windows'" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M3 5.5L11 4.3v7.2H3V5.5zm0 13L11 19.7v-7.2H3v6zm9-14.4L22 3v9h-10V4.1zm0 9.4h10v9l-10-1.4v-7.6z"/>
-                  </svg>
-                  <svg v-else class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M16.5 12.5c0-2.5 2-3.7 2.1-3.8-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3.1 2.5 1.2-.1 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8-.1-.1-2.5-1-2.7-3.9zM14.2 5.4c.7-.8 1.1-2 1-3.2-1 .1-2.2.7-2.9 1.5-.7.7-1.2 1.9-1.1 3.1 1.1.1 2.3-.6 3-1.4z"/>
-                  </svg>
-                  {{ tab.label }}
-                </span>
-              </button>
-            </div>
-
             <!-- Download options -->
-            <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="mt-6 grid gap-3 sm:grid-cols-2">
               <a
-                v-for="option in desktopDownloads[selectedOS]"
+                v-for="option in desktopDownloads"
                 :key="option.ext"
                 :href="option.url"
                 target="_blank"
