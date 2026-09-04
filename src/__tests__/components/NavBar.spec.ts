@@ -16,6 +16,7 @@ function makeRouter() {
       { path: '/audit', component: { template: '<div />' } },
       { path: '/admin/users', component: { template: '<div />' } },
       { path: '/admin/servers', component: { template: '<div />' } },
+      { path: '/admin/clusters', component: { template: '<div />' } },
       { path: '/admin/peers', component: { template: '<div />' } },
       { path: '/admin/audit', component: { template: '<div />' } },
       { path: '/admin/mesh', component: { template: '<div />' } },
@@ -77,6 +78,7 @@ describe('NavBar', () => {
     })
 
     expect(wrapper.text()).toContain('Admin Servers')
+    expect(wrapper.text()).toContain('Clústeres')
     expect(wrapper.text()).toContain('Usuarios')
     expect(wrapper.text()).toContain('Salud del clúster')
     expect(wrapper.text()).toContain('Extensiones')

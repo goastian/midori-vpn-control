@@ -17,6 +17,9 @@ import {
   AdminPeerSchema,
   AdminPeerPageSchema,
   AdminUserDetailSchema,
+  AdminClusterPageSchema,
+  AdminCoreNodePageSchema,
+  NodeEnrollmentTokenSchema,
   HealthEnvelopeSchema,
   WebSocketStatsMessageSchema,
 } from '@/lib/schemas'
@@ -450,6 +453,156 @@ describe('Zod API schemas', () => {
       expect(HealthEnvelopeSchema.safeParse({ ok: true, data: { status: 'ready' } }).success).toBe(
         false,
       )
+    })
+  })
+
+  describe('multicluster administration schemas', () => {
+    const clusterID = '9c5740cf-73c7-4eb2-a659-8d074d94705b'
+    const nodeID = '96e4f25a-a915-46c2-8b2d-1250c592ffbd'
+    const timestamps = {
+      created_at: '2026-09-03T12:00:00Z',
+      updated_at: '2026-09-03T12:00:00Z',
+    }
+
+    it('accepts bounded cluster and node pages while stripping forbidden material', () => {
+      const clusters = AdminClusterPageSchema.parse({
+        items: [
+          {
+            id: clusterID,
+            name: 'caribbean',
+            region: 'do-sdq',
+            state: 'active',
+            policy_labels: { tier: 'regional' },
+            is_principal: false,
+            node_count: 1,
+            active_node_count: 1,
+            healthy_node_count: 1,
+            ...timestamps,
+          },
+        ],
+        page: 1,
+        page_size: 20,
+        total: 1,
+      })
+      const nodes = AdminCoreNodePageSchema.parse({
+        items: [
+          {
+            id: nodeID,
+            cluster_id: clusterID,
+            name: 'regional-01',
+            management_host: 'regional-01.internal.test',
+            state: 'active',
+            core_version: '2.0.0',
+            enrolled: true,
+            enrolled_at: '2026-09-03T11:00:00Z',
+            last_seen_at: '2026-09-03T12:00:00Z',
+            desired_revision: 4,
+            desired_expires_at: '2026-09-03T12:15:00Z',
+            minimum_core_version: '2.0.0',
+            applied_revision: 4,
+            health_status: 'healthy',
+            version_compatible: true,
+            current_peers: 2,
+            max_peers: 100,
+            transport_states: { wireguard: { status: 'healthy', certified: true } },
+            last_error_code: '',
+            observed_at: '2026-09-03T12:00:00Z',
+            server_id: 'e36f54e9-44b7-48d8-aa12-3c738d9ac134',
+            server_name: 'Regional 01',
+            placement_ready: true,
+            placement_reason: 'ready',
+            identity_public_key: 'must-not-reach-the-view',
+            token_hash: 'must-not-reach-the-view',
+            signature: 'must-not-reach-the-view',
+            ...timestamps,
+          },
+        ],
+        page: 1,
+        page_size: 50,
+        total: 1,
+      })
+
+      expect(clusters.items[0].name).toBe('caribbean')
+      expect(nodes.items[0]).not.toHaveProperty('identity_public_key')
+      expect(nodes.items[0]).not.toHaveProperty('token_hash')
+      expect(nodes.items[0]).not.toHaveProperty('signature')
+    })
+
+    it('rejects inconsistent counts, capacity and placement state', () => {
+      expect(
+        AdminClusterPageSchema.safeParse({
+          items: [
+            {
+              id: clusterID,
+              name: 'invalid',
+              region: 'test',
+              state: 'active',
+              policy_labels: {},
+              is_principal: false,
+              node_count: 1,
+              active_node_count: 2,
+              healthy_node_count: 0,
+              ...timestamps,
+            },
+          ],
+          page: 1,
+          page_size: 20,
+          total: 1,
+        }).success,
+      ).toBe(false)
+
+      const baseNode = {
+        id: nodeID,
+        cluster_id: clusterID,
+        name: 'regional-01',
+        management_host: 'regional-01.internal.test',
+        state: 'active',
+        core_version: '2.0.0',
+        enrolled: true,
+        enrolled_at: '2026-09-03T11:00:00Z',
+        last_seen_at: '2026-09-03T12:00:00Z',
+        desired_revision: 4,
+        desired_expires_at: '2026-09-03T12:15:00Z',
+        minimum_core_version: '2.0.0',
+        applied_revision: 4,
+        health_status: 'healthy',
+        version_compatible: true,
+        current_peers: 101,
+        max_peers: 100,
+        transport_states: {},
+        last_error_code: '',
+        observed_at: '2026-09-03T12:00:00Z',
+        server_id: null,
+        server_name: '',
+        placement_ready: true,
+        placement_reason: 'server_unbound',
+        ...timestamps,
+      }
+      expect(
+        AdminCoreNodePageSchema.safeParse({
+          items: [baseNode],
+          page: 1,
+          page_size: 50,
+          total: 1,
+        }).success,
+      ).toBe(false)
+    })
+
+    it('accepts only canonical one-use enrollment tokens', () => {
+      expect(
+        NodeEnrollmentTokenSchema.safeParse({
+          node_id: nodeID,
+          token: 'A'.repeat(43),
+          expires_at: '2026-09-03T12:15:00Z',
+        }).success,
+      ).toBe(true)
+      expect(
+        NodeEnrollmentTokenSchema.safeParse({
+          node_id: nodeID,
+          token: 'plaintext token with spaces',
+          expires_at: '2026-09-03T12:15:00Z',
+        }).success,
+      ).toBe(false)
     })
   })
 })

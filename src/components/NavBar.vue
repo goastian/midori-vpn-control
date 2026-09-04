@@ -31,6 +31,7 @@ const navGroups = computed(() => {
         { name: t('nav.adminServers'), path: '/admin/servers', icon: 'shield' },
         { name: t('nav.adminPeers'), path: '/admin/peers', icon: 'pulse' },
         { name: t('nav.adminMesh'), path: '/admin/mesh', icon: 'mesh' },
+        { name: t('nav.adminClusters'), path: '/admin/clusters', icon: 'cluster' },
         { name: t('nav.adminHealth'), path: '/admin/health', icon: 'health' },
         { name: t('nav.adminExtensions'), path: '/admin/extensions', icon: 'extension' },
         { name: t('nav.adminLogs'), path: '/admin/audit', icon: 'log' },
@@ -63,6 +64,8 @@ function iconPath(icon: string) {
       return 'M5 2.5A1.5 1.5 0 003.5 4v12A1.5 1.5 0 005 17.5h10a1.5 1.5 0 001.5-1.5V4A1.5 1.5 0 0015 2.5H5zm2.25 4a.75.75 0 000 1.5h5.5a.75.75 0 100-1.5h-5.5zm0 3a.75.75 0 000 1.5h5.5a.75.75 0 100-1.5h-5.5zm0 3a.75.75 0 000 1.5H11a.75.75 0 100-1.5H7.25z'
     case 'mesh':
       return 'M5 3a2 2 0 100 4 2 2 0 000-4zm8 0a2 2 0 100 4 2 2 0 000-4zM3 10a2 2 0 114 0 2 2 0 01-4 0zm8 0a2 2 0 114 0 2 2 0 01-4 0zM5 14.5a2 2 0 100 4 2 2 0 000-4zm8 0a2 2 0 100 4 2 2 0 000-4zM7 5h6M7 12h6M5 8v4m10-4v4M7 16.5h6'
+    case 'cluster':
+      return 'M4 3.5A1.5 1.5 0 015.5 2h9A1.5 1.5 0 0116 3.5v3A1.5 1.5 0 0114.5 8h-9A1.5 1.5 0 014 6.5v-3zm1.5 7h9A1.5 1.5 0 0116 12v4.5a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 014 16.5V12a1.5 1.5 0 011.5-1.5zM7 4.25a.75.75 0 100 1.5.75.75 0 000-1.5zm0 9a.75.75 0 100 1.5.75.75 0 000-1.5z'
     case 'extension':
       return 'M7.5 2a1 1 0 00-1 1v2.5H4a2 2 0 00-2 2v2a1 1 0 001 1h1a1.5 1.5 0 010 3H3a1 1 0 00-1 1v2a2 2 0 002 2h4a1 1 0 001-1v-1a1.5 1.5 0 013 0v1a1 1 0 001 1h3a2 2 0 002-2v-3a1 1 0 00-1-1h-1a1.5 1.5 0 010-3h1a1 1 0 001-1v-1a2 2 0 00-2-2h-3.5V3a1 1 0 00-1-1h-3z'
     case 'health':

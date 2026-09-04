@@ -360,6 +360,121 @@ export const AdminMeshNetworkListSchema = z.array(AdminMeshNetworkSchema)
 export const AdminMeshNetworkPageSchema = pageSchema(AdminMeshNetworkSchema)
 export type AdminMeshNetworkPage = z.infer<typeof AdminMeshNetworkPageSchema>
 
+// ─── Admin multicluster ──────────────────────────────────
+
+export const ClusterStateSchema = z.enum([
+  'enrolling',
+  'inactive',
+  'active',
+  'draining',
+  'revoked',
+  'retired',
+])
+
+export const AdminClusterSchema = z
+  .object({
+    id: z.string().uuid(),
+    name: NonEmptyStringSchema.max(64),
+    region: NonEmptyStringSchema.max(64),
+    state: ClusterStateSchema,
+    policy_labels: z.record(z.string(), z.string()).default({}),
+    is_principal: z.boolean(),
+    node_count: NonNegativeIntegerSchema,
+    active_node_count: NonNegativeIntegerSchema,
+    healthy_node_count: NonNegativeIntegerSchema,
+    created_at: TimestampSchema,
+    updated_at: TimestampSchema,
+  })
+  .refine(
+    (cluster) =>
+      cluster.active_node_count <= cluster.node_count &&
+      cluster.healthy_node_count <= cluster.node_count,
+    { message: 'Cluster summary counts are inconsistent' },
+  )
+
+export type AdminCluster = z.infer<typeof AdminClusterSchema>
+export const AdminClusterPageSchema = pageSchema(AdminClusterSchema)
+export type AdminClusterPage = z.infer<typeof AdminClusterPageSchema>
+
+export const AdminNodeTransportStateSchema = z.object({
+  status: z.enum(['unknown', 'healthy', 'degraded', 'error', 'disabled']),
+  certified: z.boolean(),
+})
+
+export const PlacementReasonSchema = z.enum([
+  'ready',
+  'cluster_not_active',
+  'node_not_active',
+  'identity_not_enrolled',
+  'server_unbound',
+  'server_inactive',
+  'desired_missing',
+  'desired_expired',
+  'observation_missing',
+  'heartbeat_stale',
+  'health_unavailable',
+  'version_incompatible',
+  'version_drift',
+  'revision_drift',
+  'capacity_full',
+  'transport_unavailable',
+])
+
+export const AdminCoreNodeSchema = z
+  .object({
+    id: z.string().uuid(),
+    cluster_id: z.string().uuid(),
+    name: NonEmptyStringSchema,
+    management_host: NonEmptyStringSchema,
+    state: ClusterStateSchema,
+    core_version: z.string().default(''),
+    enrolled: z.boolean(),
+    enrolled_at: TimestampSchema.nullable(),
+    last_seen_at: TimestampSchema.nullable(),
+    desired_revision: z.number().int().positive().nullable(),
+    desired_expires_at: TimestampSchema.nullable(),
+    minimum_core_version: z.string().default(''),
+    applied_revision: z.number().int().positive().nullable(),
+    health_status: z.enum(['', 'unknown', 'healthy', 'degraded', 'error']),
+    version_compatible: z.boolean().nullable(),
+    current_peers: NonNegativeIntegerSchema.nullable(),
+    max_peers: NonNegativeIntegerSchema.nullable(),
+    transport_states: z.record(z.string(), AdminNodeTransportStateSchema).default({}),
+    last_error_code: z.string().regex(/^$|^[a-z0-9_]{1,64}$/),
+    observed_at: TimestampSchema.nullable(),
+    server_id: z.string().uuid().nullable(),
+    server_name: z.string().default(''),
+    placement_ready: z.boolean(),
+    placement_reason: PlacementReasonSchema,
+    created_at: TimestampSchema,
+    updated_at: TimestampSchema,
+  })
+  .refine(
+    (node) =>
+      (node.current_peers === null && node.max_peers === null) ||
+      (node.current_peers !== null &&
+        node.max_peers !== null &&
+        node.current_peers <= node.max_peers),
+    { message: 'Observed node capacity is inconsistent' },
+  )
+  .refine((node) => node.enrolled === (node.enrolled_at !== null), {
+    message: 'Node enrollment state is inconsistent',
+  })
+  .refine((node) => node.placement_ready === (node.placement_reason === 'ready'), {
+    message: 'Placement readiness and reason disagree',
+  })
+
+export type AdminCoreNode = z.infer<typeof AdminCoreNodeSchema>
+export const AdminCoreNodePageSchema = pageSchema(AdminCoreNodeSchema)
+export type AdminCoreNodePage = z.infer<typeof AdminCoreNodePageSchema>
+
+export const NodeEnrollmentTokenSchema = z.object({
+  node_id: z.string().uuid(),
+  token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  expires_at: TimestampSchema,
+})
+export type NodeEnrollmentToken = z.infer<typeof NodeEnrollmentTokenSchema>
+
 // ─── Operational health ───────────────────────────────────
 
 export const HealthCheckSchema = z.object({

@@ -59,6 +59,12 @@ const router = createRouter({
       meta: { admin: true },
     },
     {
+      path: '/admin/clusters',
+      name: 'admin-clusters',
+      component: () => import('../views/admin/AdminClustersView.vue'),
+      meta: { admin: true },
+    },
+    {
       path: '/admin/users',
       name: 'admin-users',
       component: () => import('../views/admin/AdminUsersView.vue'),
