@@ -65,6 +65,9 @@ jobs:
           set -Eeuo pipefail
           mkdir -p dist-release
           cp "${RUNNER_TEMP}/midorivpn-control-2.0.0.oci.tar" dist-release/
+          CONTAINER_ENGINE=docker bash scripts/scan-oci.sh archive \
+            dist-release/midorivpn-control-2.0.0.oci.tar \
+            dist-release/midorivpn-control-2.0.0.trivy.json
           docker run --rm \
             -e SYFT_CACHE_DIR=/tmp/syft-cache \
             -v "${PWD}/dist-release:/artifacts" \
@@ -77,7 +80,7 @@ jobs:
             --argjson epoch "$SOURCE_DATE_EPOCH" \
             '{schema_version:1,component:"control",version:"2.0.0",commit:$commit,image_digest:$digest,source_date_epoch:$epoch}' \
             > dist-release/midorivpn-control-2.0.0.build.json
-          (cd dist-release && sha256sum midorivpn-control-2.0.0.oci.tar midorivpn-control-2.0.0.spdx.json midorivpn-control-2.0.0.build.json > SHA256SUMS)
+          (cd dist-release && sha256sum midorivpn-control-2.0.0.oci.tar midorivpn-control-2.0.0.spdx.json midorivpn-control-2.0.0.trivy.json midorivpn-control-2.0.0.build.json > SHA256SUMS)
           (cd dist-release && sha256sum -c SHA256SUMS)
 
       - name: Retain evidence for release review

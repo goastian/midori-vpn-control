@@ -18,6 +18,11 @@ RUN npm run build
 # ── Stage 2: Production Nginx Runtime ──
 FROM docker.io/library/nginx:1.31.4-alpine3.24@sha256:1f25fedd50aec27413031afb3a4f8ee4effcc9d843f6a76e81bfa92245ac5c06
 
+RUN apk add --no-cache --upgrade \
+    libcrypto3=3.5.8-r0 \
+    libssl3=3.5.8-r0 \
+    libexpat=2.8.4-r0
+
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 

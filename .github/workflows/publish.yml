@@ -102,12 +102,15 @@ jobs:
           provenance: mode=max
           sbom: true
 
-      - name: Generate an independent SPDX SBOM from the pushed digest
+      - name: Scan the pushed digest and generate its independent SPDX SBOM
         env:
           IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
         run: |
           set -Eeuo pipefail
           mkdir -p dist-release
+          CONTAINER_ENGINE=docker bash scripts/scan-oci.sh image \
+            "${IMAGE_NAME}@${IMAGE_DIGEST}" \
+            dist-release/midorivpn-control-2.0.0.trivy.json
           docker run --rm \
             -e SYFT_CACHE_DIR=/tmp/syft-cache \
             -v "${HOME}/.docker/config.json:/root/.docker/config.json:ro" \
