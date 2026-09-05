@@ -90,6 +90,20 @@ describe('localized user views', () => {
   it('opens a named device dialog through an explicit configuration action', async () => {
     vi.mocked(api.validated).mockImplementation(async (path: string) => {
       if (path.endsWith('/quota')) return null as never
+      if (path.includes('/servers/candidates'))
+        return [
+          {
+            id: 'server-1',
+            name: 'Main',
+            location: 'Santo Domingo',
+            country_code: 'DO',
+            protocol: 'wireguard',
+            probe_url: 'https://vpn.example/.well-known/midorivpn/edge-health',
+            endpoint: 'vpn.example',
+            port: 51820,
+            priority: 100,
+          },
+        ] as never
       if (path.endsWith('/servers'))
         return [
           {

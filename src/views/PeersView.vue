@@ -16,8 +16,8 @@ import {
   DeviceSchema,
   DeviceSessionPageSchema,
   LifecycleStatusSchema,
+  ServerCandidateListSchema,
   ServerListSchema,
-  ServerPingResultListSchema,
 } from '../lib/schemas'
 import type {
   ConnectionConfig,
@@ -25,7 +25,7 @@ import type {
   DeviceConnection,
   DeviceSessionPage,
   Server,
-  ServerPingResult,
+  ServerCandidate,
 } from '../lib/schemas'
 import { PRIVATE_KEYS_STORAGE_KEY } from '../lib/storage-keys'
 import { beginResourceLoad, completeResourceLoad, type ResourceState } from '../lib/resource-state'
@@ -36,11 +36,10 @@ const auth = useAuthStore()
 const { t } = useLocale()
 
 const servers = ref<Server[]>([])
+const candidates = ref<ServerCandidate[]>([])
 const devices = ref<Device[]>([])
-const serverPing = ref<Record<string, ServerPingResult>>({})
 const serversState = ref<ResourceState>('idle')
 const devicesState = ref<ResourceState>('idle')
-const pingState = ref<ResourceState>('idle')
 const connecting = ref(false)
 const pendingDeviceID = ref('')
 const pendingDeviceAction = ref<'disconnect' | 'delete' | ''>('')
@@ -83,7 +82,12 @@ const deviceModal = ref<{
 
 onMounted(async () => {
   await Promise.all([loadData(), auth.fetchQuota()])
-  if (route.query.server_id) form.value.server_id = String(route.query.server_id)
+  if (
+    route.query.server_id &&
+    candidates.value.some((candidate) => candidate.id === String(route.query.server_id))
+  ) {
+    form.value.server_id = String(route.query.server_id)
+  }
   document.addEventListener('keydown', onEscapeKey)
 })
 
@@ -106,14 +110,22 @@ function showNotification(type: 'success' | 'error', message: string) {
 }
 
 async function loadData() {
-  await Promise.all([loadServers(), loadDevices(), loadPings()])
+  await Promise.all([loadServers(), loadDevices()])
 }
 
 async function loadServers() {
   serversState.value = beginResourceLoad(servers.value.length > 0 || serversState.value === 'empty')
   try {
-    servers.value = await api.validated('/api/v1/control/servers', ServerListSchema)
-    serversState.value = completeResourceLoad(servers.value.length > 0)
+    const [catalog, eligible] = await Promise.all([
+      api.validated('/api/v1/control/servers', ServerListSchema),
+      api.validated(
+        '/api/v1/control/servers/candidates?protocol=wireguard',
+        ServerCandidateListSchema,
+      ),
+    ])
+    servers.value = catalog
+    candidates.value = eligible
+    serversState.value = completeResourceLoad(candidates.value.length > 0)
   } catch {
     serversState.value = 'error'
   }
@@ -137,27 +149,8 @@ async function loadDevices() {
   }
 }
 
-async function loadPings() {
-  pingState.value = beginResourceLoad(
-    Object.keys(serverPing.value).length > 0 || pingState.value === 'empty',
-  )
-  try {
-    const pings = await api.validated('/api/v1/control/servers/ping', ServerPingResultListSchema)
-    serverPing.value = Object.fromEntries(pings.map((item) => [item.server_id, item]))
-    pingState.value = completeResourceLoad(pings.length > 0)
-  } catch {
-    pingState.value = 'error'
-  }
-}
-
 function availableServerCount(): number {
-  return servers.value.filter((server) => serverPing.value[server.id]?.available !== false).length
-}
-
-function selectedServerUnavailable(): boolean {
-  return Boolean(
-    form.value.server_id && serverPing.value[form.value.server_id]?.available === false,
-  )
+  return candidates.value.length
 }
 
 function deviceBadge(type: Device['device_type']) {
@@ -208,7 +201,11 @@ function effectiveStatus(device: Device): Device['status'] {
 
 function serverName(id?: string): string {
   if (!id) return t('common.unavailable')
-  return servers.value.find((server) => server.id === id)?.name || t('common.unavailable')
+  return (
+    servers.value.find((server) => server.id === id)?.name ||
+    candidates.value.find((server) => server.id === id)?.name ||
+    t('common.unavailable')
+  )
 }
 
 function sessionIP(session?: DeviceConnection | null): string {
@@ -572,14 +569,8 @@ function downloadQR() {
               class="w-full rounded-xl border border-slate-700/80 bg-slate-950/60 px-4 py-2.5 text-sm text-white outline-none focus:border-midori-500 disabled:opacity-50"
             >
               <option value="">{{ t('connectionsView.autoServer') }}</option>
-              <option v-for="server in servers" :key="server.id" :value="server.id">
-                {{ server.name }} ({{ server.location }}){{
-                  serverPing[server.id]
-                    ? serverPing[server.id].available
-                      ? ` · ${serverPing[server.id].latency_ms}ms`
-                      : ` · ${t('connectionsView.unavailableLabel')}`
-                    : ''
-                }}
+              <option v-for="server in candidates" :key="server.id" :value="server.id">
+                {{ server.name }} ({{ server.location }})
               </option>
             </select>
           </div>
@@ -630,30 +621,6 @@ function downloadQR() {
           class="rounded-xl border border-amber-800/40 bg-amber-950/30 px-4 py-3 text-xs text-amber-300"
         >
           {{ t('connectionsView.noActiveServers') }}
-        </p>
-        <p
-          v-if="pingState === 'loading' || pingState === 'refreshing'"
-          role="status"
-          class="text-xs text-slate-500"
-        >
-          {{ t('common.refreshing') }}
-        </p>
-        <p v-else-if="pingState === 'error'" role="status" class="text-xs text-amber-300">
-          {{ t('common.refreshFailed') }}
-        </p>
-        <p
-          v-else-if="availableServerCount() === 0"
-          role="status"
-          class="rounded-xl border border-amber-800/40 bg-amber-950/30 px-4 py-3 text-xs text-amber-300"
-        >
-          {{ t('connectionsView.noRespondingServers') }}
-        </p>
-        <p
-          v-if="selectedServerUnavailable()"
-          role="alert"
-          class="rounded-xl border border-rose-800/40 bg-rose-950/30 px-4 py-3 text-xs text-rose-300"
-        >
-          {{ t('connectionsView.serverUnavailable') }}
         </p>
         <div class="flex justify-end pt-2">
           <button
@@ -714,13 +681,6 @@ function downloadQR() {
         v-else-if="devicesState === 'error'"
         class="border-b border-rose-900/50 bg-rose-950/30 px-6 py-3 text-xs text-rose-300"
         role="alert"
-      >
-        {{ t('common.refreshFailed') }}
-      </p>
-      <p
-        v-if="pingState === 'error'"
-        class="border-b border-amber-900/40 bg-amber-950/20 px-6 py-2 text-xs text-amber-300"
-        role="status"
       >
         {{ t('common.refreshFailed') }}
       </p>

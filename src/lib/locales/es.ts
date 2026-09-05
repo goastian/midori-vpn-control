@@ -690,6 +690,7 @@ export const es = {
     deleteDetail: 'Esta acción no se puede deshacer y desconectará los peers asociados.',
     endpoint: 'Endpoint público WireGuard (vacío = usar Host)',
     host: 'Host del Core API',
+    probeUrl: 'URL pública de prueba del cliente',
     capabilities: 'Capacidades',
     transports: 'Transportes publicados',
     transportsHelp:
@@ -708,6 +709,7 @@ export const es = {
     unknown: 'Sin comprobar',
     nameRequired: 'El nombre es obligatorio.',
     hostRequired: 'El host es obligatorio.',
+    probeUrlInvalid: 'La URL de prueba debe usar HTTPS y la ruta edge-health de MidoriVPN.',
     portInvalid: 'El puerto debe estar entre 1 y 65535.',
     wgPortInvalid: 'El puerto WireGuard debe estar entre 1 y 65535.',
     protocolUnique: 'Cada protocolo solo puede configurarse una vez.',

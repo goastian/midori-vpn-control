@@ -25,6 +25,7 @@ const mockServers = [
     id: 's1',
     name: 'US East',
     host: 'us-east.vpn.example.com',
+    probe_url: 'https://us-east.vpn.example.com/.well-known/midorivpn/edge-health',
     endpoint: 'us-east.vpn.example.com',
     port: 8080,
     wg_port: 51820,
@@ -50,7 +51,17 @@ const mockServers = [
   },
 ]
 
-const mockPings = [{ server_id: 's1', latency_ms: 42, available: true }]
+const mockReachability = [
+  {
+    server_id: 's1',
+    name: 'Main',
+    host: 'core.example.test',
+    location: 'Santo Domingo',
+    country_code: 'DO',
+    control_latency_ms: 42,
+    available: true,
+  },
+]
 const page = <T>(items: T[]) => ({ items, page: 1, page_size: 50, total: items.length })
 
 describe('AdminServersView', () => {
@@ -82,7 +93,7 @@ describe('AdminServersView', () => {
   it('renders server names after successful load', async () => {
     const { api } = await import('@/lib/api')
     vi.mocked(api.validated).mockImplementation((path: string) => {
-      if (path.includes('/ping')) return Promise.resolve(mockPings)
+      if (path.includes('/reachability')) return Promise.resolve(mockReachability)
       return Promise.resolve(page(mockServers))
     })
 
@@ -124,10 +135,10 @@ describe('AdminServersView', () => {
     expect(wrapper.findComponent(AsyncState).props('kind')).toBe('error')
   })
 
-  it('does not auto-refresh when ping api fails', async () => {
+  it('keeps server inventory when reachability fails', async () => {
     const { api } = await import('@/lib/api')
     vi.mocked(api.validated).mockImplementation((path: string) => {
-      if (path.includes('/ping')) return Promise.reject(new Error('ping failed'))
+      if (path.includes('/reachability')) return Promise.reject(new Error('reachability failed'))
       return Promise.resolve(page(mockServers))
     })
 
@@ -145,7 +156,7 @@ describe('AdminServersView', () => {
   it('keeps deletion errors visible in the confirmation dialog', async () => {
     const { api } = await import('@/lib/api')
     vi.mocked(api.validated).mockImplementation((path: string) => {
-      if (path.includes('/ping')) return Promise.resolve(mockPings)
+      if (path.includes('/reachability')) return Promise.resolve(mockReachability)
       return Promise.resolve(page(mockServers))
     })
     vi.mocked(api.delete).mockRejectedValue(new Error('Internal detail'))
@@ -173,7 +184,7 @@ describe('AdminServersView', () => {
   it('explains that a server must finish draining before deletion', async () => {
     const { api } = await import('@/lib/api')
     vi.mocked(api.validated).mockImplementation((path: string) => {
-      if (path.includes('/ping')) return Promise.resolve(mockPings)
+      if (path.includes('/reachability')) return Promise.resolve(mockReachability)
       return Promise.resolve(page(mockServers))
     })
     vi.mocked(api.delete).mockRejectedValue({ code: 'server_not_drained' })
@@ -207,13 +218,14 @@ describe('AdminServersView', () => {
 
     expect(wrapper.find('label[for="server-name"]').exists()).toBe(true)
     expect(wrapper.find('label[for="server-host"]').exists()).toBe(true)
+    expect(wrapper.find('label[for="server-probe-url"]').exists()).toBe(true)
     expect(wrapper.find('label[for="server-public-key"]').exists()).toBe(true)
   })
 
   it('updates a server with the normalized transport payload and announces success', async () => {
     const { api } = await import('@/lib/api')
     vi.mocked(api.validated).mockImplementation((path: string) => {
-      if (path.includes('/ping')) return Promise.resolve(mockPings)
+      if (path.includes('/reachability')) return Promise.resolve(mockReachability)
       return Promise.resolve(page(mockServers))
     })
     vi.mocked(api.put).mockResolvedValue({})
@@ -232,6 +244,7 @@ describe('AdminServersView', () => {
       '/api/v1/admin/servers/s1',
       expect.objectContaining({
         endpoint: 'us-east.vpn.example.com',
+        probe_url: 'https://us-east.vpn.example.com/.well-known/midorivpn/edge-health',
         wg_port: 51820,
         transports: [
           expect.objectContaining({

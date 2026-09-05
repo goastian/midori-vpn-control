@@ -692,6 +692,7 @@ export const tr = {
     deleteDetail: 'Bu geri alınamaz ve ilişkili eşlerinin bağlantısı kesilir.',
     endpoint: 'Genel WireGuard uç noktası (boş = Ana Bilgisayarı kullan)',
     host: 'Çekirdek API ana bilgisayarı',
+    probeUrl: 'Genel istemci yoklama URL’si',
     capabilities: 'Yetenekler',
     transports: 'Yayınlanan taşımalar',
     transportsHelp:
@@ -710,6 +711,7 @@ export const tr = {
     unknown: 'İşaretlenmedi',
     nameRequired: 'Ad gerekli.',
     hostRequired: 'Ana makine gerekli.',
+    probeUrlInvalid: 'Yoklama URL’si HTTPS ve MidoriVPN edge-health yolunu kullanmalıdır.',
     portInvalid: 'Bağlantı noktası 1 ile 65535 arasında olmalıdır.',
     wgPortInvalid: 'WireGuard bağlantı noktası 1 ile 65535 arasında olmalıdır.',
     protocolUnique: 'Her protokol yalnızca bir kez yapılandırılabilir.',

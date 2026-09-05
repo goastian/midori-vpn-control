@@ -704,6 +704,7 @@ export const de = {
       'Dies kann nicht rückgängig gemacht werden und führt dazu, dass die zugehörigen Peers getrennt werden.',
     endpoint: 'Öffentlicher WireGuard-Endpunkt (leer = Host verwenden)',
     host: 'Kern-API-Host',
+    probeUrl: 'Öffentliche Client-Prüf-URL',
     capabilities: 'Fähigkeiten',
     transports: 'Veröffentlichte Transporte',
     transportsHelp:
@@ -722,6 +723,7 @@ export const de = {
     unknown: 'Nicht geprüft',
     nameRequired: 'Name ist erforderlich.',
     hostRequired: 'Gastgeber ist erforderlich.',
+    probeUrlInvalid: 'Die Prüf-URL muss HTTPS und den MidoriVPN-edge-health-Pfad verwenden.',
     portInvalid: 'Der Port muss zwischen 1 und 65535 liegen.',
     wgPortInvalid: 'Der WireGuard-Port muss zwischen 1 und 65535 liegen.',
     protocolUnique: 'Jedes Protokoll kann nur einmal konfiguriert werden.',

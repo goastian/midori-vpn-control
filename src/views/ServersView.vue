@@ -4,12 +4,7 @@ import { useRouter } from 'vue-router'
 import { api } from '../lib/api'
 import { useLocale } from '../lib/i18n'
 import { useAuthStore } from '../stores/auth'
-import {
-  ServerListSchema,
-  ServerPingResultListSchema,
-  type Server,
-  type ServerPingResult,
-} from '../lib/schemas'
+import { ServerCandidateListSchema, type ServerCandidate } from '../lib/schemas'
 import AsyncState from '../components/AsyncState.vue'
 import QuotaSummary from '../components/QuotaSummary.vue'
 import ResourceSkeleton from '../components/ResourceSkeleton.vue'
@@ -17,10 +12,8 @@ import { beginResourceLoad, completeResourceLoad, type ResourceState } from '../
 
 const router = useRouter()
 const auth = useAuthStore()
-const servers = ref<Server[]>([])
-const serverPing = ref<Record<string, ServerPingResult>>({})
+const servers = ref<ServerCandidate[]>([])
 const serversState = ref<ResourceState>('idle')
-const pingState = ref<ResourceState>('idle')
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 const { t } = useLocale()
 
@@ -44,22 +37,11 @@ onUnmounted(() => {
 async function loadServers() {
   serversState.value = beginResourceLoad(servers.value.length > 0 || serversState.value === 'empty')
   try {
-    servers.value = await api.validated('/api/v1/control/servers', ServerListSchema)
-    serversState.value = completeResourceLoad(servers.value.length > 0)
-
-    // Fetch latency pings in background non-blockingly
-    pingState.value = beginResourceLoad(
-      Object.keys(serverPing.value).length > 0 || pingState.value === 'empty',
+    servers.value = await api.validated(
+      '/api/v1/control/servers/candidates?protocol=wireguard',
+      ServerCandidateListSchema,
     )
-    api
-      .validated('/api/v1/control/servers/ping', ServerPingResultListSchema)
-      .then((pings) => {
-        serverPing.value = Object.fromEntries(pings.map((item) => [item.server_id, item]))
-        pingState.value = completeResourceLoad(pings.length > 0)
-      })
-      .catch(() => {
-        pingState.value = 'error'
-      })
+    serversState.value = completeResourceLoad(servers.value.length > 0)
   } catch {
     serversState.value = 'error'
   }
@@ -67,10 +49,6 @@ async function loadServers() {
 
 async function retryLoad() {
   await Promise.all([loadServers(), auth.fetchQuota()])
-}
-
-function isServerOnline(server: Server): boolean | null {
-  return server.id in serverPing.value ? serverPing.value[server.id].available : null
 }
 
 function connectToServer(serverId: string) {
@@ -143,20 +121,6 @@ function connectToServer(serverId: string) {
       >
         {{ t('common.refreshFailed') }}
       </p>
-      <p
-        v-if="pingState === 'loading' || pingState === 'refreshing'"
-        class="col-span-full text-xs text-slate-500"
-        role="status"
-      >
-        {{ t('common.refreshing') }}
-      </p>
-      <p
-        v-else-if="pingState === 'error'"
-        class="col-span-full text-xs text-amber-300"
-        role="status"
-      >
-        {{ t('common.refreshFailed') }}
-      </p>
       <div
         v-for="server in servers"
         :key="server.id"
@@ -180,34 +144,10 @@ function connectToServer(serverId: string) {
               </p>
             </div>
             <span
-              :class="
-                isServerOnline(server) === true
-                  ? 'bg-midori-950/60 border-midori-700/50 text-midori-300'
-                  : isServerOnline(server) === false
-                    ? 'bg-rose-950/60 border-rose-700/50 text-rose-300'
-                    : 'bg-slate-800 border-slate-700 text-slate-400'
-              "
-              class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border"
+              class="inline-flex items-center gap-1.5 rounded-full border border-midori-700/50 bg-midori-950/60 px-2.5 py-1 text-xs font-semibold text-midori-300"
             >
-              <span
-                class="w-1.5 h-1.5 rounded-full"
-                :class="
-                  isServerOnline(server) === true
-                    ? 'bg-midori-400 animate-pulse'
-                    : isServerOnline(server) === false
-                      ? 'bg-rose-400'
-                      : 'bg-slate-500'
-                "
-              ></span>
-              {{
-                isServerOnline(server) === true
-                  ? Number.isFinite(serverPing[server.id]?.latency_ms)
-                    ? `${serverPing[server.id].latency_ms}ms`
-                    : t('common.active')
-                  : isServerOnline(server) === false
-                    ? t('common.inactive')
-                    : t('common.unavailable')
-              }}
+              <span class="h-1.5 w-1.5 rounded-full bg-midori-400"></span>
+              {{ t('common.active') }}
             </span>
           </div>
 

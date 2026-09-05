@@ -4,9 +4,9 @@ import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
 import {
   AdminServerPageSchema,
-  ServerPingResultListSchema,
+  ServerReachabilityResultListSchema,
   type Server,
-  type ServerPingResult,
+  type ServerReachabilityResult,
   type TransportCapability,
 } from '../../lib/schemas'
 import AsyncState from '../../components/AsyncState.vue'
@@ -20,7 +20,7 @@ import {
 } from '../../lib/resource-state'
 
 const servers = ref<Server[]>([])
-const serverPing = ref<Record<string, ServerPingResult>>({})
+const serverReachability = ref<Record<string, ServerReachabilityResult>>({})
 const serversState = ref<ResourceState>('idle')
 const page = ref(1)
 const total = ref(0)
@@ -29,7 +29,7 @@ const search = ref('')
 const status = ref('all')
 const sort = ref('name')
 const order = ref('desc')
-const pingState = ref<ResourceState>('idle')
+const reachabilityState = ref<ResourceState>('idle')
 const showForm = ref(false)
 const editingId = ref<string | null>(null)
 const saving = ref(false)
@@ -49,6 +49,7 @@ type FormTransport = Pick<
 const createEmptyForm = () => ({
   name: '',
   host: '',
+  probe_url: '',
   endpoint: '',
   port: 443,
   wg_port: 51820,
@@ -102,7 +103,7 @@ async function loadServers(requestedPage?: number) {
     page.value = response.page
     total.value = response.total
     serversState.value = completeResourceLoad(servers.value.length > 0)
-    void loadPings()
+    void loadReachability()
   } catch {
     serversState.value = 'error'
   }
@@ -116,23 +117,35 @@ function applyFilters(filters: { search: string; status: string; sort: string; o
   void loadServers(1)
 }
 
-async function loadPings() {
-  pingState.value = beginResourceLoad(
-    Object.keys(serverPing.value).length > 0 || pingState.value === 'empty',
+async function loadReachability() {
+  reachabilityState.value = beginResourceLoad(
+    Object.keys(serverReachability.value).length > 0 || reachabilityState.value === 'empty',
   )
   try {
-    const pings = await api.validated('/api/v1/admin/servers/ping', ServerPingResultListSchema)
-    serverPing.value = Object.fromEntries(pings.map((item) => [item.server_id, item]))
-    pingState.value = completeResourceLoad(pings.length > 0)
+    const measurements = await api.validated(
+      '/api/v1/admin/servers/reachability',
+      ServerReachabilityResultListSchema,
+    )
+    serverReachability.value = Object.fromEntries(
+      measurements.map((item) => [item.server_id, item]),
+    )
+    reachabilityState.value = completeResourceLoad(measurements.length > 0)
   } catch {
-    pingState.value = 'error'
+    reachabilityState.value = 'error'
   }
 }
 
 function serverStatus(server: Server): 'online' | 'offline' | 'unknown' {
-  const ping = serverPing.value[server.id]
-  if (!ping) return 'unknown'
-  return ping.available ? 'online' : 'offline'
+  const measurement = serverReachability.value[server.id]
+  if (!measurement) return 'unknown'
+  return measurement.available ? 'online' : 'offline'
+}
+
+function serverStatusLabel(server: Server): string {
+  const statusLabel = t(`adminServers.${serverStatus(server)}`)
+  const measurement = serverReachability.value[server.id]
+  if (!measurement?.available) return statusLabel
+  return `${statusLabel} · ${measurement.control_latency_ms} ms`
 }
 
 function serverTransports(server: Server): TransportCapability[] {
@@ -144,6 +157,7 @@ function startEdit(s: Server) {
   form.value = {
     name: s.name,
     host: s.host,
+    probe_url: s.probe_url,
     endpoint: s.endpoint ?? '',
     port: s.port,
     wg_port: s.wg_port,
@@ -177,6 +191,21 @@ function validateForm(): boolean {
   const errors: Record<string, string> = {}
   if (!form.value.name.trim()) errors.name = t('adminServers.nameRequired')
   if (!form.value.host.trim()) errors.host = t('adminServers.hostRequired')
+  try {
+    const probeURL = new URL(form.value.probe_url)
+    if (
+      probeURL.protocol !== 'https:' ||
+      probeURL.username ||
+      probeURL.password ||
+      probeURL.search ||
+      probeURL.hash ||
+      probeURL.pathname !== '/.well-known/midorivpn/edge-health'
+    ) {
+      errors.probe_url = t('adminServers.probeUrlInvalid')
+    }
+  } catch {
+    errors.probe_url = t('adminServers.probeUrlInvalid')
+  }
   if (form.value.port < 1 || form.value.port > 65535) errors.port = t('adminServers.portInvalid')
   if (form.value.wg_port < 1 || form.value.wg_port > 65535)
     errors.wg_port = t('adminServers.wgPortInvalid')
@@ -416,6 +445,31 @@ async function executeDeleteServer() {
           />
           <p v-if="formErrors.host" id="server-host-error" class="text-xs text-rose-400 mt-1">
             {{ formErrors.host }}
+          </p>
+        </div>
+        <div class="md:col-span-2">
+          <label
+            for="server-probe-url"
+            class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5"
+            >{{ t('adminServers.probeUrl') }}</label
+          >
+          <input
+            id="server-probe-url"
+            v-model="form.probe_url"
+            type="url"
+            required
+            placeholder="https://vpn.example.org/.well-known/midorivpn/edge-health"
+            :aria-invalid="Boolean(formErrors.probe_url)"
+            :aria-describedby="formErrors.probe_url ? 'server-probe-url-error' : undefined"
+            class="w-full border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-950/60 text-white outline-none focus:border-midori-500 transition-colors"
+            :class="formErrors.probe_url ? 'border-rose-500' : ''"
+          />
+          <p
+            v-if="formErrors.probe_url"
+            id="server-probe-url-error"
+            class="text-xs text-rose-400 mt-1"
+          >
+            {{ formErrors.probe_url }}
           </p>
         </div>
         <div>
@@ -743,14 +797,14 @@ async function executeDeleteServer() {
         {{ t('common.refreshFailed') }}
       </p>
       <p
-        v-if="pingState === 'loading' || pingState === 'refreshing'"
+        v-if="reachabilityState === 'loading' || reachabilityState === 'refreshing'"
         role="status"
         class="border-b border-slate-800 px-6 py-2 text-xs text-slate-400"
       >
         {{ t('common.refreshing') }}
       </p>
       <p
-        v-else-if="pingState === 'error'"
+        v-else-if="reachabilityState === 'error'"
         role="status"
         class="border-b border-amber-900/40 bg-amber-950/20 px-6 py-2 text-xs text-amber-300"
       >
@@ -821,7 +875,7 @@ async function executeDeleteServer() {
                 "
                 class="text-xs font-semibold px-2.5 py-1 rounded-full border"
               >
-                {{ t(`adminServers.${serverStatus(s)}`) }}
+                {{ serverStatusLabel(s) }}
               </span>
             </td>
             <td class="px-6 py-4 text-right space-x-2">

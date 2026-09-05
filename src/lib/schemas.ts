@@ -88,10 +88,26 @@ export const TransportCapabilitySchema = z.object({
 
 export type TransportCapability = z.infer<typeof TransportCapabilitySchema>
 
+const ProbeURLSchema = z
+  .string()
+  .url()
+  .refine((value) => {
+    const parsed = new URL(value)
+    return (
+      parsed.protocol === 'https:' &&
+      !parsed.username &&
+      !parsed.password &&
+      !parsed.search &&
+      !parsed.hash &&
+      parsed.pathname === '/.well-known/midorivpn/edge-health'
+    )
+  }, 'invalid MidoriVPN edge probe URL')
+
 export const ServerSchema = z.object({
   id: NonEmptyStringSchema,
   name: NonEmptyStringSchema,
   host: NonEmptyStringSchema,
+  probe_url: z.union([z.literal(''), ProbeURLSchema]).default(''),
   endpoint: z.string().optional().default(''),
   port: z.number().int().min(1).max(65535),
   wg_port: z.number().int().min(1).max(65535),
@@ -127,14 +143,33 @@ export const ProxyCredentialResponseSchema = z.object({
 })
 export type ProxyCredentialResponse = z.infer<typeof ProxyCredentialResponseSchema>
 
-export const ServerPingResultSchema = z.object({
+export const ServerCandidateSchema = z.object({
+  id: NonEmptyStringSchema,
+  name: NonEmptyStringSchema,
+  location: z.string().default(''),
+  country_code: z.string().default(''),
+  protocol: z.enum(['wireguard', 'wss', 'masque', 'openvpn', 'ikev2', 'proxy']),
+  probe_url: ProbeURLSchema,
+  endpoint: NonEmptyStringSchema,
+  port: z.number().int().min(1).max(65535),
+  priority: z.number().int().min(0).max(1000),
+})
+
+export type ServerCandidate = z.infer<typeof ServerCandidateSchema>
+export const ServerCandidateListSchema = z.array(ServerCandidateSchema)
+
+export const ServerReachabilityResultSchema = z.object({
   server_id: NonEmptyStringSchema,
-  latency_ms: NonNegativeNumberSchema,
+  name: NonEmptyStringSchema,
+  host: NonEmptyStringSchema,
+  location: z.string(),
+  country_code: z.string(),
+  control_latency_ms: NonNegativeNumberSchema,
   available: z.boolean(),
 })
 
-export type ServerPingResult = z.infer<typeof ServerPingResultSchema>
-export const ServerPingResultListSchema = z.array(ServerPingResultSchema)
+export type ServerReachabilityResult = z.infer<typeof ServerReachabilityResultSchema>
+export const ServerReachabilityResultListSchema = z.array(ServerReachabilityResultSchema)
 
 // ─── Connection / Peer ────────────────────────────────────
 

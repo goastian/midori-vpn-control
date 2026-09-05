@@ -6,6 +6,7 @@ import {
   UserSchema,
   UserListSchema,
   ServerSchema,
+  ServerCandidateSchema,
   ConnectionSchema,
   ConnectionListSchema,
   ConnectionConfigSchema,
@@ -154,6 +155,36 @@ describe('Zod API schemas', () => {
 
     it('rejects string port', () => {
       expect(() => ServerSchema.parse({ ...validServer, port: '8080' })).toThrow()
+    })
+  })
+
+  describe('ServerCandidateSchema', () => {
+    const candidate = {
+      id: 'server-1',
+      name: 'Main',
+      location: 'Santo Domingo',
+      country_code: 'DO',
+      protocol: 'wireguard',
+      probe_url: 'https://vpn.example/.well-known/midorivpn/edge-health',
+      endpoint: 'vpn.example',
+      port: 51820,
+      priority: 100,
+    }
+
+    it('accepts the constrained HTTPS edge probe', () => {
+      expect(() => ServerCandidateSchema.parse(candidate)).not.toThrow()
+    })
+
+    it('rejects arbitrary or credential-bearing probe URLs', () => {
+      expect(() =>
+        ServerCandidateSchema.parse({ ...candidate, probe_url: 'https://vpn.example/health' }),
+      ).toThrow()
+      expect(() =>
+        ServerCandidateSchema.parse({
+          ...candidate,
+          probe_url: 'https://user@vpn.example/.well-known/midorivpn/edge-health',
+        }),
+      ).toThrow()
     })
   })
 

@@ -37,8 +37,8 @@ describe('locale catalogs', () => {
   const canonical = flattenCatalog(localeMessages.en)
   const canonicalKeys = [...canonical.keys()].sort()
 
-  it('contains the same 658 non-empty messages in every language', () => {
-    expect(canonicalKeys).toHaveLength(658)
+  it('contains the same 660 non-empty messages in every language', () => {
+    expect(canonicalKeys).toHaveLength(660)
     expect(Object.keys(localeMessages).sort()).toEqual(
       supportedLocales.map(({ code }) => code).sort(),
     )
