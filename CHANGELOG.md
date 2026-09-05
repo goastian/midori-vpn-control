@@ -12,6 +12,10 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Changed
 
+- Control OCI publication now runs from an annotated semantic tag, proves two
+  clean builds plus the pushed digest are identical, enforces private GHCR
+  visibility, scans and attests the immutable digest, and signs it with the
+  tag-bound keyless workflow identity for Core's coordinated release gate.
 - Dashboard now consumes one validated summary built from registered devices,
   active sessions, quota, preserved traffic and recent session history. It no
   longer treats peer rows or repeated device names as devices, and it removes
@@ -58,9 +62,9 @@ All notable changes to Midori VPN Control are documented here.
   fields, warnings, notifications, table actions and the device configuration
   dialog expose explicit names and relationships without changing key or
   profile generation.
-- Added a separate protected publication workflow that refuses tag replacement
-  and binds the Control digest to GitHub provenance, SPDX attestation and an
-  immediately verified keyless Cosign workflow identity.
+- Added a separate protected publication workflow that refuses version
+  replacement and binds the Control digest to GitHub provenance, SPDX
+  attestation and an immediately verified keyless Cosign workflow identity.
 - Replaced direct container publication with a read-only build evidence job
   that produces an OCI archive, embedded and independent SBOMs, provenance and
   checksums using immutable workflow dependencies.
