@@ -17,8 +17,9 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write src/",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "check": "npm run lint -- --max-warnings=0 && npm test && npm run build"
+    "check": "npm run lint -- --max-warnings=0 && npm run test:coverage && npm run build"
   },
   "dependencies": {
     "@types/qrcode": "^1.5.6",
@@ -33,6 +34,7 @@
     "@eslint/js": "10.0.1",
     "@tailwindcss/vite": "^4.0.0",
     "@vitejs/plugin-vue": "6.0.8",
+    "@vitest/coverage-v8": "5.0.0",
     "@vue/test-utils": "2.5.0",
     "eslint": "10.10.0",
     "eslint-config-prettier": "^10.0.1",

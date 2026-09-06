@@ -55,6 +55,18 @@ export default defineConfig(({ command, mode }) => {
     test: {
       environment: 'happy-dom',
       globals: true,
+      coverage: {
+        provider: 'v8',
+        reporter: ['text', 'json-summary'],
+        include: ['src/**/*.{ts,vue}'],
+        exclude: ['src/__tests__/**', 'src/env.d.ts'],
+        thresholds: {
+          statements: 70,
+          branches: 60,
+          functions: 60,
+          lines: 70,
+        },
+      },
     },
   }
 })
