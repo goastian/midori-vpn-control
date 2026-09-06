@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { mount } from '@vue/test-utils'
 
+import AsyncState from '@/components/AsyncState.vue'
+import ResourceSkeleton from '@/components/ResourceSkeleton.vue'
 import { setLocale, supportedLocales, useLocale } from '@/lib/i18n'
 import { localeMessages, type LocaleCode, type TranslationTree } from '@/lib/locales'
 
@@ -36,6 +39,8 @@ function staticallyReferencedKeys(): string[] {
 describe('locale catalogs', () => {
   const canonical = flattenCatalog(localeMessages.en)
   const canonicalKeys = [...canonical.keys()].sort()
+
+  afterEach(() => setLocale('es'))
 
   it('contains the same 660 non-empty messages in every language', () => {
     expect(canonicalKeys).toHaveLength(660)
@@ -94,5 +99,41 @@ describe('locale catalogs', () => {
 
     expect(resolved.size).toBe(supportedLocales.length)
     expect(t('missing.translation.key')).toBe('missing.translation.key')
+  })
+
+  it('renders localized loading, empty, and error states in all ten languages', () => {
+    const { t } = useLocale()
+
+    for (const { code } of supportedLocales) {
+      setLocale(code)
+      const loading = mount(ResourceSkeleton, {
+        props: { title: t('common.loading'), count: 1 },
+      })
+      const empty = mount(AsyncState, {
+        props: { kind: 'empty', title: t('connectionsView.emptyDevices') },
+      })
+      const error = mount(AsyncState, {
+        props: {
+          kind: 'error',
+          title: t('connectionsView.loadError'),
+          retryLabel: t('common.retry'),
+        },
+      })
+
+      expect(loading.get('[role="status"]').text(), `${code}:loading`).toBe(t('common.loading'))
+      expect(empty.get('[role="status"]').text(), `${code}:empty`).toBe(
+        t('connectionsView.emptyDevices'),
+      )
+      expect(error.get('[role="alert"]').text(), `${code}:error`).toContain(
+        t('connectionsView.loadError'),
+      )
+      expect(`${loading.text()} ${empty.text()} ${error.text()}`, code).not.toMatch(
+        /common\.|connectionsView\.|\b(?:undefined|null|NaN)\b/,
+      )
+
+      loading.unmount()
+      empty.unmount()
+      error.unmount()
+    }
   })
 })

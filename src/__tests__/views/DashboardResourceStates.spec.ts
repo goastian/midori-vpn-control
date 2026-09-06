@@ -84,6 +84,16 @@ const dashboardSummary = {
   infrastructure: adminStats,
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve
+    reject = promiseReject
+  })
+  return { promise, resolve, reject }
+}
+
 describe('dashboard resource states', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -113,13 +123,15 @@ describe('dashboard resource states', () => {
     const wrapper = mount(DashboardView)
     await flushPromises()
 
-    const artifactLinks = wrapper.findAll('a').filter((link) =>
-      link.attributes('href')?.includes('/releases/latest/download/'),
-    )
+    const artifactLinks = wrapper
+      .findAll('a')
+      .filter((link) => link.attributes('href')?.includes('/releases/latest/download/'))
     expect(artifactLinks).toHaveLength(2)
-    expect(artifactLinks.every((link) =>
-      link.attributes('href')?.endsWith('/midori-vpn-2.0.0-1.x86_64.rpm'),
-    )).toBe(true)
+    expect(
+      artifactLinks.every((link) =>
+        link.attributes('href')?.endsWith('/midori-vpn-2.0.0-1.x86_64.rpm'),
+      ),
+    ).toBe(true)
     expect(wrapper.html()).not.toMatch(/\.(?:deb|AppImage|msi|exe|dmg)/)
   })
 
@@ -132,6 +144,23 @@ describe('dashboard resource states', () => {
     expect(wrapper.text()).toContain('Parte del Dashboard no está disponible')
     expect(wrapper.text()).not.toContain('0 B')
     expect(wrapper.text()).not.toContain('0%')
+  })
+
+  it('renders only a stable skeleton while the initial summary is pending', async () => {
+    const pendingSummary = deferred<typeof dashboardSummary>()
+    vi.mocked(api.validated).mockReturnValue(pendingSummary.promise)
+
+    const wrapper = mount(DashboardView)
+    await flushPromises()
+
+    expect(wrapper.get('[role="status"]').text()).toBe('Cargando...')
+    expect(wrapper.text()).not.toMatch(/\b(?:undefined|null|NaN)\b/)
+    expect(wrapper.text()).not.toContain('0 B')
+    expect(wrapper.text()).not.toContain('0%')
+
+    pendingSummary.resolve(dashboardSummary)
+    await flushPromises()
+    expect(wrapper.text()).toContain('Work laptop')
   })
 
   it('renders the coherent HTTP summary without counting sessions as devices', async () => {
