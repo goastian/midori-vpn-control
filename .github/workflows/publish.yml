@@ -19,6 +19,7 @@ env:
 jobs:
   validate-tag:
     name: Validate annotated release tag
+    if: github.repository == 'goastian/midori-vpn-control-dev'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout the complete tag
@@ -33,7 +34,9 @@ jobs:
           [[ "${GITHUB_REF_NAME}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$ ]]
           test "$(git cat-file -t "refs/tags/${GITHUB_REF_NAME}")" = tag
           test "$(git rev-parse "refs/tags/${GITHUB_REF_NAME}^{}")" = "$GITHUB_SHA"
-          test "$(node -p "require('./package.json').version")" = "${GITHUB_REF_NAME#v}"
+          product_version="$(node -p "require('./package.json').version")"
+          release_version="${GITHUB_REF_NAME#v}"
+          [[ "$release_version" == "$product_version" || "$release_version" == "$product_version"-* ]]
 
   publish:
     name: Rebuild, publish privately, attest and sign Control
@@ -62,17 +65,21 @@ jobs:
         run: |
           set -Eeuo pipefail
           test "$RELEASE_SIGNING_ENABLED" = true
-          version="${GITHUB_REF_NAME#v}"
-          test "$(node -p "require('./package.json').version")" = "$version"
-          printf 'RELEASE_VERSION=%s\n' "$version" >> "$GITHUB_ENV"
-          printf 'SOURCE_DATE_EPOCH=%s\n' "$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
+          product_version="$(node -p "require('./package.json').version")"
+          release_version="${GITHUB_REF_NAME#v}"
+          [[ "$release_version" == "$product_version" || "$release_version" == "$product_version"-* ]]
+          {
+            printf 'PRODUCT_VERSION=%s\n' "$product_version"
+            printf 'RELEASE_VERSION=%s\n' "$release_version"
+            printf 'SOURCE_DATE_EPOCH=%s\n' "$(git show -s --format=%ct HEAD)"
+          } >> "$GITHUB_ENV"
 
       - name: Set up current pinned Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       - name: First clean OCI build
         id: first
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: Dockerfile
@@ -83,7 +90,7 @@ jobs:
           labels: |
             org.opencontainers.image.version=${{ env.RELEASE_VERSION }}
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.source=https://github.com/goastian/midori-vpn-control
+            org.opencontainers.image.source=https://github.com/goastian/midori-vpn-control-dev
           build-args: SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
           outputs: type=oci,dest=${{ runner.temp }}/control-first.oci.tar,rewrite-timestamp=true
           provenance: mode=max
@@ -91,7 +98,7 @@ jobs:
 
       - name: Second clean OCI build
         id: second
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: Dockerfile
@@ -102,7 +109,7 @@ jobs:
           labels: |
             org.opencontainers.image.version=${{ env.RELEASE_VERSION }}
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.source=https://github.com/goastian/midori-vpn-control
+            org.opencontainers.image.source=https://github.com/goastian/midori-vpn-control-dev
           build-args: SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
           outputs: type=oci,dest=${{ runner.temp }}/control-second.oci.tar,rewrite-timestamp=true
           provenance: mode=max
@@ -142,7 +149,7 @@ jobs:
 
       - name: Push the rebuilt immutable image
         id: push
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: Dockerfile
@@ -153,7 +160,7 @@ jobs:
           labels: |
             org.opencontainers.image.version=${{ env.RELEASE_VERSION }}
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.source=https://github.com/goastian/midori-vpn-control
+            org.opencontainers.image.source=https://github.com/goastian/midori-vpn-control-dev
           build-args: SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
           provenance: mode=max
           sbom: true
@@ -219,16 +226,21 @@ jobs:
           IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
         run: |
           set -Eeuo pipefail
-          image_ref="${IMAGE_NAME}@${IMAGE_DIGEST}"
-          identity="https://github.com/goastian/midori-vpn-control/.github/workflows/publish.yml@refs/tags/${GITHUB_REF_NAME}"
-          cosign sign --yes "$image_ref"
+          tag_ref="${IMAGE_NAME}:${RELEASE_VERSION}"
+          verification_ref="${IMAGE_NAME}@${IMAGE_DIGEST}"
+          docker pull "$tag_ref" >/dev/null
+          docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$tag_ref" | grep -Fx "$verification_ref"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$tag_ref")" = "$GITHUB_SHA"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' "$tag_ref")" = "$RELEASE_VERSION"
+          identity="https://github.com/goastian/midori-vpn-control-dev/.github/workflows/publish.yml@refs/tags/${GITHUB_REF_NAME}"
+          cosign sign --yes "$verification_ref"
           cosign verify --certificate-identity "$identity" \
-            --certificate-oidc-issuer https://token.actions.githubusercontent.com "$image_ref"
-          gh attestation verify "oci://${image_ref}" --repo goastian/midori-vpn-control \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com "$verification_ref"
+          gh attestation verify "oci://${verification_ref}" --repo goastian/midori-vpn-control-dev \
             --predicate-type https://slsa.dev/provenance/v1
-          gh attestation verify "oci://${image_ref}" --repo goastian/midori-vpn-control \
+          gh attestation verify "oci://${verification_ref}" --repo goastian/midori-vpn-control-dev \
             --predicate-type https://spdx.dev/Document/v2.3
-          (cd dist-release && sha256sum * > SHA256SUMS && sha256sum --check SHA256SUMS)
+          (cd dist-release && sha256sum -- * > SHA256SUMS && sha256sum --check SHA256SUMS)
 
       - name: Retain private release evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
