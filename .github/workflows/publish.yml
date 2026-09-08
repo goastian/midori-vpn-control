@@ -1,4 +1,4 @@
-name: Publish - tagged private Control OCI
+name: Publish - tagged private Control OCI candidate
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: midorivpn-control-${{ github.ref_name }}-publication
+  group: midorivpn-control-${{ github.ref_name }}-candidate-publication
   cancel-in-progress: false
 
 env:
@@ -18,10 +18,15 @@ env:
 
 jobs:
   validate-tag:
-    name: Validate annotated release tag
+    name: Validate annotated candidate tag
     if: github.repository == 'goastian/midori-vpn-control-dev'
     runs-on: ubuntu-24.04
     steps:
+      - name: Require the private candidate switch
+        env:
+          CANDIDATE_PUBLISH_ENABLED: ${{ vars.MIDORIVPN_PRIVATE_CANDIDATE_ENABLED }}
+        run: test "$CANDIDATE_PUBLISH_ENABLED" = true
+
       - name: Checkout the complete tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -39,11 +44,9 @@ jobs:
           [[ "$release_version" == "$product_version" || "$release_version" == "$product_version"-* ]]
 
   publish:
-    name: Rebuild, publish privately, attest and sign Control
+    name: Rebuild, publish private Control candidate, attest and sign
     needs: validate-tag
     runs-on: ubuntu-24.04
-    environment:
-      name: release-production
     permissions:
       artifact-metadata: write
       attestations: write
@@ -53,18 +56,15 @@ jobs:
     outputs:
       digest: ${{ steps.push.outputs.digest }}
     steps:
-      - name: Checkout the approved annotated tag
+      - name: Checkout the validated annotated tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Define immutable release inputs
-        env:
-          RELEASE_SIGNING_ENABLED: ${{ vars.RELEASE_SIGNING_ENABLED }}
         run: |
           set -Eeuo pipefail
-          test "$RELEASE_SIGNING_ENABLED" = true
           product_version="$(node -p "require('./package.json').version")"
           release_version="${GITHUB_REF_NAME#v}"
           [[ "$release_version" == "$product_version" || "$release_version" == "$product_version"-* ]]
@@ -242,7 +242,7 @@ jobs:
             --predicate-type https://spdx.dev/Document/v2.3
           (cd dist-release && sha256sum -- * > SHA256SUMS && sha256sum --check SHA256SUMS)
 
-      - name: Retain private release evidence
+      - name: Retain private candidate evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: control-${{ env.RELEASE_VERSION }}-private-evidence

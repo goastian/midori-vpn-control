@@ -62,7 +62,7 @@ All notable changes to Midori VPN Control are documented here.
   fields, warnings, notifications, table actions and the device configuration
   dialog expose explicit names and relationships without changing key or
   profile generation.
-- Added a separate protected publication workflow that refuses version
+- Added a separate tag-driven private candidate workflow that refuses version
   replacement and binds the Control digest to GitHub provenance, SPDX
   attestation and an immediately verified keyless Cosign workflow identity.
 - Replaced direct container publication with a read-only build evidence job
