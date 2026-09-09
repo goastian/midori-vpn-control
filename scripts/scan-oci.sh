@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+umask 077
 
 readonly TRIVY_IMAGE='docker.io/aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,7 +21,9 @@ target="$2"
 report_path="$3"
 [[ "$mode" == archive || "$mode" == image ]] || usage
 
-for command_name in "$CONTAINER_ENGINE" jq date mktemp; do
+required_commands=("$CONTAINER_ENGINE" jq date mktemp)
+[[ "$mode" == archive ]] && required_commands+=(tar)
+for command_name in "${required_commands[@]}"; do
   command -v "$command_name" >/dev/null 2>&1 || {
     printf 'error: required command not found: %s\n' "$command_name" >&2
     exit 1
@@ -51,8 +54,12 @@ jq -e --arg today "$today" '
 }
 
 ignore_file="$(mktemp /tmp/midorivpn-trivy-ignore.XXXXXX)"
+oci_layout_dir=''
 cleanup() {
   rm -f -- "$ignore_file"
+  if [[ -n "$oci_layout_dir" ]]; then
+    rm -rf -- "$oci_layout_dir"
+  fi
 }
 trap cleanup EXIT
 jq -r '.exceptions[].id' "$EXCEPTIONS_FILE" >"$ignore_file"
@@ -85,8 +92,30 @@ if [[ "$mode" == archive ]]; then
   target_dir="$(cd "$(dirname -- "$target")" && pwd -P)"
   target_name="$(basename -- "$target")"
   target="${target_dir}/${target_name}"
-  run_args+=(-v "$target:/scan/image.tar${ro_suffix}")
-  scan_args=(image --input /scan/image.tar)
+  oci_layout_dir="$(mktemp -d /tmp/midorivpn-trivy-oci.XXXXXX)"
+  tar --extract --file "$target" --directory "$oci_layout_dir" \
+    --no-same-owner --no-same-permissions
+  [[ -f "${oci_layout_dir}/oci-layout" && \
+    -f "${oci_layout_dir}/index.json" && \
+    -d "${oci_layout_dir}/blobs/sha256" ]] || {
+    printf 'error: archive does not contain an OCI image layout\n' >&2
+    exit 1
+  }
+  jq -e '.imageLayoutVersion == "1.0.0"' \
+    "${oci_layout_dir}/oci-layout" >/dev/null || {
+    printf 'error: unsupported OCI image layout version\n' >&2
+    exit 1
+  }
+  jq -e '
+    .schemaVersion == 2 and
+    (.manifests | type == "array" and length > 0) and
+    all(.manifests[]; .digest | test("^sha256:[0-9a-f]{64}$"))
+  ' "${oci_layout_dir}/index.json" >/dev/null || {
+    printf 'error: invalid OCI image index\n' >&2
+    exit 1
+  }
+  run_args+=(-v "$oci_layout_dir:/scan/image${ro_suffix}")
+  scan_args=(image --input /scan/image)
 else
   [[ "$target" =~ @sha256:[0-9a-f]{64}$ ]] || {
     printf 'error: registry image must be pinned by sha256 digest\n' >&2

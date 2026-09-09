@@ -66,11 +66,15 @@ All notable changes to Midori VPN Control are documented here.
   replacement and binds the Control digest to GitHub provenance, SPDX
   attestation and an immediately verified keyless Cosign workflow identity.
 - Replaced direct container publication with a read-only build evidence job
-  that produces an OCI archive, embedded and independent SBOMs, provenance and
-  checksums using immutable workflow dependencies.
+  that produces a reproducible OCI archive, validates its extracted layout for
+  the pinned vulnerability gate, and generates independent SBOM, provenance
+  metadata and checksums using immutable workflow dependencies.
 - API failures retain their stable machine-readable code, HTTP status and
   retry metadata, and connection-list schemas no longer admit preshared keys.
-- Pinned Node 24.20.0 and Nginx 1.31.4 build/runtime images to exact Alpine 3.24 digests so clean Control builds do not depend on mutable container tags.
+- Pinned Node 24.20.0 and Nginx 1.31.5 build/runtime images to exact Alpine
+  3.24 digests. The slim Nginx runtime already contains libcrypto3/libssl3
+  3.5.8-r0 while omitting unused libexpat and vulnerable libuuid, removing a
+  redundant, non-deterministic APK upgrade layer and reducing attack surface.
 - Added an administrator view for registered Firefox, Midori and Chromium extension origins, including explicit revoke and restore actions with localized status and timestamps.
 - Added a mandatory `npm run check` quality gate and cleaned test-router diagnostics so successful tests do not emit framework warnings.
 - Reworked the Control panel release line to 2.0.0.
