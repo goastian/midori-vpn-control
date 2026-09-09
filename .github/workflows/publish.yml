@@ -15,6 +15,7 @@ concurrency:
 
 env:
   IMAGE_NAME: ghcr.io/goastian/midori-vpn-control
+  BUILDX_NO_DEFAULT_ATTESTATIONS: 1
 
 jobs:
   validate-tag:
@@ -93,8 +94,8 @@ jobs:
             org.opencontainers.image.source=https://github.com/goastian/midori-vpn-control-dev
           build-args: SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
           outputs: type=oci,dest=${{ runner.temp }}/control-first.oci.tar,rewrite-timestamp=true
-          provenance: mode=max
-          sbom: true
+          provenance: false
+          sbom: false
 
       - name: Second clean OCI build
         id: second
@@ -112,8 +113,8 @@ jobs:
             org.opencontainers.image.source=https://github.com/goastian/midori-vpn-control-dev
           build-args: SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
           outputs: type=oci,dest=${{ runner.temp }}/control-second.oci.tar,rewrite-timestamp=true
-          provenance: mode=max
-          sbom: true
+          provenance: false
+          sbom: false
 
       - name: Require reproducible image digests
         env:
@@ -162,8 +163,8 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.source=https://github.com/goastian/midori-vpn-control-dev
           build-args: SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
-          provenance: mode=max
-          sbom: true
+          provenance: false
+          sbom: false
 
       - name: Require the pushed digest to match both clean builds
         env:
@@ -236,9 +237,9 @@ jobs:
           cosign sign --yes "$verification_ref"
           cosign verify --certificate-identity "$identity" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com "$verification_ref"
-          gh attestation verify "oci://${verification_ref}" --repo goastian/midori-vpn-control-dev \
+          gh attestation verify "oci://${verification_ref}" --bundle-from-oci --repo goastian/midori-vpn-control-dev \
             --predicate-type https://slsa.dev/provenance/v1
-          gh attestation verify "oci://${verification_ref}" --repo goastian/midori-vpn-control-dev \
+          gh attestation verify "oci://${verification_ref}" --bundle-from-oci --repo goastian/midori-vpn-control-dev \
             --predicate-type https://spdx.dev/Document/v2.3
           (cd dist-release && sha256sum -- * > SHA256SUMS && sha256sum --check SHA256SUMS)
 

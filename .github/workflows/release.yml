@@ -6,6 +6,9 @@ on:
 permissions:
   contents: read
 
+env:
+  BUILDX_NO_DEFAULT_ATTESTATIONS: 1
+
 jobs:
   build-evidence:
     name: Build private Control evidence
@@ -20,7 +23,7 @@ jobs:
       - name: Define reproducible build epoch
         run: echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
 
-      - name: Build OCI archive with embedded provenance and SBOM
+      - name: Build reproducible OCI archive without embedded attestations
         id: build-first
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
@@ -33,8 +36,8 @@ jobs:
           build-args: |
             SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
           outputs: type=oci,dest=${{ runner.temp }}/midorivpn-control-2.0.0.oci.tar,rewrite-timestamp=true
-          provenance: mode=max
-          sbom: true
+          provenance: false
+          sbom: false
 
       - name: Repeat the clean OCI build
         id: build-second
@@ -49,8 +52,8 @@ jobs:
           build-args: |
             SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
           outputs: type=oci,dest=${{ runner.temp }}/midorivpn-control-2.0.0.rebuild.oci.tar,rewrite-timestamp=true
-          provenance: mode=max
-          sbom: true
+          provenance: false
+          sbom: false
 
       - name: Compare clean build digests
         env:
