@@ -155,7 +155,6 @@ jobs:
           context: .
           file: Dockerfile
           platforms: linux/amd64
-          push: true
           no-cache: true
           tags: ${{ env.IMAGE_NAME }}:${{ env.RELEASE_VERSION }}
           labels: |
@@ -163,6 +162,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.source=https://github.com/goastian/midori-vpn-control-dev
           build-args: SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
+          outputs: type=registry,rewrite-timestamp=true
           provenance: false
           sbom: false
 

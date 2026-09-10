@@ -65,6 +65,9 @@ All notable changes to Midori VPN Control are documented here.
 - Added a separate tag-driven private candidate workflow that refuses version
   replacement and binds the Control digest to GitHub provenance, SPDX
   attestation and an immediately verified keyless Cosign workflow identity.
+- Normalized timestamps on the registry exporter as well as both clean OCI
+  builds, preventing the published manifest from diverging after the
+  reproducibility gate.
 - Replaced direct container publication with a read-only build evidence job
   that produces a reproducible OCI archive, validates its extracted layout for
   the pinned vulnerability gate, and generates independent SBOM, provenance
