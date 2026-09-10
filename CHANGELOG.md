@@ -12,6 +12,8 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Changed
 
+- GHCR publication now verifies the package's effective private visibility
+  without calling the unsupported package visibility PATCH endpoint.
 - Control OCI publication now runs from an annotated semantic tag, proves two
   clean builds plus the pushed digest are identical, enforces private GHCR
   visibility, scans and attests the immutable digest, and signs it with the
