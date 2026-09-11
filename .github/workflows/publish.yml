@@ -49,8 +49,6 @@ jobs:
     needs: validate-tag
     runs-on: ubuntu-24.04
     permissions:
-      artifact-metadata: write
-      attestations: write
       contents: read
       id-token: write
       packages: write
@@ -73,6 +71,7 @@ jobs:
             printf 'PRODUCT_VERSION=%s\n' "$product_version"
             printf 'RELEASE_VERSION=%s\n' "$release_version"
             printf 'SOURCE_DATE_EPOCH=%s\n' "$(git show -s --format=%ct HEAD)"
+            printf 'BUILD_STARTED_ON=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } >> "$GITHUB_ENV"
 
       - name: Set up current pinned Buildx
@@ -197,32 +196,22 @@ jobs:
             --arg commit "$GITHUB_SHA" --arg digest "$IMAGE_DIGEST" \
             '{schema_version:1,component:"control",version:$version,tag:$tag,commit:$commit,image_digest:$digest,visibility:"private"}' \
             > "dist-release/control-${RELEASE_VERSION}.json"
-
-      - name: Attest provenance
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
-        with:
-          subject-name: ${{ env.IMAGE_NAME }}
-          subject-digest: ${{ steps.push.outputs.digest }}
-          subject-version: ${{ env.RELEASE_VERSION }}
-          push-to-registry: true
-
-      - name: Attest SPDX SBOM
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
-        with:
-          subject-name: ${{ env.IMAGE_NAME }}
-          subject-digest: ${{ steps.push.outputs.digest }}
-          subject-version: ${{ env.RELEASE_VERSION }}
-          sbom-path: dist-release/control-${{ env.RELEASE_VERSION }}.spdx.json
-          push-to-registry: true
+          jq -n \
+            --arg server "$GITHUB_SERVER_URL" --arg repository "$GITHUB_REPOSITORY" \
+            --arg ref "$GITHUB_REF" --arg commit "$GITHUB_SHA" \
+            --arg run_id "$GITHUB_RUN_ID" --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg product_version "$PRODUCT_VERSION" --arg release_version "$RELEASE_VERSION" \
+            --arg started_on "$BUILD_STARTED_ON" --arg finished_on "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{buildDefinition:{buildType:"https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1",externalParameters:{workflow:{ref:$ref,repository:($server+"/"+$repository),path:".github/workflows/publish.yml"},product_version:$product_version,release_version:$release_version},internalParameters:{github:{event_name:"push",runner_environment:"github-hosted"}},resolvedDependencies:[{uri:("git+"+$server+"/"+$repository+"@"+$ref),digest:{gitCommit:$commit}}]},runDetails:{builder:{id:($server+"/actions/runner/github-hosted")},metadata:{invocationId:($server+"/"+$repository+"/actions/runs/"+$run_id+"/attempts/"+$run_attempt),startedOn:$started_on,finishedOn:$finished_on},byproducts:[]}}' \
+            > "dist-release/control-${RELEASE_VERSION}.provenance.json"
 
       - name: Install current pinned Cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with:
           cosign-release: v3.1.3
 
-      - name: Sign and verify the digest
+      - name: Sign, attest and verify the digest
         env:
-          GH_TOKEN: ${{ github.token }}
           IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
         run: |
           set -Eeuo pipefail
@@ -234,12 +223,31 @@ jobs:
           test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' "$tag_ref")" = "$RELEASE_VERSION"
           identity="https://github.com/goastian/midori-vpn-control-dev/.github/workflows/publish.yml@refs/tags/${GITHUB_REF_NAME}"
           cosign sign --yes "$verification_ref"
+          cosign attest --yes --type slsaprovenance1 \
+            --predicate "dist-release/control-${RELEASE_VERSION}.provenance.json" "$verification_ref"
+          cosign attest --yes --type spdxjson \
+            --predicate "dist-release/control-${RELEASE_VERSION}.spdx.json" "$verification_ref"
           cosign verify --certificate-identity "$identity" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com "$verification_ref"
-          gh attestation verify "oci://${verification_ref}" --bundle-from-oci --repo goastian/midori-vpn-control-dev \
-            --predicate-type https://slsa.dev/provenance/v1
-          gh attestation verify "oci://${verification_ref}" --bundle-from-oci --repo goastian/midori-vpn-control-dev \
-            --predicate-type https://spdx.dev/Document/v2.3
+          cosign verify-attestation --type slsaprovenance1 \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$verification_ref" > "dist-release/control-${RELEASE_VERSION}.provenance.verify.json"
+          cosign verify-attestation --type spdxjson \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$verification_ref" > "dist-release/control-${RELEASE_VERSION}.spdx.verify.json"
+          jq -e --arg commit "$GITHUB_SHA" --arg ref "$GITHUB_REF" --arg version "$RELEASE_VERSION" '
+            def records: if type == "array" then .[] else . end;
+            any(records; ((.payload | @base64d | fromjson).predicate) as $p |
+              $p.buildDefinition.externalParameters.workflow.ref == $ref and
+              $p.buildDefinition.externalParameters.release_version == $version and
+              $p.buildDefinition.resolvedDependencies[0].digest.gitCommit == $commit)
+          ' "dist-release/control-${RELEASE_VERSION}.provenance.verify.json" >/dev/null
+          jq -e '
+            def records: if type == "array" then .[] else . end;
+            any(records; (.payload | @base64d | fromjson).predicate.spdxVersion == "SPDX-2.3")
+          ' "dist-release/control-${RELEASE_VERSION}.spdx.verify.json" >/dev/null
           (cd dist-release && sha256sum -- * > SHA256SUMS && sha256sum --check SHA256SUMS)
 
       - name: Retain private candidate evidence

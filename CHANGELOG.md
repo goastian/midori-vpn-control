@@ -12,6 +12,9 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Changed
 
+- Private candidates now attach and immediately verify SLSA v1 provenance and
+  SPDX as keyless Cosign OCI attestations, avoiding GitHub's unavailable
+  private artifact-attestation API on the organization plan.
 - Private-registry SPDX generation now gives the pinned Syft container an
   explicit `DOCKER_CONFIG` path matching its read-only credential mount.
 - GHCR publication now verifies the package's effective private visibility
@@ -67,8 +70,8 @@ All notable changes to Midori VPN Control are documented here.
   dialog expose explicit names and relationships without changing key or
   profile generation.
 - Added a separate tag-driven private candidate workflow that refuses version
-  replacement and binds the Control digest to GitHub provenance, SPDX
-  attestation and an immediately verified keyless Cosign workflow identity.
+  replacement and binds the Control digest to SLSA provenance, SPDX
+  attestations and an immediately verified keyless Cosign workflow identity.
 - Normalized timestamps on the registry exporter as well as both clean OCI
   builds, preventing the published manifest from diverging after the
   reproducibility gate.
