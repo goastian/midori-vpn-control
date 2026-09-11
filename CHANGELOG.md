@@ -12,6 +12,8 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Changed
 
+- Private-registry SPDX generation now gives the pinned Syft container an
+  explicit `DOCKER_CONFIG` path matching its read-only credential mount.
 - GHCR publication now verifies the package's effective private visibility
   without calling the unsupported package visibility PATCH endpoint.
 - Control OCI publication now runs from an annotated semantic tag, proves two

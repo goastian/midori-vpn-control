@@ -187,8 +187,8 @@ jobs:
           mkdir -p dist-release
           CONTAINER_ENGINE=docker bash scripts/scan-oci.sh image \
             "${IMAGE_NAME}@${IMAGE_DIGEST}" "dist-release/control-${RELEASE_VERSION}.trivy.json"
-          docker run --rm -e SYFT_CACHE_DIR=/tmp/syft-cache \
-            -v "${HOME}/.docker/config.json:/root/.docker/config.json:ro" \
+          docker run --rm -e SYFT_CACHE_DIR=/tmp/syft-cache -e DOCKER_CONFIG=/auth \
+            -v "${HOME}/.docker/config.json:/auth/config.json:ro" \
             -v "${PWD}/dist-release:/artifacts" \
             ghcr.io/anchore/syft@sha256:41f8289664101d6ebab30a97ac8df6b6f86b92d8343285ca90f428e2bc353106 \
             scan "registry:${IMAGE_NAME}@${IMAGE_DIGEST}" \
