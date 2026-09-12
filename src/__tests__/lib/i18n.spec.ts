@@ -42,8 +42,8 @@ describe('locale catalogs', () => {
 
   afterEach(() => setLocale('es'))
 
-  it('contains the same 660 non-empty messages in every language', () => {
-    expect(canonicalKeys).toHaveLength(660)
+  it('contains the same 665 non-empty messages in every language', () => {
+    expect(canonicalKeys).toHaveLength(665)
     expect(Object.keys(localeMessages).sort()).toEqual(
       supportedLocales.map(({ code }) => code).sort(),
     )

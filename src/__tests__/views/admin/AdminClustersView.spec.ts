@@ -6,7 +6,7 @@ import { setLocale } from '@/lib/i18n'
 import AdminClustersView from '@/views/admin/AdminClustersView.vue'
 
 vi.mock('@/lib/api', () => ({
-  api: { validated: vi.fn(), post: vi.fn() },
+  api: { validated: vi.fn(), post: vi.fn(), patch: vi.fn() },
 }))
 
 const clusterID = '9c5740cf-73c7-4eb2-a659-8d074d94705b'
@@ -209,6 +209,26 @@ describe('AdminClustersView', () => {
     const closeButton = wrapper.findAll('button').find((button) => button.text().trim() === 'Close')
     await closeButton!.trigger('click')
     expect(document.body.textContent).not.toContain(token)
+  })
+
+  it('updates the management host only before enrollment and reloads validated inventory', async () => {
+    const api = await configureValidatedAPI()
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-test="edit-management-host"]').trigger('click')
+    await wrapper.get('[data-test="management-host-input"]').setValue('10.254.240.2:8443')
+    await wrapper.get('[data-test="save-management-host"]').trigger('submit')
+    await flushPromises()
+
+    expect(api.patch).toHaveBeenCalledWith(`/api/v1/admin/nodes/${nodeID}`, {
+      management_host: '10.254.240.2:8443',
+    })
+    expect(api.validated).toHaveBeenCalledWith(
+      expect.stringContaining(`/api/v1/admin/clusters/${clusterID}/nodes?`),
+      expect.anything(),
+    )
+    expect(wrapper.text()).toContain('The management host was updated.')
   })
 
   it('fails closed on an invalid cluster payload', async () => {

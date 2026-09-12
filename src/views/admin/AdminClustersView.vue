@@ -37,6 +37,8 @@ const showNodeForm = ref(false)
 const creatingCluster = ref(false)
 const creatingNode = ref(false)
 const mutatingNodeID = ref('')
+const editingNodeID = ref('')
+const managementHostDraft = ref('')
 const feedback = ref<{ kind: 'success' | 'error'; message: string } | null>(null)
 const enrollment = ref<NodeEnrollmentToken | null>(null)
 const tokenCopied = ref(false)
@@ -160,6 +162,41 @@ function tokenDisabledReason(node: AdminCoreNode): string {
   if (node.enrolled) return t('adminClusters.tokenDisabledEnrolled')
   if (node.state !== 'enrolling') return t('adminClusters.tokenDisabledState')
   return ''
+}
+
+function managementHostDisabledReason(node: AdminCoreNode): string {
+  if (node.enrolled) return t('adminClusters.managementHostDisabledEnrolled')
+  if (node.state !== 'enrolling') return t('adminClusters.managementHostDisabledState')
+  return ''
+}
+
+function beginManagementHostEdit(node: AdminCoreNode) {
+  if (managementHostDisabledReason(node)) return
+  editingNodeID.value = node.id
+  managementHostDraft.value = node.management_host
+  feedback.value = null
+}
+
+function cancelManagementHostEdit() {
+  editingNodeID.value = ''
+  managementHostDraft.value = ''
+}
+
+async function saveManagementHost(node: AdminCoreNode) {
+  const managementHost = managementHostDraft.value.trim()
+  if (managementHostDisabledReason(node) || !managementHost) return
+  mutatingNodeID.value = node.id
+  feedback.value = null
+  try {
+    await api.patch(`/api/v1/admin/nodes/${node.id}`, { management_host: managementHost })
+    cancelManagementHostEdit()
+    feedback.value = { kind: 'success', message: t('adminClusters.managementHostUpdated') }
+    await loadNodes(nodePage.value)
+  } catch {
+    feedback.value = { kind: 'error', message: t('adminClusters.managementHostUpdateError') }
+  } finally {
+    mutatingNodeID.value = ''
+  }
 }
 
 function revokeDisabledReason(node: AdminCoreNode): string {
@@ -511,9 +548,48 @@ onMounted(() => loadClusters())
               <p class="mt-1 break-all font-mono text-xs text-slate-400">
                 {{ node.management_host }}
               </p>
+              <form
+                v-if="editingNodeID === node.id"
+                class="mt-3 flex max-w-xl flex-col gap-2 sm:flex-row"
+                @submit.prevent="saveManagementHost(node)"
+              >
+                <input
+                  v-model="managementHostDraft"
+                  required
+                  maxlength="253"
+                  class="input-field min-w-0 flex-1"
+                  :aria-label="t('adminClusters.managementHost')"
+                  data-test="management-host-input"
+                />
+                <button
+                  type="submit"
+                  class="rounded-lg bg-midori-600 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+                  :disabled="mutatingNodeID === node.id || !managementHostDraft.trim()"
+                  data-test="save-management-host"
+                >
+                  {{ t('common.save') }}
+                </button>
+                <button
+                  type="button"
+                  class="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-300"
+                  @click="cancelManagementHostEdit"
+                >
+                  {{ t('common.cancel') }}
+                </button>
+              </form>
             </div>
             <div>
               <div class="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+                  :disabled="Boolean(managementHostDisabledReason(node)) || mutatingNodeID === node.id"
+                  :title="managementHostDisabledReason(node)"
+                  data-test="edit-management-host"
+                  @click="beginManagementHostEdit(node)"
+                >
+                  {{ t('adminClusters.editManagementHost') }}
+                </button>
                 <button
                   type="button"
                   class="rounded-lg border border-cyan-700/50 px-3 py-1.5 text-xs font-semibold text-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
@@ -535,6 +611,12 @@ onMounted(() => loadClusters())
               </div>
               <p v-if="tokenDisabledReason(node)" class="mt-2 max-w-sm text-xs text-slate-400">
                 {{ tokenDisabledReason(node) }}
+              </p>
+              <p
+                v-if="managementHostDisabledReason(node)"
+                class="mt-2 max-w-sm text-xs text-slate-400"
+              >
+                {{ managementHostDisabledReason(node) }}
               </p>
               <p v-if="revokeDisabledReason(node)" class="mt-2 max-w-sm text-xs text-slate-400">
                 {{ revokeDisabledReason(node) }}
