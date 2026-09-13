@@ -12,6 +12,9 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Changed
 
+- Refreshed the supported Node 24 toolchain to ESLint Vue 10.11.0,
+  happy-dom 20.14.5, TypeScript-ESLint 8.70.0 and Vite 8.3.0, and updated the
+  runtime validation contract to Zod 4.6.4.
 - Private candidates now attach and immediately verify SLSA v1 provenance and
   SPDX as keyless Cosign OCI attestations, avoiding GitHub's unavailable
   private artifact-attestation API on the organization plan.
