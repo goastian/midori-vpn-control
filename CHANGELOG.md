@@ -12,6 +12,11 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Changed
 
+- Refresh Node 24.22.3/npm 12.2.2, Vue 3.5.45, Router 5.5, Pinia 4.1 and
+  VueUse 15 with compatible Vite 8.3.8/Vitest 5.1 and lint/type tooling.
+  TypeScript remains on 6.0.3 while TypeScript-ESLint requires a version below 6.1.
+- Refresh verified CI/publication Action pins and the Trivy/Syft/Cosign tools;
+  deployment inputs and publication approval gates remain unchanged.
 - Refreshed the supported Node 24 toolchain to ESLint Vue 10.11.0,
   happy-dom 20.14.5, TypeScript-ESLint 8.70.0 and Vite 8.3.0, and updated the
   runtime validation contract to Zod 4.6.4.

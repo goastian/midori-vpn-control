@@ -1,7 +1,7 @@
-FROM docker.io/library/node:24.20.0-alpine3.24@sha256:4caaaf42195bcd6f6f3559a413b20cb8f8ad089e231ee874cf7701643966689f
+FROM docker.io/library/node:24.22.3-alpine3.24@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5
 
 RUN apk add --no-cache bash ca-certificates coreutils findutils git jq zip && \
-    npm install --global npm@12.0.2
+    npm install --global npm@12.2.2
 
 ENV npm_config_cache=/tmp/npm-cache
 WORKDIR /workspace

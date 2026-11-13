@@ -1,11 +1,11 @@
 ARG SOURCE_DATE_EPOCH=0
 
 # ── Stage 1: Build ──
-FROM docker.io/library/node:24.20.0-alpine3.24@sha256:4caaaf42195bcd6f6f3559a413b20cb8f8ad089e231ee874cf7701643966689f AS builder
+FROM docker.io/library/node:24.22.3-alpine3.24@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS builder
 
 WORKDIR /app
 
-RUN npm install --global npm@12.0.2
+RUN npm install --global npm@12.2.2
 
 COPY package.json package-lock.json ./
 RUN npm ci
