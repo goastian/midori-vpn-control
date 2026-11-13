@@ -100,6 +100,18 @@ All notable changes to Midori VPN Control are documented here.
 ### Security
 
 - Updated Vitest and its Vite dependency chain, removing the critical development-server advisory reported by `npm audit`.
+- Updated `zod` to 4.6.7, removing a high-severity advisory where oversized
+  constrained collections could exhaust memory while validating rendered API
+  data (`GHSA-mrhx-c7xc-m3w5`).
+- Updated `vite` to 8.3.5 and `vitest`/`@vitest/coverage-v8` to 5.0.5,
+  removing high-severity `vite`/`launch-editor` advisories and a moderate
+  `@vitest/mocker` code-injection advisory, all development-only.
+- Updated `happy-dom` to 21.0.4, removing high-severity SSRF and incomplete
+  code-execution-fix advisories in the Vitest DOM test environment.
+- Added `glob` and `minimatch` overrides (14.0.3 / 11.0.3) to the transitive
+  ESLint/TypeScript-ESLint toolchain, removing a high-severity `source-map-js`
+  event-loop denial-of-service advisory pulled in via `vue` and moderate
+  `glob`/`minimatch` denial-of-service advisories, all development-only.
 
 ### Compatibility
 
