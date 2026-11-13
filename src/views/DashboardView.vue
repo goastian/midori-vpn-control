@@ -4,7 +4,6 @@ import { useAuthStore } from '../stores/auth'
 import { AUTH_LOGOUT_EVENT } from '../stores/auth'
 import { api } from '../lib/api'
 import { useLocale } from '../lib/i18n'
-import { detectDesktopEnvironment } from '../lib/platform'
 import { beginResourceLoad, type ResourceState } from '../lib/resource-state'
 import AsyncState from '../components/AsyncState.vue'
 import ResourceSkeleton from '../components/ResourceSkeleton.vue'
@@ -13,15 +12,6 @@ import {
   WebSocketStatsMessageSchema,
   type DashboardSummary,
 } from '../lib/schemas'
-import type { DesktopPlatform, DetectionConfidence } from '../lib/platform'
-
-type DesktopDownload = {
-  key: string
-  label: string
-  filename: string
-  hintKey: string
-  primary?: boolean
-}
 
 const auth = useAuthStore()
 const { t, formatDateTime } = useLocale()
@@ -38,9 +28,6 @@ const dashboardLoading = computed(
 
 const dashboardHasError = computed(() => summaryState.value === 'error')
 
-const desktopReleaseBase = 'https://github.com/goastian/midori-vpn-desktop/releases/latest/download'
-const detectedDesktopPlatform = ref<DesktopPlatform>('unknown')
-const detectedConfidence = ref<DetectionConfidence>('unknown')
 
 const activePercent = computed(() => {
   if (!summary.value) return null
@@ -101,40 +88,6 @@ const dashboardCards = computed(() => {
 })
 
 const adminStats = computed(() => summary.value?.infrastructure ?? null)
-
-const desktopDownloads = computed<DesktopDownload[]>(() => {
-  return [
-    {
-      key: 'linux-rpm',
-      label: t('dashboard.desktopDownload.actions.linuxRpm'),
-      filename: 'midori-vpn-2.0.0-1.x86_64.rpm',
-      hintKey: 'dashboard.desktopDownload.hints.linuxRpm',
-      primary:
-        detectedDesktopPlatform.value === 'linux' && detectedConfidence.value === 'detected',
-    },
-  ]
-})
-
-const primaryDesktopDownload = computed(
-  () => desktopDownloads.value.find((download) => download.primary) || null,
-)
-
-function desktopDownloadUrl(filename: string): string {
-  return `${desktopReleaseBase}/${filename}`
-}
-
-function desktopPlatformLabel(platform: DesktopPlatform): string {
-  switch (platform) {
-    case 'windows':
-      return t('dashboard.desktopDownload.platforms.windows')
-    case 'macos':
-      return t('dashboard.desktopDownload.platforms.macos')
-    case 'linux':
-      return t('dashboard.desktopDownload.platforms.linux')
-    default:
-      return t('dashboard.desktopDownload.platforms.unknown')
-  }
-}
 
 function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return t('common.unavailable')
@@ -202,10 +155,6 @@ function connectWebSocket() {
 }
 
 onMounted(async () => {
-  const desktopEnvironment = await detectDesktopEnvironment()
-  detectedDesktopPlatform.value = desktopEnvironment.platform
-  detectedConfidence.value = desktopEnvironment.confidence
-
   await loadDashboard()
   if (auth.isAdmin) connectWebSocket()
 })
@@ -292,7 +241,6 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
         {{ t('common.refreshing') }}
       </p>
       <section
-        v-if="detectedConfidence !== 'mobile'"
         class="relative overflow-hidden rounded-[2rem] border border-cyan-400/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(15,23,42,0.9))] p-6 shadow-xl shadow-cyan-950/10 lg:p-8"
       >
         <div class="absolute right-0 top-0 h-56 w-56 rounded-full bg-midori-500/10 blur-3xl"></div>
@@ -301,7 +249,7 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
         ></div>
 
         <div
-          class="relative z-10 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.25fr)_420px] xl:items-center"
+          class="relative z-10"
         >
           <div>
             <p class="text-xs font-semibold uppercase tracking-[0.26em] text-cyan-300">
@@ -314,92 +262,10 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
               {{ t('dashboard.desktopDownload.subtitle') }}
             </p>
 
-            <div
-              class="mt-5 inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm text-cyan-50 backdrop-blur"
-            >
-              <span class="mr-2 h-2.5 w-2.5 rounded-full bg-midori-400"></span>
-              {{
-                t('dashboard.desktopDownload.detected', {
-                  platform: desktopPlatformLabel(detectedDesktopPlatform),
-                })
-              }}
-            </div>
-
             <div class="mt-6 flex flex-wrap gap-3">
-              <a
-                v-for="download in desktopDownloads"
-                :key="download.key"
-                :href="desktopDownloadUrl(download.filename)"
-                target="_blank"
-                rel="noreferrer"
-                class="group inline-flex min-w-[220px] flex-1 items-center justify-between rounded-2xl border px-4 py-3 transition md:flex-none"
-                :class="
-                  download.primary
-                    ? 'border-midori-400/40 bg-midori-500/12 text-white hover:bg-midori-500/18'
-                    : 'border-white/10 bg-white/5 text-slate-200 hover:border-cyan-300/40 hover:bg-white/10'
-                "
-              >
-                <div>
-                  <p class="text-sm font-semibold">{{ download.label }}</p>
-                  <p class="mt-1 text-xs text-slate-400">{{ t(download.hintKey) }}</p>
-                </div>
-                <span
-                  v-if="download.primary"
-                  class="ml-4 shrink-0 rounded-full bg-midori-400/15 px-2.5 py-1 text-[11px] font-semibold text-midori-200"
-                >
-                  {{ t('dashboard.desktopDownload.recommendedBadge') }}
-                </span>
-              </a>
+              <a href="/download" class="rounded-xl border border-cyan-300/40 px-5 py-3 font-semibold text-cyan-200 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-4">{{ t('landing.footerDownload') }}</a>
             </div>
           </div>
-
-          <div
-            v-if="primaryDesktopDownload"
-            class="rounded-[1.75rem] border border-white/10 bg-slate-950/40 p-5 backdrop-blur-md"
-          >
-            <div
-              class="rounded-[1.4rem] border border-midori-400/20 bg-gradient-to-br from-midori-500 via-midori-600 to-emerald-500 p-6 text-white shadow-lg shadow-midori-950/20"
-            >
-              <p class="text-xs font-semibold uppercase tracking-[0.22em] text-midori-100/90">
-                {{ t('dashboard.desktopDownload.recommended') }}
-              </p>
-              <p class="mt-3 text-2xl font-semibold tracking-tight">
-                {{ primaryDesktopDownload.label }}
-              </p>
-              <p class="mt-2 text-sm leading-6 text-midori-50/90">
-                {{ t(primaryDesktopDownload.hintKey) }}
-              </p>
-
-              <a
-                :href="desktopDownloadUrl(primaryDesktopDownload.filename)"
-                target="_blank"
-                rel="noreferrer"
-                class="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-white px-5 py-4 text-base font-semibold text-midori-700 transition hover:bg-slate-100"
-              >
-                {{ t('dashboard.desktopDownload.primaryAction') }}
-              </a>
-
-              <div class="mt-4 rounded-2xl border border-white/15 bg-black/10 px-4 py-3">
-                <p class="text-[11px] uppercase tracking-[0.2em] text-midori-100/70">Asset</p>
-                <p class="mt-1 break-all text-xs font-mono text-white/90">
-                  {{ primaryDesktopDownload.filename }}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="relative z-10 mt-5 flex flex-wrap items-center gap-3 text-sm">
-          <a
-            href="https://github.com/goastian/midori-vpn-desktop/releases"
-            target="_blank"
-            rel="noreferrer"
-            class="font-semibold text-cyan-300 transition hover:text-cyan-200"
-          >
-            {{ t('dashboard.desktopDownload.allReleases') }}
-          </a>
-          <span class="text-white/20">•</span>
-          <span class="text-slate-400">{{ t('dashboard.desktopDownload.releaseSource') }}</span>
         </div>
       </section>
 

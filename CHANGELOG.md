@@ -99,6 +99,14 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Security
 
+- Replace simulated public statistics, prices and unsupported claims with
+  explicit pre-release status. Public download, privacy and terms routes remain
+  accessible without account bootstrap; legal notices are pending approval,
+  not published service policies. Downloads do not invent a release asset.
+- Remove third-party font requests and serve CSP, anti-framing, MIME, referrer
+  and browser-permission headers on both HTML and static assets.
+- Refresh the pinned Nginx runtime to 1.31.8, including patched Alpine musl,
+  PCRE2 and zlib libraries identified by the OCI vulnerability gate.
 - Updated Vitest and its Vite dependency chain, removing the critical development-server advisory reported by `npm audit`.
 - Updated `zod` to 4.6.7, removing a high-severity advisory where oversized
   constrained collections could exhaust memory while validating rendered API

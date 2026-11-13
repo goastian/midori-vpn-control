@@ -36,7 +36,7 @@ watch(
 </script>
 
 <template>
-  <!-- OAuth callbacks are isolated full-page routes and cannot expose the shell. -->
+  <!-- Static public information and OAuth callbacks never expose the shell. -->
   <RouterView v-if="bypassesBootstrap" v-slot="{ Component, route: viewRoute }">
     <ViewErrorBoundary v-slot="{ retryKey }" :reset-key="viewRoute.fullPath">
       <component :is="Component" :key="`${viewRoute.fullPath}:${retryKey}`" />

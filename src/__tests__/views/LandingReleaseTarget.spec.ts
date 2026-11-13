@@ -12,18 +12,14 @@ describe('landing release target', () => {
     vi.restoreAllMocks()
   })
 
-  it('advertises only the supported Linux x86_64 RPM package', () => {
-    vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1)
-    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
-
-    const wrapper = mount(LandingView)
+  it('routes downloads through release status without inventing a published artifact', () => {
+    const wrapper = mount(LandingView, { global: { stubs: { RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } } } })
     const releaseLinks = wrapper.findAll('a').filter((link) =>
       link.attributes('href')?.includes('/midori-vpn-desktop/releases/latest'),
     )
 
-    expect(releaseLinks).toHaveLength(1)
-    expect(releaseLinks[0]?.text()).toContain('Linux x86_64')
-    expect(releaseLinks[0]?.text()).toContain('.rpm')
+    expect(releaseLinks).toHaveLength(0)
+    expect(wrapper.find('a[href="/download"]').exists()).toBe(true)
     expect(wrapper.html()).not.toMatch(/\.(?:deb|AppImage|msi|exe|dmg)/)
 
     wrapper.unmount()

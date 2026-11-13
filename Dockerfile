@@ -16,7 +16,7 @@ COPY src ./src
 RUN npm run build
 
 # ── Stage 2: Production Nginx Runtime ──
-FROM docker.io/library/nginx:1.31.5-alpine3.24-slim@sha256:f1865067f7bc1222cab3d68a85b5f226ef15dfed923e93e5ddbc625bd6cd5a1a
+FROM docker.io/library/nginx:1.31.8-alpine3.24-slim@sha256:4c734d33ee731135dc9f2349914a34551c920f4451fca8bb05bf5880eb9079e8
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/templates/default.conf.template

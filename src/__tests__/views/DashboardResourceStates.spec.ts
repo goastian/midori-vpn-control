@@ -109,7 +109,7 @@ describe('dashboard resource states', () => {
     vi.stubGlobal('WebSocket', FakeWebSocket)
   })
 
-  it('offers only the supported Linux x86_64 RPM artifact', async () => {
+  it('links to public release status instead of a nonexistent latest artifact', async () => {
     state.auth.isAdmin = false
     state.desktopEnvironment = {
       platform: 'linux',
@@ -126,12 +126,8 @@ describe('dashboard resource states', () => {
     const artifactLinks = wrapper
       .findAll('a')
       .filter((link) => link.attributes('href')?.includes('/releases/latest/download/'))
-    expect(artifactLinks).toHaveLength(2)
-    expect(
-      artifactLinks.every((link) =>
-        link.attributes('href')?.endsWith('/midori-vpn-2.0.0-1.x86_64.rpm'),
-      ),
-    ).toBe(true)
+    expect(artifactLinks).toHaveLength(0)
+    expect(wrapper.find('a[href="/download"]').exists()).toBe(true)
     expect(wrapper.html()).not.toMatch(/\.(?:deb|AppImage|msi|exe|dmg)/)
   })
 

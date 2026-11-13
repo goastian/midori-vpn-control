@@ -4,6 +4,14 @@ import { useAuthStore } from '../stores/auth'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    ...(['download', 'privacy', 'terms'] as const).map((kind) => ({
+      path: `/${kind}`,
+      name: kind,
+      component: () => import('../views/PublicInformationView.vue'),
+      props: { kind },
+      // Static information never needs tokens, profile or a reachable IdP.
+      meta: { public: true, fullPage: true, bootstrapBypass: true },
+    })),
     {
       path: '/',
       name: 'landing',

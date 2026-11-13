@@ -10,6 +10,17 @@ Vue administration and user SPA for MidoriVPN Core. Runtime identity configurati
 | Certified | Integrated principal-staging workflows have been validated; that evidence does not certify an arbitrary deployment or regional server. |
 | Pending | 2.0.0 remains **Unreleased**. Regional acceptance and final coordinated artifact validation are still required. |
 
+Public pages show pre-release status instead of simulated statistics, pricing
+or service guarantees. `/download`, `/privacy` and `/terms` remain reachable
+without restoring an account session, even when authentication is unavailable.
+The legal routes contain explicit pending-approval notices, **not approved VPN
+policies**; legal review remains a launch/store gate. Download links must not be
+enabled until signed, validated artifacts or store listings actually exist.
+
+The static server supplies CSP and related security headers, including for
+cached assets. It makes no third-party font requests. HSTS belongs at the TLS
+ingress (the Core vhost template), not on this internal HTTP listener.
+
 ## Stack
 
 - Node.js 24 LTS and npm 12.
