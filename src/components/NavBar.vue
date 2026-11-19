@@ -6,12 +6,14 @@ import { useDarkMode } from '../composables/useDarkMode'
 import LanguageSelector from './LanguageSelector.vue'
 import { useLocale } from '../lib/i18n'
 import BrandLogo from './BrandLogo.vue'
+import { useBrandCopy } from '../lib/brand-copy'
 import AppIcon from './AppIcon.vue'
 
 const auth = useAuthStore()
 const route = useRoute()
 const { isDark, toggle: toggleDark } = useDarkMode()
 const { t } = useLocale()
+const copy = useBrandCopy()
 const mobileOpen = ref(false)
 const menuButton = ref<HTMLButtonElement | null>(null)
 const closeButton = ref<HTMLButtonElement | null>(null)
@@ -25,6 +27,7 @@ function closeOnDesktop(event: MediaQueryListEvent) {
 
 onMounted(() => {
   desktopMedia = window.matchMedia('(min-width: 1024px)')
+  document.addEventListener('keydown', handleEscape)
   desktopMedia.addEventListener('change', closeOnDesktop)
 })
 
@@ -44,12 +47,13 @@ watch(
   { flush: 'post' },
 )
 watch(
-  () => route.path,
+  () => route.fullPath,
   () => {
     mobileOpen.value = false
   },
 )
 onUnmounted(() => {
+  document.removeEventListener('keydown', handleEscape)
   desktopMedia?.removeEventListener('change', closeOnDesktop)
   if (mobileOpen.value) document.body.style.overflow = previousOverflow.value
 })
@@ -81,6 +85,7 @@ const navGroups = computed(() => {
         { name: t('nav.dashboard'), path: '/dashboard', icon: 'home' },
         { name: t('nav.servers'), path: '/servers', icon: 'server' },
         { name: t('nav.connections'), path: '/connections', icon: 'link' },
+        { name: t('nav.proxy'), path: '/proxy', icon: 'extension' },
       ],
     },
   ]
@@ -93,6 +98,9 @@ const navGroups = computed(() => {
         { name: t('nav.adminServers'), path: '/admin/servers', icon: 'shield' },
         { name: t('nav.adminPeers'), path: '/admin/peers', icon: 'pulse' },
         { name: t('nav.adminMesh'), path: '/admin/mesh', icon: 'mesh' },
+        { name: t('nav.adminClusters'), path: '/admin/clusters', icon: 'cluster' },
+        { name: t('nav.adminHealth'), path: '/admin/health', icon: 'health' },
+        { name: t('nav.adminExtensions'), path: '/admin/extensions', icon: 'extension' },
         { name: t('nav.adminLogs'), path: '/admin/audit', icon: 'log' },
       ],
     })
@@ -123,9 +131,19 @@ function iconPath(icon: string) {
       return 'M5 2.5A1.5 1.5 0 003.5 4v12A1.5 1.5 0 005 17.5h10a1.5 1.5 0 001.5-1.5V4A1.5 1.5 0 0015 2.5H5zm2.25 4a.75.75 0 000 1.5h5.5a.75.75 0 100-1.5h-5.5zm0 3a.75.75 0 000 1.5h5.5a.75.75 0 100-1.5h-5.5zm0 3a.75.75 0 000 1.5H11a.75.75 0 100-1.5H7.25z'
     case 'mesh':
       return 'M5 3a2 2 0 100 4 2 2 0 000-4zm8 0a2 2 0 100 4 2 2 0 000-4zM3 10a2 2 0 114 0 2 2 0 01-4 0zm8 0a2 2 0 114 0 2 2 0 01-4 0zM5 14.5a2 2 0 100 4 2 2 0 000-4zm8 0a2 2 0 100 4 2 2 0 000-4zM7 5h6M7 12h6M5 8v4m10-4v4M7 16.5h6'
+    case 'cluster':
+      return 'M4 3.5A1.5 1.5 0 015.5 2h9A1.5 1.5 0 0116 3.5v3A1.5 1.5 0 0114.5 8h-9A1.5 1.5 0 014 6.5v-3zm1.5 7h9A1.5 1.5 0 0116 12v4.5a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 014 16.5V12a1.5 1.5 0 011.5-1.5zM7 4.25a.75.75 0 100 1.5.75.75 0 000-1.5zm0 9a.75.75 0 100 1.5.75.75 0 000-1.5z'
+    case 'extension':
+      return 'M7.5 2a1 1 0 00-1 1v2.5H4a2 2 0 00-2 2v2a1 1 0 001 1h1a1.5 1.5 0 010 3H3a1 1 0 00-1 1v2a2 2 0 002 2h4a1 1 0 001-1v-1a1.5 1.5 0 013 0v1a1 1 0 001 1h3a2 2 0 002-2v-3a1 1 0 00-1-1h-1a1.5 1.5 0 010-3h1a1 1 0 001-1v-1a2 2 0 00-2-2h-3.5V3a1 1 0 00-1-1h-3z'
+    case 'health':
+      return 'M2.5 10a1 1 0 011-1h2.2l1.4-3.5a1 1 0 011.87.05l1.6 4.8 1.1-2.2a1 1 0 01.9-.55h3.95a1 1 0 110 2h-3.33l-1.78 3.56a1 1 0 01-1.84-.1l-1.52-4.56-.8 2A1 1 0 015 11H3.5a1 1 0 01-1-1z'
     default:
       return 'M10 2a8 8 0 100 16 8 8 0 000-16z'
   }
+}
+
+function handleEscape(event: KeyboardEvent) {
+  if (event.key === 'Escape' && mobileOpen.value) closeMobile()
 }
 
 function closeMobile() {
@@ -141,7 +159,7 @@ function closeMobile() {
       class="mobile-menu-toggle"
       :aria-label="t('nav.openMenu')"
       :aria-expanded="mobileOpen"
-      aria-controls="app-navigation"
+      aria-controls="mobile-navigation"
       @click="mobileOpen = true"
     >
       <AppIcon name="menu" />
@@ -150,13 +168,13 @@ function closeMobile() {
 
   <button
     v-if="mobileOpen"
-    class="sidebar-backdrop lg:hidden"
+    class="absolute inset-0 sidebar-backdrop lg:hidden"
     :aria-label="t('nav.closeMenu')"
     tabindex="-1"
     @click="closeMobile"
   ></button>
   <aside
-    id="app-navigation"
+    id="mobile-navigation"
     ref="drawer"
     class="app-sidebar"
     :class="{ 'is-open': mobileOpen }"
@@ -170,7 +188,7 @@ function closeMobile() {
     <div class="sidebar-brand">
       <div>
         <router-link to="/dashboard" @click="closeMobile"><BrandLogo /></router-link>
-        <p class="sidebar-brand-caption">{{ t('nav.controlPanel') }} · Astian</p>
+        <p class="sidebar-brand-caption">{{ copy.controlPanel }} · Astian</p>
       </div>
       <button
         ref="closeButton"
@@ -215,10 +233,16 @@ function closeMobile() {
           (auth.user?.display_name || auth.user?.email || 'M').slice(0, 1).toUpperCase()
         }}</span>
         <div class="account-details">
-          <p :title="auth.user?.email">{{ auth.user?.email }}</p>
+          <p :title="auth.user?.email">{{ auth.user?.email || t('common.unavailable') }}</p>
           <span>{{ auth.isAdmin ? t('common.roleAdmin') : t('common.roleUser') }}</span>
         </div>
       </div>
+      <p v-if="auth.profileState === 'refreshing'" class="sidebar-profile-state" role="status">
+        {{ t('common.refreshing') }}
+      </p>
+      <p v-else-if="auth.profileState === 'error'" class="sidebar-profile-state" role="alert">
+        {{ t('common.refreshFailed') }}
+      </p>
       <button class="sidebar-logout" @click="auth.logout()">
         <AppIcon name="logout" />{{ t('common.signOut') }}
       </button>

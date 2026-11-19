@@ -2,44 +2,63 @@
 import { ref, onMounted } from 'vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
-import type { AuditLog } from '../../lib/schemas'
+import { AdminAuditLogPageSchema, type AuditLog } from '../../lib/schemas'
+import AsyncState from '../../components/AsyncState.vue'
+import ResourceSkeleton from '../../components/ResourceSkeleton.vue'
+import PaginationControls from '../../components/PaginationControls.vue'
+import AdminListFilters from '../../components/AdminListFilters.vue'
+import {
+  beginResourceLoad,
+  completeResourceLoad,
+  type ResourceState,
+} from '../../lib/resource-state'
 
 const logs = ref<AuditLog[]>([])
-const loading = ref(true)
-const loadError = ref('')
-const currentOffset = ref(0)
-const hasMore = ref(true)
+const logsState = ref<ResourceState>('idle')
+const page = ref(1)
+const total = ref(0)
 const PAGE_SIZE = 50
 const actionFilter = ref('')
+const search = ref('')
+const status = ref('all')
+const sort = ref('created_at')
+const order = ref('desc')
 const { t, formatDateTime } = useLocale()
 
 onMounted(() => loadLogs())
 
-async function loadLogs(append = false) {
-  loading.value = true
-  loadError.value = ''
+async function loadLogs(requestedPage?: number) {
+  logsState.value = beginResourceLoad(logs.value.length > 0 || logsState.value === 'empty')
   try {
-    const offset = append ? currentOffset.value : 0
-    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) })
+    const targetPage = typeof requestedPage === 'number' ? requestedPage : page.value
+    const params = new URLSearchParams({
+      page: String(targetPage),
+      page_size: String(PAGE_SIZE),
+      status: status.value,
+      sort: sort.value,
+      order: order.value,
+    })
+    if (search.value) params.set('search', search.value)
     if (actionFilter.value) params.set('action', actionFilter.value)
-    const page = (await api.get<AuditLog[]>(`/api/v1/admin/audit-logs?${params}`)) || []
-    if (append) {
-      logs.value = [...logs.value, ...page]
-    } else {
-      logs.value = page
-      currentOffset.value = 0
-    }
-    hasMore.value = page.length >= PAGE_SIZE
-    currentOffset.value = (append ? currentOffset.value : 0) + page.length
-  } catch (e: any) {
-    loadError.value = e.message ?? 'Failed to load audit logs'
-  } finally {
-    loading.value = false
+    const response = await api.validated(
+      `/api/v1/admin/audit-logs?${params}`,
+      AdminAuditLogPageSchema,
+    )
+    logs.value = response.items
+    page.value = response.page
+    total.value = response.total
+    logsState.value = completeResourceLoad(logs.value.length > 0)
+  } catch {
+    logsState.value = 'error'
   }
 }
 
-async function loadMoreLogs() {
-  await loadLogs(true)
+function applyFilters(filters: { search: string; status: string; sort: string; order: string }) {
+  search.value = filters.search
+  status.value = filters.status
+  sort.value = filters.sort
+  order.value = filters.order
+  void loadLogs(1)
 }
 
 function actionLabel(action: string): string {
@@ -48,7 +67,8 @@ function actionLabel(action: string): string {
 }
 
 function actionColor(action: string): string {
-  if (action.includes('ban') || action.includes('delete') || action.includes('disconnect')) return 'bg-red-100 text-red-600'
+  if (action.includes('ban') || action.includes('delete') || action.includes('disconnect'))
+    return 'bg-red-100 text-red-600'
   if (action.includes('create') || action.includes('connect')) return 'bg-green-100 text-green-700'
   if (action.includes('update')) return 'bg-blue-100 text-blue-700'
   if (action.includes('cleanup')) return 'bg-yellow-100 text-yellow-700'
@@ -57,77 +77,135 @@ function actionColor(action: string): string {
 </script>
 
 <template>
-  <div>
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">{{ t('adminAudit.title') }}</h1>
-
-    <div class="flex items-center gap-3 mb-6">
-      <select v-model="actionFilter" @change="loadLogs()" class="border dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200">
-        <option value="">{{ t('common.allActions') }}</option>
-        <option value="peer.connect">peer.connect</option>
-        <option value="peer.disconnect">peer.disconnect</option>
-        <option value="peer.cleanup">peer.cleanup</option>
-        <option value="admin.server.create">admin.server.create</option>
-        <option value="admin.server.update">admin.server.update</option>
-        <option value="admin.server.delete">admin.server.delete</option>
-        <option value="admin.user.create">admin.user.create</option>
-        <option value="admin.user.ban">admin.user.ban</option>
-        <option value="admin.peer.disconnect">admin.peer.disconnect</option>
-      </select>
+  <div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight text-white">{{ t('adminAudit.title') }}</h1>
+        <p class="text-sm text-slate-400 mt-1">{{ t('adminAudit.subtitle') }}</p>
+      </div>
+      <div>
+        <label for="audit-action-filter" class="sr-only">{{ t('adminAudit.filterLabel') }}</label>
+        <select
+          id="audit-action-filter"
+          v-model="actionFilter"
+          class="border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm bg-slate-900/80 text-white outline-none focus:border-midori-500 transition-colors cursor-pointer"
+          @change="loadLogs(1)"
+        >
+          <option value="" class="bg-slate-900 text-slate-100">{{ t('common.allActions') }}</option>
+          <option value="peer.connect" class="bg-slate-900 text-slate-100">peer.connect</option>
+          <option value="peer.disconnect" class="bg-slate-900 text-slate-100">
+            peer.disconnect
+          </option>
+          <option value="peer.cleanup" class="bg-slate-900 text-slate-100">peer.cleanup</option>
+          <option value="admin.server.create" class="bg-slate-900 text-slate-100">
+            admin.server.create
+          </option>
+          <option value="admin.server.update" class="bg-slate-900 text-slate-100">
+            admin.server.update
+          </option>
+          <option value="admin.server.delete" class="bg-slate-900 text-slate-100">
+            admin.server.delete
+          </option>
+          <option value="admin.user.create" class="bg-slate-900 text-slate-100">
+            admin.user.create
+          </option>
+          <option value="admin.user.ban" class="bg-slate-900 text-slate-100">admin.user.ban</option>
+          <option value="admin.peer.disconnect" class="bg-slate-900 text-slate-100">
+            admin.peer.disconnect
+          </option>
+        </select>
+      </div>
     </div>
 
-    <div v-if="loadError" class="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg text-sm text-red-700 dark:text-red-300 flex items-center justify-between">
-      <span>{{ loadError }}</span>
-      <button @click="loadLogs()" class="text-xs underline ml-3">{{ t('common.retry') }}</button>
-    </div>
+    <AdminListFilters
+      :search="search"
+      :status="status"
+      :sort="sort"
+      :order="order"
+      :statuses="['all']"
+      :sorts="['created_at', 'action']"
+      :disabled="logsState === 'loading' || logsState === 'refreshing'"
+      @apply="applyFilters"
+    />
 
-    <div v-if="loading && logs.length === 0" class="flex justify-center py-12">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
-    </div>
+    <ResourceSkeleton
+      v-if="logsState === 'idle' || logsState === 'loading'"
+      :title="t('adminAudit.loading')"
+      item-class="h-20"
+    />
+    <AsyncState
+      v-else-if="logsState === 'error' && logs.length === 0"
+      kind="error"
+      :title="t('adminAudit.loadError')"
+      :retry-label="t('common.retry')"
+      @retry="loadLogs()"
+    />
+    <AsyncState v-else-if="logsState === 'empty'" kind="empty" :title="t('adminAudit.empty')" />
 
-    <div v-else-if="logs.length === 0" class="text-center py-12 text-gray-400 dark:text-gray-500">
-      {{ t('adminAudit.empty') }}
-    </div>
-
-    <div v-else class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+    <div
+      v-else
+      class="bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 overflow-hidden backdrop-blur-xl"
+    >
+      <p
+        v-if="logsState === 'refreshing'"
+        role="status"
+        class="border-b border-slate-800 px-6 py-3 text-xs text-slate-400"
+      >
+        {{ t('common.refreshing') }}
+      </p>
+      <p
+        v-else-if="logsState === 'error'"
+        role="alert"
+        class="border-b border-rose-900/50 bg-rose-950/30 px-6 py-3 text-xs text-rose-300"
+      >
+        {{ t('common.refreshFailed') }}
+      </p>
       <table class="w-full text-sm">
-        <thead class="bg-gray-50 dark:bg-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        <thead
+          class="bg-slate-950/60 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800"
+        >
           <tr>
-            <th class="px-6 py-3">{{ t('common.date') }}</th>
-            <th class="px-6 py-3">{{ t('auditView.action') }}</th>
-            <th class="px-6 py-3 hidden md:table-cell">{{ t('common.user') }}</th>
-            <th class="px-6 py-3 hidden md:table-cell">{{ t('auditView.ip') }}</th>
-            <th class="px-6 py-3 hidden lg:table-cell">{{ t('common.details') }}</th>
+            <th class="px-6 py-4">{{ t('common.date') }}</th>
+            <th class="px-6 py-4">{{ t('auditView.action') }}</th>
+            <th class="px-6 py-4 hidden md:table-cell">{{ t('common.user') }}</th>
+            <th class="px-6 py-4 hidden md:table-cell">{{ t('auditView.ip') }}</th>
+            <th class="px-6 py-4 hidden lg:table-cell">{{ t('common.details') }}</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
-          <tr v-for="log in logs" :key="log.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
-            <td class="px-6 py-4 text-gray-500 whitespace-nowrap text-xs">
+        <tbody class="divide-y divide-slate-800/60">
+          <tr v-for="log in logs" :key="log.id" class="hover:bg-slate-800/50 transition-colors">
+            <td class="px-6 py-4 text-slate-400 whitespace-nowrap text-xs font-mono">
               {{ formatDateTime(log.created_at) }}
             </td>
             <td class="px-6 py-4">
-              <span :class="actionColor(log.action)" class="text-xs font-medium px-2 py-1 rounded-full">
+              <span
+                :class="actionColor(log.action)"
+                class="text-xs font-semibold px-2.5 py-1 rounded-full border"
+              >
                 {{ actionLabel(log.action) }}
               </span>
             </td>
-            <td class="px-6 py-4 hidden md:table-cell text-xs text-gray-500">
-              {{ log.user_email || (log.user_id ? log.user_id.slice(0, 8) + '…' : t('common.system')) }}
+            <td class="px-6 py-4 hidden md:table-cell text-xs font-medium text-slate-300">
+              {{ log.user_email || (log.user_id ? t('common.unavailable') : t('common.system')) }}
             </td>
-            <td class="px-6 py-4 font-mono text-gray-500 dark:text-gray-400 hidden md:table-cell text-xs">{{ log.ip_address }}</td>
-            <td class="px-6 py-4 text-xs text-gray-400 dark:text-gray-500 hidden lg:table-cell font-mono max-w-xs truncate">
+            <td class="px-6 py-4 font-mono text-midori-300 hidden md:table-cell text-xs">
+              {{ log.ip_address || t('common.unavailable') }}
+            </td>
+            <td
+              class="px-6 py-4 text-xs text-slate-400 hidden lg:table-cell font-mono max-w-xs truncate"
+            >
               {{ JSON.stringify(log.metadata) }}
             </td>
           </tr>
         </tbody>
       </table>
-      <div v-if="hasMore" class="px-6 py-3 border-t border-gray-100 dark:border-gray-700 text-center">
-        <button
-          @click="loadMoreLogs"
-          :disabled="loading"
-          class="text-sm text-midori-600 hover:text-midori-700 disabled:opacity-50"
-        >
-          {{ loading ? t('common.loading') : t('common.loadMore') }}
-        </button>
-      </div>
+      <PaginationControls
+        :page="page"
+        :page-size="PAGE_SIZE"
+        :total="total"
+        :disabled="logsState === 'refreshing'"
+        @change="loadLogs"
+      />
     </div>
   </div>
 </template>

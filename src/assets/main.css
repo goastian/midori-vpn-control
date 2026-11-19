@@ -1,3 +1,5 @@
+@import 'tailwindcss';
+
 @font-face {
   font-family: Selawik;
   src: url('/brand/fonts/selawk.ttf') format('truetype');
@@ -20,9 +22,43 @@
   font-display: swap;
 }
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@custom-variant dark (&:where(.dark, .dark *));
+@theme {
+  --color-midori-50: #effaf5;
+  --color-midori-100: #daf4e8;
+  --color-midori-200: #b6e8d2;
+  --color-midori-300: #88d5b7;
+  --color-midori-400: #54bc97;
+  --color-midori-500: #229b76;
+  --color-midori-600: #177d5f;
+  --color-midori-700: #145d49;
+  --color-midori-800: #154a3c;
+  --color-midori-900: #123c31;
+  --color-midori-950: #102e26;
+  --color-slate-50: #f5f8f7;
+  --color-slate-100: #edf2f0;
+  --color-slate-200: #dce4e0;
+  --color-slate-300: #bccbc4;
+  --color-slate-400: #788c82;
+  --color-slate-500: #5d7067;
+  --color-slate-600: #495d53;
+  --color-slate-700: #344b40;
+  --color-slate-800: #23392f;
+  --color-slate-900: #172d24;
+  --color-slate-950: #0e2019;
+  --color-gray-50: #f5f8f7;
+  --color-gray-100: #edf2f0;
+  --color-gray-200: #dce4e0;
+  --color-gray-300: #bccbc4;
+  --color-gray-400: #788c82;
+  --color-gray-500: #5d7067;
+  --color-gray-600: #495d53;
+  --color-gray-700: #344b40;
+  --color-gray-800: #23392f;
+  --color-gray-900: #172d24;
+  --color-gray-950: #0e2019;
+  --color-slate-850: #1e3329;
+}
 
 :root {
   font-family: 'Segoe UI', Selawik, Arial, sans-serif;
@@ -1590,4 +1626,116 @@ p {
   .astian-brand img {
     width: 4.375rem;
   }
+}
+
+.glass-panel {
+  @apply bg-white dark:bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-200 dark:border-slate-700/80 backdrop-blur-xl;
+}
+
+.glass-card {
+  @apply bg-white dark:bg-slate-900/80 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700/80 backdrop-blur-xl transition-all;
+}
+
+.glass-input {
+  @apply bg-white dark:bg-slate-950/60 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white placeholder-slate-500 focus:outline-none focus:border-midori-500 focus:ring-1 focus:ring-midori-500 transition-colors;
+}
+
+.btn-primary {
+  @apply bg-midori-600 hover:bg-midori-500 text-white font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-midori-950/40 transition-all cursor-pointer inline-flex items-center justify-center gap-2;
+}
+
+.btn-secondary {
+  @apply bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold px-5 py-2.5 rounded-xl border border-slate-700/80 transition-all cursor-pointer inline-flex items-center justify-center gap-2;
+}
+
+.badge-active {
+  @apply bg-midori-950/60 border border-midori-700/50 text-midori-300 font-semibold text-xs px-2.5 py-1 rounded-full inline-flex items-center gap-1.5;
+}
+
+.badge-inactive {
+  @apply bg-slate-800/80 border border-slate-700 text-slate-400 font-semibold text-xs px-2.5 py-1 rounded-full inline-flex items-center gap-1.5;
+}
+
+.badge-danger {
+  @apply bg-rose-950/60 border border-rose-800/50 text-rose-300 font-semibold text-xs px-2.5 py-1 rounded-full inline-flex items-center gap-1.5;
+}
+
+.sidebar-profile-state {
+  margin-top: 0.75rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.landing-account-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-left: auto;
+}
+@media (max-width: 767px) {
+  .site-nav {
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding-block: 1rem;
+  }
+  .landing-account-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+:root:not(.dark) .app-main :is(h1, h2, h3, h4).text-white,
+:root:not(.dark) .glass-panel :is(.text-white, .text-slate-100, .text-slate-200),
+:root:not(.dark) .glass-card :is(.text-white, .text-slate-100, .text-slate-200) {
+  color: var(--ink);
+}
+
+:root:not(.dark)
+  .app-main
+  :is(
+    .bg-slate-900,
+    .bg-slate-900\/60,
+    .bg-slate-900\/80,
+    .bg-slate-900\/90,
+    .bg-slate-950\/40,
+    .bg-slate-950\/60,
+    .bg-slate-950\/80
+  ) {
+  background-color: var(--paper);
+}
+:root:not(.dark)
+  .app-main
+  :is(
+    .bg-slate-800,
+    .bg-slate-800\/40,
+    .bg-slate-800\/50,
+    .bg-slate-800\/60,
+    .bg-slate-800\/70,
+    .bg-slate-800\/80,
+    .bg-slate-800\/90
+  ) {
+  background-color: var(--paper-soft);
+}
+:root:not(.dark) .app-main :is(.text-slate-100, .text-slate-200),
+:root:not(.dark) .app-main :is(p, td, th, strong, label).text-white,
+:root:not(.dark) .app-main :is(input, select, textarea) {
+  color: var(--ink);
+}
+:root:not(.dark) .app-main .text-slate-300 {
+  color: var(--muted);
+}
+:root:not(.dark)
+  .app-main
+  :is(
+    .border-slate-700,
+    .border-slate-700\/40,
+    .border-slate-700\/50,
+    .border-slate-700\/60,
+    .border-slate-700\/80,
+    .border-slate-800,
+    .border-slate-800\/50,
+    .border-slate-800\/60,
+    .border-slate-800\/80
+  ) {
+  border-color: var(--line);
 }

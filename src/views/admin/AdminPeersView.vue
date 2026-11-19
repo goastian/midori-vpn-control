@@ -2,38 +2,84 @@
 import { ref, onMounted } from 'vue'
 import { api } from '../../lib/api'
 import { useLocale } from '../../lib/i18n'
-import type { AdminPeer } from '../../lib/schemas'
+import { AdminPeerPageSchema, LifecycleStatusSchema, type AdminPeer } from '../../lib/schemas'
+import AsyncState from '../../components/AsyncState.vue'
+import ResourceSkeleton from '../../components/ResourceSkeleton.vue'
+import PaginationControls from '../../components/PaginationControls.vue'
+import AdminListFilters from '../../components/AdminListFilters.vue'
+import {
+  beginResourceLoad,
+  completeResourceLoad,
+  type ResourceState,
+} from '../../lib/resource-state'
 
 const peers = ref<AdminPeer[]>([])
-const loading = ref(true)
-const loadError = ref('')
+const peersState = ref<ResourceState>('idle')
+const page = ref(1)
+const total = ref(0)
+const PAGE_SIZE = 50
+const search = ref('')
+const status = ref('all')
+const sort = ref('created_at')
+const order = ref('desc')
+const disconnectingID = ref('')
+const feedback = ref<{ kind: 'success' | 'error'; message: string } | null>(null)
 const { t } = useLocale()
 
 onMounted(() => loadPeers())
 
-async function loadPeers() {
-  loading.value = true
-  loadError.value = ''
+async function loadPeers(requestedPage?: number) {
+  peersState.value = beginResourceLoad(peers.value.length > 0 || peersState.value === 'empty')
   try {
-    peers.value = (await api.get<AdminPeer[]>('/api/v1/admin/peers')) || []
-  } catch (e: any) {
-    loadError.value = e.message ?? 'Failed to load peers'
-  } finally {
-    loading.value = false
+    const targetPage = typeof requestedPage === 'number' ? requestedPage : page.value
+    const params = new URLSearchParams({
+      page: String(targetPage),
+      page_size: String(PAGE_SIZE),
+      status: status.value,
+      sort: sort.value,
+      order: order.value,
+    })
+    if (search.value) params.set('search', search.value)
+    const response = await api.validated(`/api/v1/admin/peers?${params}`, AdminPeerPageSchema)
+    peers.value = response.items
+    page.value = response.page
+    total.value = response.total
+    peersState.value = completeResourceLoad(peers.value.length > 0)
+  } catch {
+    peersState.value = 'error'
   }
+}
+
+function applyFilters(filters: { search: string; status: string; sort: string; order: string }) {
+  search.value = filters.search
+  status.value = filters.status
+  sort.value = filters.sort
+  order.value = filters.order
+  void loadPeers(1)
 }
 
 async function forceDisconnect(id: string) {
   if (!confirm(t('adminPeers.forceDisconnectConfirm'))) return
+  disconnectingID.value = id
+  feedback.value = null
   try {
-    await api.delete(`/api/v1/admin/peers/${id}`)
+    const outcome = await api.validated(`/api/v1/admin/peers/${id}`, LifecycleStatusSchema, {
+      method: 'DELETE',
+    })
     await loadPeers()
-  } catch (e: any) {
-    alert(e.message)
+    feedback.value =
+      outcome.status === 'disconnect_pending'
+        ? { kind: 'error', message: t('adminPeers.disconnectPending') }
+        : { kind: 'success', message: t('adminPeers.disconnectSuccess') }
+  } catch {
+    feedback.value = { kind: 'error', message: t('adminPeers.disconnectError') }
+  } finally {
+    disconnectingID.value = ''
   }
 }
 
 function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return t('common.unavailable')
   if (bytes === 0) return '0 B'
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
@@ -43,48 +89,101 @@ function formatBytes(bytes: number): string {
 </script>
 
 <template>
-  <div>
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">{{ t('adminPeers.title') }}</h1>
-
-    <div v-if="loadError" class="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg text-sm text-red-700 dark:text-red-300 flex items-center justify-between">
-      <span>{{ loadError }}</span>
-      <button @click="loadPeers()" class="text-xs underline ml-3">{{ t('common.retry') }}</button>
+  <div class="space-y-6">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight text-white">{{ t('adminPeers.title') }}</h1>
+      <p class="text-sm text-slate-400 mt-1">{{ t('adminPeers.subtitle') }}</p>
     </div>
 
-    <div v-if="loading" class="flex justify-center py-12">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-midori-600"></div>
+    <div
+      v-if="feedback"
+      :role="feedback.kind === 'error' ? 'alert' : 'status'"
+      class="rounded-2xl border p-4 text-sm"
+      :class="
+        feedback.kind === 'error'
+          ? 'border-rose-800/50 bg-rose-950/40 text-rose-300'
+          : 'border-midori-800/50 bg-midori-950/40 text-midori-300'
+      "
+    >
+      {{ feedback.message }}
     </div>
 
-    <div v-else-if="peers.length === 0" class="text-center py-12 text-gray-400 dark:text-gray-500">
-      {{ t('adminPeers.empty') }}
-    </div>
+    <AdminListFilters
+      :search="search"
+      :status="status"
+      :sort="sort"
+      :order="order"
+      :statuses="['all', 'active', 'inactive']"
+      :sorts="['created_at', 'last_handshake', 'traffic']"
+      :disabled="peersState === 'loading' || peersState === 'refreshing'"
+      @apply="applyFilters"
+    />
 
-    <div v-else class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+    <ResourceSkeleton
+      v-if="peersState === 'idle' || peersState === 'loading'"
+      :title="t('adminPeers.loading')"
+      item-class="h-20"
+    />
+    <AsyncState
+      v-else-if="peersState === 'error' && peers.length === 0"
+      kind="error"
+      :title="t('adminPeers.loadError')"
+      :retry-label="t('common.retry')"
+      @retry="loadPeers"
+    />
+    <AsyncState v-else-if="peersState === 'empty'" kind="empty" :title="t('adminPeers.empty')" />
+
+    <div
+      v-else
+      class="bg-slate-900/80 rounded-3xl shadow-xl shadow-black/30 border border-slate-800/80 overflow-hidden backdrop-blur-xl"
+    >
+      <p
+        v-if="peersState === 'refreshing'"
+        role="status"
+        class="border-b border-slate-800 px-6 py-3 text-xs text-slate-400"
+      >
+        {{ t('common.refreshing') }}
+      </p>
+      <p
+        v-else-if="peersState === 'error'"
+        role="alert"
+        class="border-b border-rose-900/50 bg-rose-950/30 px-6 py-3 text-xs text-rose-300"
+      >
+        {{ t('common.refreshFailed') }}
+      </p>
       <table class="w-full text-sm">
-        <thead class="bg-gray-50 dark:bg-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        <thead
+          class="bg-slate-950/60 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800"
+        >
           <tr>
-            <th class="px-6 py-3">{{ t('common.device') }}</th>
-            <th class="px-6 py-3">{{ t('common.ip') }}</th>
-            <th class="px-6 py-3 hidden md:table-cell">{{ t('common.user') }}</th>
-            <th class="px-6 py-3 hidden md:table-cell">{{ t('common.traffic') }}</th>
-            <th class="px-6 py-3">{{ t('common.status') }}</th>
-            <th class="px-6 py-3"></th>
+            <th class="px-6 py-4">{{ t('common.device') }}</th>
+            <th class="px-6 py-4">{{ t('common.ip') }}</th>
+            <th class="px-6 py-4 hidden md:table-cell">{{ t('common.user') }}</th>
+            <th class="px-6 py-4 hidden md:table-cell">{{ t('common.traffic') }}</th>
+            <th class="px-6 py-4">{{ t('common.status') }}</th>
+            <th class="px-6 py-4 text-right">{{ t('common.actions') }}</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-50 dark:divide-gray-700">
-          <tr v-for="p in peers" :key="p.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
-            <td class="px-6 py-4 text-gray-900">{{ p.device_name || '—' }}</td>
-            <td class="px-6 py-4 font-mono text-xs text-gray-600 dark:text-gray-400">{{ p.assigned_ip }}</td>
-            <td class="px-6 py-4 hidden md:table-cell text-xs text-gray-500">
-              {{ p.user_email || p.user_id.slice(0, 8) + '…' }}
+        <tbody class="divide-y divide-slate-800/60">
+          <tr v-for="p in peers" :key="p.id" class="hover:bg-slate-800/50 transition-colors">
+            <td class="px-6 py-4 font-semibold text-white">
+              {{ p.device_name || t('common.unavailable') }}
             </td>
-            <td class="px-6 py-4 hidden md:table-cell text-xs text-gray-500">
-              ↑{{ formatBytes(p.bytes_sent) }} ↓{{ formatBytes(p.bytes_received) }}
+            <td class="px-6 py-4 font-mono text-xs text-midori-300">{{ p.assigned_ip }}</td>
+            <td class="px-6 py-4 hidden md:table-cell text-xs text-slate-300">
+              {{ p.user_email || t('common.unavailable') }}
+            </td>
+            <td class="px-6 py-4 hidden md:table-cell text-xs text-slate-400 font-mono">
+              ↑{{ formatBytes(p.bytes_sent) }} · ↓{{ formatBytes(p.bytes_received) }}
             </td>
             <td class="px-6 py-4">
               <span
-                :class="p.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
-                class="text-xs font-medium px-2 py-1 rounded-full"
+                :class="
+                  p.is_active
+                    ? 'bg-midori-950/60 border-midori-700/50 text-midori-300'
+                    : 'bg-slate-800 border-slate-700 text-slate-400'
+                "
+                class="text-xs font-semibold px-2.5 py-1 rounded-full border"
               >
                 {{ p.is_active ? t('common.active') : t('common.inactive') }}
               </span>
@@ -92,8 +191,11 @@ function formatBytes(bytes: number): string {
             <td class="px-6 py-4 text-right">
               <button
                 v-if="p.is_active"
+                type="button"
+                class="px-2.5 py-1 rounded-lg border border-rose-900/40 bg-rose-950/20 text-xs font-medium text-rose-400 hover:bg-rose-900/40 transition cursor-pointer"
+                :disabled="disconnectingID === p.id"
+                :aria-busy="disconnectingID === p.id"
                 @click="forceDisconnect(p.id)"
-                class="text-xs text-red-500 hover:text-red-700"
               >
                 {{ t('common.disconnect') }}
               </button>
@@ -101,6 +203,13 @@ function formatBytes(bytes: number): string {
           </tr>
         </tbody>
       </table>
+      <PaginationControls
+        :page="page"
+        :page-size="PAGE_SIZE"
+        :total="total"
+        :disabled="peersState === 'refreshing'"
+        @change="loadPeers"
+      />
     </div>
   </div>
 </template>

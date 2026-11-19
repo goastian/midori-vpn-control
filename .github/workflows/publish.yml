@@ -1,0 +1,259 @@
+name: Publish - tagged private Control OCI candidate
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: midorivpn-control-${{ github.ref_name }}-candidate-publication
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: ghcr.io/goastian/midori-vpn-control
+  BUILDX_NO_DEFAULT_ATTESTATIONS: 1
+
+jobs:
+  validate-tag:
+    name: Validate annotated candidate tag
+    if: github.repository == 'goastian/midori-vpn-control-dev'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require the private candidate switch
+        env:
+          CANDIDATE_PUBLISH_ENABLED: ${{ vars.MIDORIVPN_PRIVATE_CANDIDATE_ENABLED }}
+        run: test "$CANDIDATE_PUBLISH_ENABLED" = true
+
+      - name: Checkout the complete tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require an annotated semantic tag matching package metadata
+        run: |
+          set -Eeuo pipefail
+          [[ "${GITHUB_REF_NAME}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$ ]]
+          test "$(git cat-file -t "refs/tags/${GITHUB_REF_NAME}")" = tag
+          test "$(git rev-parse "refs/tags/${GITHUB_REF_NAME}^{}")" = "$GITHUB_SHA"
+          product_version="$(node -p "require('./package.json').version")"
+          release_version="${GITHUB_REF_NAME#v}"
+          [[ "$release_version" == "$product_version" || "$release_version" == "$product_version"-* ]]
+
+  publish:
+    name: Rebuild, publish private Control candidate, attest and sign
+    needs: validate-tag
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - name: Checkout the validated annotated tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Define immutable release inputs
+        run: |
+          set -Eeuo pipefail
+          product_version="$(node -p "require('./package.json').version")"
+          release_version="${GITHUB_REF_NAME#v}"
+          [[ "$release_version" == "$product_version" || "$release_version" == "$product_version"-* ]]
+          {
+            printf 'PRODUCT_VERSION=%s\n' "$product_version"
+            printf 'RELEASE_VERSION=%s\n' "$release_version"
+            printf 'SOURCE_DATE_EPOCH=%s\n' "$(git show -s --format=%ct HEAD)"
+            printf 'BUILD_STARTED_ON=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_ENV"
+
+      - name: Set up current pinned Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: First clean OCI build
+        id: first
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: false
+          no-cache: true
+          tags: ${{ env.IMAGE_NAME }}:${{ env.RELEASE_VERSION }}
+          labels: |
+            org.opencontainers.image.version=${{ env.RELEASE_VERSION }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/goastian/midori-vpn-control-dev
+          build-args: SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
+          outputs: type=oci,dest=${{ runner.temp }}/control-first.oci.tar,rewrite-timestamp=true
+          provenance: false
+          sbom: false
+
+      - name: Second clean OCI build
+        id: second
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: false
+          no-cache: true
+          tags: ${{ env.IMAGE_NAME }}:${{ env.RELEASE_VERSION }}
+          labels: |
+            org.opencontainers.image.version=${{ env.RELEASE_VERSION }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/goastian/midori-vpn-control-dev
+          build-args: SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
+          outputs: type=oci,dest=${{ runner.temp }}/control-second.oci.tar,rewrite-timestamp=true
+          provenance: false
+          sbom: false
+
+      - name: Require reproducible image digests
+        env:
+          FIRST_DIGEST: ${{ steps.first.outputs.digest }}
+          SECOND_DIGEST: ${{ steps.second.outputs.digest }}
+        run: test -n "$FIRST_DIGEST" && test "$FIRST_DIGEST" = "$SECOND_DIGEST"
+
+      - name: Log in to GHCR without a persistent credential
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Refuse to replace an existing version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          error_file="$(mktemp)"
+          if existing_tags="$(gh api --paginate '/orgs/goastian/packages/container/midori-vpn-control/versions?per_page=100' --jq '.[].metadata.container.tags[]?' 2>"$error_file")"; then
+            :
+          elif grep -Fq 'HTTP 404' "$error_file"; then
+            existing_tags=""
+          else
+            echo 'error: unable to establish whether the Control version already exists' >&2
+            exit 1
+          fi
+          if grep -Fxq "$RELEASE_VERSION" <<< "$existing_tags"; then
+            echo "error: immutable Control version already exists" >&2
+            exit 1
+          fi
+
+      - name: Push the rebuilt immutable image
+        id: push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          no-cache: true
+          tags: ${{ env.IMAGE_NAME }}:${{ env.RELEASE_VERSION }}
+          labels: |
+            org.opencontainers.image.version=${{ env.RELEASE_VERSION }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/goastian/midori-vpn-control-dev
+          build-args: SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
+          outputs: type=registry,rewrite-timestamp=true
+          provenance: false
+          sbom: false
+
+      - name: Require the pushed digest to match both clean builds
+        env:
+          FIRST_DIGEST: ${{ steps.first.outputs.digest }}
+          PUSHED_DIGEST: ${{ steps.push.outputs.digest }}
+        run: test -n "$PUSHED_DIGEST" && test "$FIRST_DIGEST" = "$PUSHED_DIGEST"
+
+      - name: Verify private package visibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          test "$(gh api /orgs/goastian/packages/container/midori-vpn-control --jq .visibility)" = private
+
+      - name: Scan the exact digest and generate independent SPDX
+        env:
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          set -Eeuo pipefail
+          mkdir -p dist-release
+          CONTAINER_ENGINE=docker bash scripts/scan-oci.sh image \
+            "${IMAGE_NAME}@${IMAGE_DIGEST}" "dist-release/control-${RELEASE_VERSION}.trivy.json"
+          docker run --rm -e SYFT_CACHE_DIR=/tmp/syft-cache -e DOCKER_CONFIG=/auth \
+            -v "${HOME}/.docker/config.json:/auth/config.json:ro" \
+            -v "${PWD}/dist-release:/artifacts" \
+            ghcr.io/anchore/syft@sha256:03215d0e98b661d0ecbc8575dbc14d65be1743b5de5df6410aecb7e80f95b060 \
+            scan "registry:${IMAGE_NAME}@${IMAGE_DIGEST}" \
+            -o "spdx-json=/artifacts/control-${RELEASE_VERSION}.spdx.json"
+          jq -n --arg version "$RELEASE_VERSION" --arg tag "$GITHUB_REF_NAME" \
+            --arg commit "$GITHUB_SHA" --arg digest "$IMAGE_DIGEST" \
+            '{schema_version:1,component:"control",version:$version,tag:$tag,commit:$commit,image_digest:$digest,visibility:"private"}' \
+            > "dist-release/control-${RELEASE_VERSION}.json"
+          jq -n \
+            --arg server "$GITHUB_SERVER_URL" --arg repository "$GITHUB_REPOSITORY" \
+            --arg ref "$GITHUB_REF" --arg commit "$GITHUB_SHA" \
+            --arg run_id "$GITHUB_RUN_ID" --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg product_version "$PRODUCT_VERSION" --arg release_version "$RELEASE_VERSION" \
+            --arg started_on "$BUILD_STARTED_ON" --arg finished_on "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{buildDefinition:{buildType:"https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1",externalParameters:{workflow:{ref:$ref,repository:($server+"/"+$repository),path:".github/workflows/publish.yml"},product_version:$product_version,release_version:$release_version},internalParameters:{github:{event_name:"push",runner_environment:"github-hosted"}},resolvedDependencies:[{uri:("git+"+$server+"/"+$repository+"@"+$ref),digest:{gitCommit:$commit}}]},runDetails:{builder:{id:($server+"/actions/runner/github-hosted")},metadata:{invocationId:($server+"/"+$repository+"/actions/runs/"+$run_id+"/attempts/"+$run_attempt),startedOn:$started_on,finishedOn:$finished_on},byproducts:[]}}' \
+            > "dist-release/control-${RELEASE_VERSION}.provenance.json"
+
+      - name: Install current pinned Cosign
+        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+        with:
+          cosign-release: v3.1.4
+
+      - name: Sign, attest and verify the digest
+        env:
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          set -Eeuo pipefail
+          tag_ref="${IMAGE_NAME}:${RELEASE_VERSION}"
+          verification_ref="${IMAGE_NAME}@${IMAGE_DIGEST}"
+          docker pull "$tag_ref" >/dev/null
+          docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$tag_ref" | grep -Fx "$verification_ref"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$tag_ref")" = "$GITHUB_SHA"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' "$tag_ref")" = "$RELEASE_VERSION"
+          identity="https://github.com/goastian/midori-vpn-control-dev/.github/workflows/publish.yml@refs/tags/${GITHUB_REF_NAME}"
+          cosign sign --yes "$verification_ref"
+          cosign attest --yes --type slsaprovenance1 \
+            --predicate "dist-release/control-${RELEASE_VERSION}.provenance.json" "$verification_ref"
+          cosign attest --yes --type spdxjson \
+            --predicate "dist-release/control-${RELEASE_VERSION}.spdx.json" "$verification_ref"
+          cosign verify --certificate-identity "$identity" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com "$verification_ref"
+          cosign verify-attestation --type slsaprovenance1 \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$verification_ref" > "dist-release/control-${RELEASE_VERSION}.provenance.verify.json"
+          cosign verify-attestation --type spdxjson \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$verification_ref" > "dist-release/control-${RELEASE_VERSION}.spdx.verify.json"
+          jq -e --arg commit "$GITHUB_SHA" --arg ref "$GITHUB_REF" --arg version "$RELEASE_VERSION" '
+            def records: if type == "array" then .[] else . end;
+            any(records; ((.payload | @base64d | fromjson).predicate) as $p |
+              $p.buildDefinition.externalParameters.workflow.ref == $ref and
+              $p.buildDefinition.externalParameters.release_version == $version and
+              $p.buildDefinition.resolvedDependencies[0].digest.gitCommit == $commit)
+          ' "dist-release/control-${RELEASE_VERSION}.provenance.verify.json" >/dev/null
+          jq -e '
+            def records: if type == "array" then .[] else . end;
+            any(records; (.payload | @base64d | fromjson).predicate.spdxVersion == "SPDX-2.3")
+          ' "dist-release/control-${RELEASE_VERSION}.spdx.verify.json" >/dev/null
+          (cd dist-release && sha256sum -- * > SHA256SUMS && sha256sum --check SHA256SUMS)
+
+      - name: Retain private candidate evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: control-${{ env.RELEASE_VERSION }}-private-evidence
+          path: dist-release/
+          if-no-files-found: error
+          retention-days: 30

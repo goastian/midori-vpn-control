@@ -4,7 +4,7 @@
  * Strategy (priority order):
  *   1. `navigator.userAgentData.getHighEntropyValues()` — most accurate, Chromium 90+.
  *   2. WebGL UNMASKED_RENDERER — detects Apple Silicon on Safari (where UA still says Intel).
- *   3. Legacy `navigator.userAgent` / `navigator.platform` — universal fallback.
+ *   3. Standard `navigator.userAgent` / `navigator.platform` — universal fallback.
  *
  * Confidence levels control whether a "Recommended" badge is shown:
  *   - 'detected'  — high-confidence signal; mark one option as primary.

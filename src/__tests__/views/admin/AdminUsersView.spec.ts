@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { shallowMount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { createRouter, createWebHistory } from 'vue-router'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import AdminUsersView from '@/views/admin/AdminUsersView.vue'
+import AsyncState from '@/components/AsyncState.vue'
+import ResourceSkeleton from '@/components/ResourceSkeleton.vue'
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -14,7 +16,7 @@ vi.mock('@/lib/api', () => ({
   },
   setAccessToken: vi.fn(),
   clearAccessToken: vi.fn(),
-  onAccessTokenRefreshed: vi.fn(),
+  onAccessTokenChanged: vi.fn(),
   initFromStoredRefreshToken: vi.fn().mockResolvedValue(null),
   exchangeCode: vi.fn(),
 }))
@@ -27,6 +29,7 @@ const mockUsers = [
     display_name: 'Alice',
     groups: ['vpn-users'],
     is_banned: false,
+    ban_reason: '',
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
   },
@@ -37,15 +40,19 @@ const mockUsers = [
     display_name: 'Bob',
     groups: [],
     is_banned: true,
+    ban_reason: 'Policy violation',
     created_at: '2024-01-02T00:00:00Z',
     updated_at: '2024-01-02T00:00:00Z',
   },
 ]
 
+const page = <T>(items: T[]) => ({ items, page: 1, page_size: 50, total: items.length })
+
 function makeRouter() {
   return createRouter({
-    history: createWebHistory(),
+    history: createMemoryHistory(),
     routes: [
+      { path: '/', component: { template: '<div />' } },
       { path: '/admin/users', component: { template: '<div />' } },
       { path: '/admin/users/:id', component: { template: '<div />' } },
     ],
@@ -66,18 +73,18 @@ describe('AdminUsersView', () => {
 
   it('shows loading spinner while fetching', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockReturnValue(new Promise(() => {})) // never resolves
+    vi.mocked(api.validated).mockReturnValue(new Promise(() => {})) // never resolves
 
     const wrapper = shallowMount(AdminUsersView, {
       global: { plugins: [createPinia(), makeRouter()] },
     })
 
-    expect(wrapper.find('.animate-spin').exists()).toBe(true)
+    expect(wrapper.findComponent(ResourceSkeleton).props('title')).toBe('Cargando usuarios…')
   })
 
   it('renders user rows after successful load', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockResolvedValue(mockUsers)
+    vi.mocked(api.validated).mockResolvedValue(page(mockUsers))
 
     const wrapper = shallowMount(AdminUsersView, {
       global: { plugins: [createPinia(), makeRouter()] },
@@ -85,14 +92,14 @@ describe('AdminUsersView', () => {
 
     await flushPromises()
 
-    expect(wrapper.find('.animate-spin').exists()).toBe(false)
+    expect(wrapper.findComponent(AsyncState).exists()).toBe(false)
     expect(wrapper.text()).toContain('alice@example.com')
     expect(wrapper.text()).toContain('bob@example.com')
   })
 
-  it('hides loading spinner and shows table on empty response', async () => {
+  it('shows an explicit empty state', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockResolvedValue([])
+    vi.mocked(api.validated).mockResolvedValue(page([]))
 
     const wrapper = shallowMount(AdminUsersView, {
       global: { plugins: [createPinia(), makeRouter()] },
@@ -100,13 +107,13 @@ describe('AdminUsersView', () => {
 
     await flushPromises()
 
-    expect(wrapper.find('.animate-spin').exists()).toBe(false)
-    expect(wrapper.find('table').exists()).toBe(true)
+    expect(wrapper.findComponent(AsyncState).props('kind')).toBe('empty')
+    expect(wrapper.find('table').exists()).toBe(false)
   })
 
   it('does not crash when api throws', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockRejectedValue(new Error('Network error'))
+    vi.mocked(api.validated).mockRejectedValue(new Error('Network error'))
 
     const wrapper = shallowMount(AdminUsersView, {
       global: { plugins: [createPinia(), makeRouter()] },
@@ -115,12 +122,13 @@ describe('AdminUsersView', () => {
     await flushPromises()
 
     expect(wrapper.exists()).toBe(true)
-    expect(wrapper.find('.animate-spin').exists()).toBe(false)
+    expect(wrapper.findComponent(AsyncState).props('kind')).toBe('error')
+    expect(wrapper.findComponent(AsyncState).props('title')).toContain('No se pudieron cargar')
   })
 
   it('calls DELETE endpoint when deleteUser is triggered', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockResolvedValue(mockUsers)
+    vi.mocked(api.validated).mockResolvedValue(page(mockUsers))
     vi.mocked(api.delete).mockResolvedValue(undefined)
     vi.spyOn(window, 'confirm').mockReturnValue(true)
 
@@ -137,5 +145,87 @@ describe('AdminUsersView', () => {
     await flushPromises()
 
     expect(vi.mocked(api.delete)).toHaveBeenCalledWith('/api/v1/admin/users/u1')
+    expect(wrapper.text()).toContain('El usuario fue eliminado.')
+  })
+
+  it('keeps a failed suspension dialog open with localized feedback', async () => {
+    const { api } = await import('@/lib/api')
+    vi.mocked(api.validated).mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/v1/admin/users?')) return page(mockUsers)
+      throw new Error('Internal detail')
+    })
+
+    const wrapper = shallowMount(AdminUsersView, {
+      global: { plugins: [createPinia(), makeRouter()] },
+    })
+    await flushPromises()
+
+    const suspend = wrapper.findAll('button').find((button) => button.text() === 'Suspender')
+    await suspend?.trigger('click')
+    await wrapper.find('#ban-reason').setValue('Policy violation')
+    const confirm = wrapper
+      .findAll('[role="dialog"] button')
+      .find((button) => button.text() === 'Suspender')
+    await confirm?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    expect(wrapper.find('#ban-error').text()).toContain('No se pudo suspender')
+    expect(wrapper.text()).not.toContain('Internal detail')
+  })
+
+  it('reports pending cleanup after suspending access', async () => {
+    const { api } = await import('@/lib/api')
+    vi.mocked(api.validated).mockImplementation(async (path: string) =>
+      path.startsWith('/api/v1/admin/users?') ? page(mockUsers) : { status: 'ban_cleanup_pending' },
+    )
+
+    const wrapper = shallowMount(AdminUsersView, {
+      global: { plugins: [createPinia(), makeRouter()] },
+    })
+    await flushPromises()
+
+    const suspend = wrapper.findAll('button').find((button) => button.text() === 'Suspender')
+    await suspend?.trigger('click')
+    await wrapper.find('#ban-reason').setValue('Policy violation')
+    const confirm = wrapper
+      .findAll('[role="dialog"] button')
+      .find((button) => button.text() === 'Suspender')
+    await confirm?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="alert"]').text()).toContain(
+      'retirada de sus sesiones sigue pendiente',
+    )
+    expect(wrapper.text()).not.toContain('El usuario fue suspendido.')
+  })
+
+  it('creates a user from labelled fields and announces success', async () => {
+    const { api } = await import('@/lib/api')
+    vi.mocked(api.validated).mockResolvedValue(page([]))
+    vi.mocked(api.post).mockResolvedValue({})
+
+    const wrapper = shallowMount(AdminUsersView, {
+      global: { plugins: [createPinia(), makeRouter()] },
+    })
+    await flushPromises()
+
+    const create = wrapper.findAll('button').find((button) => button.text() === 'Crear usuario')
+    await create?.trigger('click')
+    await wrapper.find('#user-authentik-uid').setValue('authentik-new')
+    await wrapper.find('#user-email').setValue('new@example.com')
+    await wrapper.find('#user-groups').setValue('vpn-users, operators')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/v1/admin/users',
+      expect.objectContaining({
+        authentik_uid: 'authentik-new',
+        email: 'new@example.com',
+        groups: ['vpn-users', 'operators'],
+      }),
+    )
+    expect(wrapper.text()).toContain('El usuario fue creado.')
   })
 })

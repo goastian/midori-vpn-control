@@ -1,11 +1,68 @@
-const API_URL = import.meta.env.VITE_API_URL || ''
+const API_URL = window.location.origin
 
 import type { ZodType } from 'zod'
 
-interface ApiResponse<T = any> {
-  ok: boolean
+interface ApiSuccess<T> {
+  ok: true
   data: T
-  error?: string
+}
+
+interface ApiFailure {
+  ok: false
+  error: string
+  code: string
+}
+
+type ApiResponse<T> = ApiSuccess<T> | ApiFailure
+
+export class APIError extends Error {
+  readonly status: number
+  readonly code: string
+  readonly retryAfter?: number
+
+  constructor(status: number, code: string, message: string, retryAfter?: number) {
+    super(message)
+    this.name = 'APIError'
+    this.status = status
+    this.code = code
+    this.retryAfter = retryAfter
+  }
+}
+
+function isInvalidRefreshFailure(error: unknown): boolean {
+  return !localStorage.getItem('refresh_token') || (
+    error instanceof APIError && [400, 401, 403].includes(error.status)
+  )
+}
+
+function normalizeRefreshFailure(error: unknown): Error {
+  if (isInvalidRefreshFailure(error)) {
+    clearAccessToken()
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('token_expires_at')
+    return new APIError(401, 'unauthorized', 'Unauthorized')
+  }
+  return error instanceof Error ? error : new Error('Token refresh failed')
+}
+
+async function responseError(res: Response, fallback: string): Promise<APIError> {
+  let payload: Partial<ApiFailure> = {}
+  try {
+    payload = await res.json() as Partial<ApiFailure>
+  } catch {
+    // The fallback remains safe for non-JSON gateway failures.
+  }
+  const retryAfterHeader = res.headers.get('Retry-After')
+  const parsedRetryAfter = retryAfterHeader ? Number.parseInt(retryAfterHeader, 10) : Number.NaN
+  const retryAfter = Number.isNaN(parsedRetryAfter)
+    ? (res.status === 429 ? 60 : undefined)
+    : Math.max(1, Math.min(parsedRetryAfter, 120))
+  return new APIError(
+    res.status,
+    typeof payload.code === 'string' && payload.code ? payload.code : 'request_failed',
+    typeof payload.error === 'string' && payload.error ? payload.error : fallback,
+    retryAfter,
+  )
 }
 
 let isRefreshing = false
@@ -21,14 +78,16 @@ function processRefreshQueue(error: Error | null, token: string | null) {
 
 // In-memory access token — never persisted to localStorage.
 let _accessToken = ''
-let _onRefreshCallback: ((token: string) => void) | null = null
+let _onAccessTokenCallback: ((token: string) => void) | null = null
 
 export function setAccessToken(token: string): void {
   _accessToken = token
+  _onAccessTokenCallback?.(token)
 }
 
 export function clearAccessToken(): void {
   _accessToken = ''
+  _onAccessTokenCallback?.('')
 }
 
 /** Returns the current in-memory access token without exposing the variable. */
@@ -36,8 +95,8 @@ export function getAccessToken(): string {
   return _accessToken
 }
 
-export function onAccessTokenRefreshed(cb: (token: string) => void): void {
-  _onRefreshCallback = cb
+export function onAccessTokenChanged(cb: (token: string) => void): void {
+  _onAccessTokenCallback = cb
 }
 
 /**
@@ -50,10 +109,13 @@ export async function initFromStoredRefreshToken(): Promise<string | null> {
   if (!saved) return null
   try {
     return await tryRefreshToken()
-  } catch {
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('token_expires_at')
-    return null
+  } catch (error) {
+    if (isInvalidRefreshFailure(error)) {
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('token_expires_at')
+      return null
+    }
+    throw error
   }
 }
 
@@ -70,7 +132,7 @@ async function tryRefreshToken(): Promise<string> {
   })
 
   if (!res.ok) {
-    throw new Error('Token refresh failed')
+    throw await responseError(res, 'Token refresh failed')
   }
 
   const json: ApiResponse<{ access_token: string; refresh_token?: string }> = await res.json()
@@ -80,7 +142,6 @@ async function tryRefreshToken(): Promise<string> {
 
   // Keep access token in memory only — never write to localStorage.
   setAccessToken(json.data.access_token)
-  _onRefreshCallback?.(json.data.access_token)
 
   if (json.data.refresh_token) {
     localStorage.setItem('refresh_token', json.data.refresh_token)
@@ -118,11 +179,9 @@ async function request<T>(path: string, options: RequestInit = {}, _isRetry = fa
         return request<T>(path, options, true)
       } catch (err) {
         isRefreshing = false
-        processRefreshQueue(err as Error, null)
-        clearAccessToken()
-        localStorage.removeItem('refresh_token')
-        window.location.href = '/dashboard'
-        throw new Error('Unauthorized')
+        const failure = normalizeRefreshFailure(err)
+        processRefreshQueue(failure, null)
+        throw failure
       }
     } else {
       // Another refresh is in progress — wait for it
@@ -138,26 +197,16 @@ async function request<T>(path: string, options: RequestInit = {}, _isRetry = fa
   if (res.status === 401 && _isRetry) {
     clearAccessToken()
     localStorage.removeItem('refresh_token')
-    window.location.href = '/dashboard'
-    throw new Error('Unauthorized')
+    localStorage.removeItem('token_expires_at')
+    throw new APIError(401, 'unauthorized', 'Unauthorized')
   }
 
-  if (res.status === 429) {
-    const retryAfter = res.headers.get('Retry-After')
-    const seconds = retryAfter ? parseInt(retryAfter, 10) : 60
-    const waitSecs = isNaN(seconds) ? 60 : Math.min(seconds, 120)
-    throw Object.assign(new Error(`Too many requests. Please wait ${waitSecs} seconds.`), {
-      status: 429,
-      retryAfter: waitSecs,
-    })
+  if (!res.ok) {
+    throw await responseError(res, `Request failed: ${res.status}`)
   }
 
   const json: ApiResponse<T> = await res.json()
-
-  if (!res.ok || json.error) {
-    throw new Error(json.error || `Request failed: ${res.status}`)
-  }
-
+  if (!json.ok) throw new APIError(res.status, json.code, json.error)
   return json.data
 }
 
@@ -192,11 +241,9 @@ async function requestRaw(path: string, options: RequestInit = {}, _isRetry = fa
         return requestRaw(path, options, true)
       } catch (err) {
         isRefreshing = false
-        processRefreshQueue(err as Error, null)
-        clearAccessToken()
-        localStorage.removeItem('refresh_token')
-        window.location.href = '/dashboard'
-        throw new Error('Unauthorized')
+        const failure = normalizeRefreshFailure(err)
+        processRefreshQueue(failure, null)
+        throw failure
       }
     } else {
       return new Promise<Response>((resolve, reject) => {
@@ -211,18 +258,15 @@ async function requestRaw(path: string, options: RequestInit = {}, _isRetry = fa
   if (res.status === 401 && _isRetry) {
     clearAccessToken()
     localStorage.removeItem('refresh_token')
-    window.location.href = '/dashboard'
-    throw new Error('Unauthorized')
+    localStorage.removeItem('token_expires_at')
+    throw new APIError(401, 'unauthorized', 'Unauthorized')
   }
 
   if (res.status === 429) {
     const retryAfter = res.headers.get('Retry-After')
     const seconds = retryAfter ? parseInt(retryAfter, 10) : 60
     const waitSecs = isNaN(seconds) ? 60 : Math.min(seconds, 120)
-    throw Object.assign(new Error(`Too many requests. Please wait ${waitSecs} seconds.`), {
-      status: 429,
-      retryAfter: waitSecs,
-    })
+    throw new APIError(429, 'rate_limited', `Too many requests. Please wait ${waitSecs} seconds.`, waitSecs)
   }
 
   return res
@@ -234,6 +278,8 @@ export const api = {
     request<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
   put: <T>(path: string, body?: any) =>
     request<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
+  patch: <T>(path: string, body?: any) =>
+    request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 
   /** Type-safe request with Zod schema validation on the response. */
@@ -260,8 +306,7 @@ export async function exchangeCode(code: string, redirectUri: string, codeVerifi
   })
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'token exchange failed' }))
-    throw new Error(err.error || 'token exchange failed')
+    throw await responseError(res, 'token exchange failed')
   }
 
   const json = await res.json()

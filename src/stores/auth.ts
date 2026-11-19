@@ -1,8 +1,17 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { generateCodeVerifier, generateCodeChallenge } from '../lib/pkce'
-import { exchangeCode, api, setAccessToken, clearAccessToken, onAccessTokenRefreshed, initFromStoredRefreshToken } from '../lib/api'
-import { UserSchema, type User } from '../lib/schemas'
+import {
+  APIError,
+  exchangeCode,
+  api,
+  setAccessToken,
+  clearAccessToken,
+  onAccessTokenChanged,
+  initFromStoredRefreshToken,
+} from '../lib/api'
+import { UserQuotaSchema, UserSchema, type User } from '../lib/schemas'
+import { beginResourceLoad, completeResourceLoad, type ResourceState } from '../lib/resource-state'
 import { SENSITIVE_SESSION_KEYS } from '../lib/storage-keys'
 
 /** Event name dispatched on `window` right before the logout redirect.
@@ -10,35 +19,51 @@ import { SENSITIVE_SESSION_KEYS } from '../lib/storage-keys'
  *  synchronously or within ~50ms — see `logout()` below. */
 export const AUTH_LOGOUT_EVENT = 'auth:logout'
 
-function normalizeIssuer(value: string | undefined): string {
-  return (value || '').replace(/\/+$/, '')
+interface OIDCConfigData {
+  issuer: string
+  authorization_endpoint: string
+  token_endpoint: string
+  userinfo_endpoint: string
+  end_session_endpoint: string
+  jwks_uri: string
+  client_id: string
+  redirect_uri: string
 }
 
-function parseIssuerUrls(value: string | undefined) {
-  const appUrl = normalizeIssuer(value)
+let cachedOIDCConfig: OIDCConfigData | null = null
 
-  try {
-    const url = new URL(appUrl)
-    const origin = url.origin
-    return {
-      appUrl,
-      expectedTokenIssuer: `${origin}/`,
-      authorizationUrl: `${origin}/application/o/authorize/`,
-      endSessionUrl: `${appUrl}/end-session/`,
+async function getOIDCConfig() {
+  if (!cachedOIDCConfig) {
+    const res = await fetch('/api/v1/auth/config', {
+      headers: { Accept: 'application/json' },
+      credentials: 'same-origin',
+    })
+    if (!res.ok) {
+      throw new Error(`OIDC discovery failed with HTTP ${res.status}`)
     }
-  } catch {
-    return {
-      appUrl,
-      expectedTokenIssuer: appUrl,
-      authorizationUrl: `${appUrl}/authorize/`,
-      endSessionUrl: `${appUrl}/end-session/`,
+    const json: { ok?: boolean; data?: OIDCConfigData } = await res.json()
+    const data = json.data
+    if (
+      !json.ok ||
+      !data?.issuer ||
+      !data.authorization_endpoint ||
+      !data.end_session_endpoint ||
+      !data.client_id ||
+      !data.redirect_uri
+    ) {
+      throw new Error('OIDC discovery returned an incomplete configuration')
     }
+    cachedOIDCConfig = data
+  }
+
+  return {
+    authorizationUrl: cachedOIDCConfig.authorization_endpoint,
+    clientId: cachedOIDCConfig.client_id,
+    redirectUri: cachedOIDCConfig.redirect_uri,
+    endSessionUrl: cachedOIDCConfig.end_session_endpoint,
+    expectedTokenIssuer: cachedOIDCConfig.issuer,
   }
 }
-
-const issuerUrls = parseIssuerUrls(import.meta.env.VITE_AUTHENTIK_ISSUER)
-const CLIENT_ID = import.meta.env.VITE_AUTHENTIK_CLIENT_ID
-const REDIRECT_URI = import.meta.env.VITE_AUTHENTIK_REDIRECT_URI || `${window.location.origin}/auth/callback`
 
 interface JWTPayload {
   sub?: string
@@ -49,6 +74,8 @@ interface JWTPayload {
   groups?: string[]
   [key: string]: unknown
 }
+
+export type BootstrapState = 'idle' | 'loading' | 'ready' | 'error'
 
 function decodeJWTPayload(token: string): JWTPayload | null {
   try {
@@ -81,17 +108,22 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const loading = ref(false)
   const error = ref('')
-  const initialized = ref(false)
+  const bootstrapState = ref<BootstrapState>('idle')
+  const profileState = ref<ResourceState>('idle')
+  const quotaState = ref<ResourceState>('idle')
   let restorePromise: Promise<void> | null = null
 
-  const isAuthenticated = computed(() => !!accessToken.value)
-  const isAdmin = computed(() =>
-    user.value?.groups?.some((g) =>
-      g === 'vpn-admins' || g === 'admins' || g === 'authentik Admins'
-    ) ?? false
+  const initialized = computed(() => bootstrapState.value === 'ready')
+  const isAuthenticated = computed(() => !!accessToken.value && user.value !== null)
+  const isAdmin = computed(
+    () =>
+      user.value?.groups?.some(
+        (g) => g === 'vpn-admins' || g === 'admins' || g === 'authentik Admins',
+      ) ?? false,
   )
 
   async function startLogin() {
+    const oidc = await getOIDCConfig()
     const verifier = generateCodeVerifier()
     const challenge = await generateCodeChallenge(verifier)
 
@@ -102,27 +134,29 @@ export const useAuthStore = defineStore('auth', () => {
 
     const params = new URLSearchParams({
       response_type: 'code',
-      client_id: CLIENT_ID,
-      redirect_uri: REDIRECT_URI,
+      client_id: oidc.clientId,
+      redirect_uri: oidc.redirectUri,
       scope: 'openid email profile offline_access',
       code_challenge: challenge,
       code_challenge_method: 'S256',
       state,
     })
 
-    const loginUrl = `${issuerUrls.authorizationUrl}?${params.toString()}`
+    const loginUrl = `${oidc.authorizationUrl}?${params.toString()}`
     window.location.href = loginUrl
   }
 
   async function handleCallback(code: string) {
     loading.value = true
     error.value = ''
+    bootstrapState.value = 'loading'
 
     try {
+      const oidc = await getOIDCConfig()
       const verifier = sessionStorage.getItem('pkce_verifier') || ''
       sessionStorage.removeItem('pkce_verifier')
 
-      const tokens = await exchangeCode(code, REDIRECT_URI, verifier)
+      const tokens = await exchangeCode(code, oidc.redirectUri, verifier)
 
       // Validate issuer: prefer id_token (guaranteed JWT per OIDC), fall back to access_token
       const accessPayload = decodeJWTPayload(tokens.access_token)
@@ -130,7 +164,7 @@ export const useAuthStore = defineStore('auth', () => {
       const issuerPayload = idPayload ?? accessPayload
       if (issuerPayload?.iss) {
         const tokenIss = issuerPayload.iss.replace(/\/+$/, '')
-        const expectedIss = issuerUrls.expectedTokenIssuer.replace(/\/+$/, '')
+        const expectedIss = oidc.expectedTokenIssuer.replace(/\/+$/, '')
         if (tokenIss !== expectedIss) {
           throw new Error('Token issuer mismatch')
         }
@@ -151,89 +185,138 @@ export const useAuthStore = defineStore('auth', () => {
       }
 
       await fetchProfile()
-      initialized.value = true
+      bootstrapState.value = 'ready'
       startSessionCheck()
     } catch (e: any) {
       error.value = e.message || 'Login failed'
+      clearLocalSession()
+      bootstrapState.value = 'ready'
       throw e
     } finally {
       loading.value = false
     }
   }
 
-  async function fetchProfile() {
+  async function fetchProfile(): Promise<User> {
+    profileState.value = beginResourceLoad(user.value !== null)
     try {
-      user.value = await api.validated('/api/v1/control/me', UserSchema)
-    } catch (e: any) {
-      if (e.message === 'Unauthorized') {
-        logout()
-      }
+      const profile = await api.validated('/api/v1/control/me', UserSchema)
+      const previousQuota = user.value?.quota
+      user.value = { ...profile, quota: profile.quota ?? previousQuota }
+      profileState.value = 'ready'
+      quotaState.value = user.value.quota ? 'ready' : 'idle'
+      return profile
+    } catch (error) {
+      profileState.value = 'error'
+      throw error
     }
   }
 
-  async function logout() {
+  function clearLocalSession(options: { preserveRefreshToken?: boolean } = {}) {
     accessToken.value = ''
-    refreshToken.value = ''
     user.value = null
-    clearAccessToken() // clear in-memory token from api module
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('token_expires_at')
+    clearAccessToken()
+    stopSessionCheck()
+
+    if (!options.preserveRefreshToken) {
+      refreshToken.value = ''
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('token_expires_at')
+    }
+    profileState.value = 'empty'
+    quotaState.value = 'empty'
+  }
+
+  async function logout() {
+    clearLocalSession()
     // Wipe sensitive material from sessionStorage (e.g. WireGuard private keys).
     // Non-sensitive caches (platform detection, etc.) are intentionally preserved.
     for (const key of SENSITIVE_SESSION_KEYS) {
-      try { sessionStorage.removeItem(key) } catch { /* sessionStorage unavailable */ }
+      try {
+        sessionStorage.removeItem(key)
+      } catch {
+        /* sessionStorage unavailable */
+      }
     }
-    initialized.value = true
+    bootstrapState.value = 'ready'
     restorePromise = null
-    stopSessionCheck()
 
     // Notify subscribers (e.g. dashboard WS) so they can release resources
     // before the page is unloaded by the redirect below.
-    try { window.dispatchEvent(new Event(AUTH_LOGOUT_EVENT)) } catch { /* ignore */ }
+    try {
+      window.dispatchEvent(new Event(AUTH_LOGOUT_EVENT))
+    } catch {
+      /* ignore */
+    }
     // Yield one tick so listeners have a chance to call ws.close() before
     // the navigation tears down the page.
-    await new Promise((resolve) => setTimeout(resolve, 50))
-
-    const logoutUrl = `${issuerUrls.endSessionUrl}?post_logout_redirect_uri=${encodeURIComponent(window.location.origin + '/')}`
+    const oidc = await getOIDCConfig()
+    const logoutUrl = `${oidc.endSessionUrl}?post_logout_redirect_uri=${encodeURIComponent(window.location.origin + '/')}`
     window.location.href = logoutUrl
   }
 
   // Keep accessToken ref in sync when api.ts silently refreshes the token.
-  onAccessTokenRefreshed((token) => {
+  onAccessTokenChanged((token) => {
     accessToken.value = token
+    if (!token) {
+      user.value = null
+      refreshToken.value = ''
+      stopSessionCheck()
+    }
   })
 
   async function restoreSession(): Promise<void> {
     if (restorePromise) return restorePromise
+    if (bootstrapState.value === 'ready' || bootstrapState.value === 'error') return
 
     const savedRefresh = localStorage.getItem('refresh_token')
     if (!savedRefresh) {
-      refreshToken.value = ''
-      initialized.value = true
+      clearLocalSession()
+      error.value = ''
+      bootstrapState.value = 'ready'
       return
     }
 
     restorePromise = (async () => {
       refreshToken.value = savedRefresh
       loading.value = true
+      error.value = ''
+      bootstrapState.value = 'loading'
       try {
         const token = await initFromStoredRefreshToken()
         if (token) {
           accessToken.value = token
           await fetchProfile()
           startSessionCheck()
+          bootstrapState.value = 'ready'
         } else {
-          refreshToken.value = ''
+          clearLocalSession()
+          bootstrapState.value = 'ready'
         }
-      } catch {
-        refreshToken.value = ''
+      } catch (e: any) {
+        if (e instanceof APIError && [401, 403].includes(e.status)) {
+          clearLocalSession()
+          bootstrapState.value = 'ready'
+        } else {
+          clearLocalSession({ preserveRefreshToken: true })
+          refreshToken.value = localStorage.getItem('refresh_token') || savedRefresh
+          error.value = e?.message || 'Session restoration failed'
+          profileState.value = 'error'
+          bootstrapState.value = 'error'
+        }
       } finally {
         loading.value = false
-        initialized.value = true
+        restorePromise = null
       }
     })()
 
     return restorePromise
+  }
+
+  async function retryBootstrap(): Promise<void> {
+    if (bootstrapState.value !== 'error') return restoreSession()
+    bootstrapState.value = 'idle'
+    return restoreSession()
   }
 
   // Periodic session validity check (every 5 minutes).
@@ -271,22 +354,43 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  void restoreSession()
+  const userQuota = computed(() => user.value?.quota ?? null)
+
+  async function fetchQuota() {
+    quotaState.value = beginResourceLoad(userQuota.value !== null)
+    try {
+      const quota = await api.validated('/api/v1/control/quota', UserQuotaSchema)
+      if (quota && user.value) {
+        user.value.quota = quota
+      }
+      quotaState.value = completeResourceLoad(quota !== null && quota !== undefined)
+      return quota
+    } catch {
+      quotaState.value = 'error'
+      return userQuota.value
+    }
+  }
 
   return {
     accessToken,
     refreshToken,
     user,
+    userQuota,
     loading,
     error,
+    bootstrapState,
+    profileState,
+    quotaState,
     initialized,
     isAuthenticated,
     isAdmin,
     isTokenExpired: () => isTokenExpired(accessToken.value),
     restoreSession,
+    retryBootstrap,
     startLogin,
     handleCallback,
     fetchProfile,
+    fetchQuota,
     logout,
     startSessionCheck,
     stopSessionCheck,

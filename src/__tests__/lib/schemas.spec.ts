@@ -1,13 +1,28 @@
 import { describe, it, expect } from 'vitest'
 import {
   TokenResponseSchema,
+  DesktopAgentCallbackResponseSchema,
+  UserQuotaSchema,
   UserSchema,
+  UserListSchema,
   ServerSchema,
+  ServerCandidateSchema,
   ConnectionSchema,
+  ConnectionListSchema,
   ConnectionConfigSchema,
+  DeviceSchema,
+  DeviceSessionPageSchema,
   AdminStatsSchema,
+  DashboardSummarySchema,
   AuditLogSchema,
   AdminPeerSchema,
+  AdminPeerPageSchema,
+  AdminUserDetailSchema,
+  AdminClusterPageSchema,
+  AdminCoreNodePageSchema,
+  NodeEnrollmentTokenSchema,
+  HealthEnvelopeSchema,
+  WebSocketStatsMessageSchema,
 } from '@/lib/schemas'
 
 describe('Zod API schemas', () => {
@@ -24,6 +39,16 @@ describe('Zod API schemas', () => {
 
     it('rejects missing access_token', () => {
       expect(() => TokenResponseSchema.parse({ token_type: 'Bearer', expires_in: 3600 })).toThrow()
+    })
+  })
+
+  describe('DesktopAgentCallbackResponseSchema', () => {
+    it('normalizes an omitted optional username', () => {
+      expect(DesktopAgentCallbackResponseSchema.parse({})).toEqual({ username: '' })
+    })
+
+    it('rejects a non-object callback response', () => {
+      expect(DesktopAgentCallbackResponseSchema.safeParse(null).success).toBe(false)
     })
   })
 
@@ -52,6 +77,50 @@ describe('Zod API schemas', () => {
     it('rejects non-array groups', () => {
       expect(() => UserSchema.parse({ ...validUser, groups: 'not-array' })).toThrow()
     })
+
+    it('normalizes optional display fields before templates consume them', () => {
+      const { display_name, groups, ban_reason } = UserSchema.parse({
+        ...validUser,
+        display_name: undefined,
+        groups: undefined,
+      })
+      expect({ display_name, groups, ban_reason }).toEqual({
+        display_name: '',
+        groups: [],
+        ban_reason: '',
+      })
+    })
+
+    it('rejects an incomplete user in a rendered list', () => {
+      expect(() => UserListSchema.parse([{ id: 'partial' }])).toThrow()
+    })
+  })
+
+  describe('UserQuotaSchema', () => {
+    it('rejects an incomplete quota instead of rendering false availability', () => {
+      expect(() =>
+        UserQuotaSchema.parse({
+          connected_devices: 1,
+          max_devices: 5,
+          available_devices: 4,
+          plan_slug: 'pro',
+          plan_name: 'Pro',
+        }),
+      ).toThrow()
+    })
+
+    it('rejects negative counters', () => {
+      expect(() =>
+        UserQuotaSchema.parse({
+          connected_devices: -1,
+          max_devices: 5,
+          available_devices: 6,
+          plan_slug: 'pro',
+          plan_name: 'Pro',
+          devices_by_type: { desktop: 0, extension: 0, wireguard: 0 },
+        }),
+      ).toThrow()
+    })
   })
 
   describe('ServerSchema', () => {
@@ -67,6 +136,17 @@ describe('Zod API schemas', () => {
       max_peers: 100,
       current_peers: 42,
       is_active: true,
+      transports: [
+        {
+          protocol: 'wireguard',
+          host: 'vpn.example.test',
+          port: 51820,
+          enabled: true,
+          priority: 100,
+          health_status: 'healthy',
+          metadata: {},
+        },
+      ],
     }
 
     it('parses a valid server', () => {
@@ -75,6 +155,36 @@ describe('Zod API schemas', () => {
 
     it('rejects string port', () => {
       expect(() => ServerSchema.parse({ ...validServer, port: '8080' })).toThrow()
+    })
+  })
+
+  describe('ServerCandidateSchema', () => {
+    const candidate = {
+      id: 'server-1',
+      name: 'Main',
+      location: 'Santo Domingo',
+      country_code: 'DO',
+      protocol: 'wireguard',
+      probe_url: 'https://vpn.example/.well-known/midorivpn/edge-health',
+      endpoint: 'vpn.example',
+      port: 51820,
+      priority: 100,
+    }
+
+    it('accepts the constrained HTTPS edge probe', () => {
+      expect(() => ServerCandidateSchema.parse(candidate)).not.toThrow()
+    })
+
+    it('rejects arbitrary or credential-bearing probe URLs', () => {
+      expect(() =>
+        ServerCandidateSchema.parse({ ...candidate, probe_url: 'https://vpn.example/health' }),
+      ).toThrow()
+      expect(() =>
+        ServerCandidateSchema.parse({
+          ...candidate,
+          probe_url: 'https://user@vpn.example/.well-known/midorivpn/edge-health',
+        }),
+      ).toThrow()
     })
   })
 
@@ -110,12 +220,35 @@ describe('Zod API schemas', () => {
       }
       expect(() => ConnectionSchema.parse(conn)).not.toThrow()
     })
+
+    it('does not expose a preshared key from connection listings', () => {
+      const parsed = ConnectionSchema.parse({
+        id: 'uuid-3',
+        server_id: 'uuid-2',
+        public_key: 'pk',
+        preshared_key: 'must-not-reach-the-view',
+        assigned_ip: '10.8.0.2/32',
+        device_name: 'laptop',
+        is_active: true,
+        bytes_sent: 0,
+        bytes_received: 0,
+        last_handshake: null,
+        created_at: '2024-01-01T00:00:00Z',
+      })
+
+      expect(parsed).not.toHaveProperty('preshared_key')
+    })
+
+    it('rejects a partial connection list before Dashboard rendering', () => {
+      expect(() => ConnectionListSchema.parse([{ id: 'partial' }])).toThrow()
+    })
   })
 
   describe('ConnectionConfigSchema', () => {
     it('parses a valid config', () => {
       const cfg = {
         peer_id: 'uuid-4',
+        device_id: 'device-4',
         peer_ip: '10.8.0.5',
         server_public_key: 'spk',
         server_endpoint: '1.2.3.4:51820',
@@ -123,6 +256,73 @@ describe('Zod API schemas', () => {
         allowed_ips: '0.0.0.0/0',
       }
       expect(() => ConnectionConfigSchema.parse(cfg)).not.toThrow()
+    })
+  })
+
+  describe('DeviceSchema', () => {
+    const connection = {
+      id: 'peer-1',
+      device_id: 'device-1',
+      server_id: 'server-1',
+      protocol: 'wireguard' as const,
+      public_key: 'public-key',
+      assigned_ip: '10.8.0.2/32',
+      is_active: true,
+      bytes_sent: 10,
+      bytes_received: 20,
+      last_handshake: null,
+      created_at: '2026-09-03T00:00:00Z',
+      expires_at: null,
+    }
+
+    it('parses one stable device with its active session', () => {
+      const parsed = DeviceSchema.parse({
+        id: 'device-1',
+        client_instance_id: 'client-1',
+        reported_name: 'Tecno-09',
+        alias: 'Laptop',
+        display_name: 'Laptop',
+        device_type: 'desktop',
+        adapter_reference: 'net-v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+        adapter_label: 'LAN · 7F3A91C2',
+        first_seen_at: '2026-09-02T00:00:00Z',
+        last_seen_at: '2026-09-03T00:00:00Z',
+        revoked_at: null,
+        status: 'connected',
+        active_connection: connection,
+      })
+      expect(parsed.active_connection?.id).toBe('peer-1')
+      expect(parsed.display_name).toBe('Laptop')
+    })
+
+    it('rejects a partial active session without replacing valid data', () => {
+      expect(() =>
+        DeviceSchema.parse({
+          id: 'device-1',
+          client_instance_id: null,
+          reported_name: 'Legacy',
+          alias: '',
+          display_name: 'Legacy',
+          device_type: 'manual',
+          adapter_reference: '',
+          adapter_label: '',
+          first_seen_at: '2026-09-02T00:00:00Z',
+          last_seen_at: '2026-09-03T00:00:00Z',
+          revoked_at: null,
+          status: 'connected',
+          active_connection: { id: 'partial' },
+        }),
+      ).toThrow()
+    })
+
+    it('parses paginated history', () => {
+      const parsed = DeviceSessionPageSchema.parse({
+        items: [connection],
+        page: 1,
+        page_size: 10,
+        total: 1,
+      })
+      expect(parsed.items).toHaveLength(1)
     })
   })
 
@@ -138,6 +338,83 @@ describe('Zod API schemas', () => {
         total_bytes_received: 2147483648,
       }
       expect(() => AdminStatsSchema.parse(stats)).not.toThrow()
+    })
+
+    it('rejects incomplete WebSocket statistics', () => {
+      expect(
+        WebSocketStatsMessageSchema.safeParse({
+          type: 'stats',
+          data: { total_users: 1 },
+        }).success,
+      ).toBe(false)
+    })
+  })
+
+  describe('DashboardSummarySchema', () => {
+    const summary = {
+      registered_devices: 1,
+      connected_devices: 1,
+      max_devices: 5,
+      available_devices: 4,
+      plan_slug: 'pro',
+      plan_name: 'Pro',
+      traffic: { bytes_sent: 10, bytes_received: 20 },
+      recent_sessions: [
+        {
+          id: '6c5575e8-c212-4df5-b44f-e12ea5b1ec8e',
+          device_id: 'bd2c610d-5e38-4eeb-a460-30eddb4f20c5',
+          device_name: 'Work laptop',
+          server_id: 'd1a60c46-9294-407a-90a4-7c0f29bda831',
+          server_name: 'Santo Domingo',
+          protocol: 'wireguard',
+          assigned_ip: '10.8.0.2/32',
+          is_active: true,
+          bytes_sent: 10,
+          bytes_received: 20,
+          last_handshake: null,
+          created_at: '2026-09-03T00:00:00Z',
+        },
+      ],
+    }
+
+    it('parses a coherent user summary and normalizes absent infrastructure', () => {
+      const parsed = DashboardSummarySchema.parse(summary)
+      expect(parsed.infrastructure).toBeNull()
+      expect(parsed.recent_sessions).toHaveLength(1)
+    })
+
+    it('rejects session counts masquerading as device counts', () => {
+      expect(
+        DashboardSummarySchema.safeParse({
+          ...summary,
+          registered_devices: 1,
+          connected_devices: 2,
+        }).success,
+      ).toBe(false)
+    })
+
+    it('rejects an available-device count from a different snapshot', () => {
+      expect(
+        DashboardSummarySchema.safeParse({
+          ...summary,
+          available_devices: 3,
+        }).success,
+      ).toBe(false)
+    })
+
+    it('rejects partial traffic and recent-session payloads', () => {
+      expect(
+        DashboardSummarySchema.safeParse({
+          ...summary,
+          traffic: { bytes_sent: 10 },
+        }).success,
+      ).toBe(false)
+      expect(
+        DashboardSummarySchema.safeParse({
+          ...summary,
+          recent_sessions: [{ id: summary.recent_sessions[0].id }],
+        }).success,
+      ).toBe(false)
     })
   })
 
@@ -170,6 +447,193 @@ describe('Zod API schemas', () => {
         created_at: '2024-01-01T00:00:00Z',
       }
       expect(() => AdminPeerSchema.parse(peer)).not.toThrow()
+    })
+
+    it('rejects an incomplete user-detail envelope', () => {
+      expect(() => AdminUserDetailSchema.parse({ user: { id: 'partial' }, peers: [] })).toThrow()
+    })
+
+    it('requires bounded pagination metadata for administrator lists', () => {
+      expect(() =>
+        AdminPeerPageSchema.parse({ items: [], page: 1, page_size: 100, total: 0 }),
+      ).not.toThrow()
+      expect(() =>
+        AdminPeerPageSchema.parse({ items: [], page: 1, page_size: 101, total: 0 }),
+      ).toThrow()
+      expect(() => AdminPeerPageSchema.parse([])).toThrow()
+    })
+  })
+
+  describe('HealthEnvelopeSchema', () => {
+    it('accepts a degraded but complete protected readiness payload', () => {
+      expect(() =>
+        HealthEnvelopeSchema.parse({
+          ok: true,
+          data: {
+            status: 'degraded',
+            checks: {
+              postgres: { status: 'ok', latency_ms: 3 },
+              wireguard: { status: 'error' },
+            },
+          },
+        }),
+      ).not.toThrow()
+    })
+
+    it('rejects an incomplete readiness envelope', () => {
+      expect(HealthEnvelopeSchema.safeParse({ ok: true, data: { status: 'ready' } }).success).toBe(
+        false,
+      )
+    })
+  })
+
+  describe('multicluster administration schemas', () => {
+    const clusterID = '9c5740cf-73c7-4eb2-a659-8d074d94705b'
+    const nodeID = '96e4f25a-a915-46c2-8b2d-1250c592ffbd'
+    const timestamps = {
+      created_at: '2026-09-03T12:00:00Z',
+      updated_at: '2026-09-03T12:00:00Z',
+    }
+
+    it('accepts bounded cluster and node pages while stripping forbidden material', () => {
+      const clusters = AdminClusterPageSchema.parse({
+        items: [
+          {
+            id: clusterID,
+            name: 'caribbean',
+            region: 'do-sdq',
+            state: 'active',
+            policy_labels: { tier: 'regional' },
+            is_principal: false,
+            node_count: 1,
+            active_node_count: 1,
+            healthy_node_count: 1,
+            ...timestamps,
+          },
+        ],
+        page: 1,
+        page_size: 20,
+        total: 1,
+      })
+      const nodes = AdminCoreNodePageSchema.parse({
+        items: [
+          {
+            id: nodeID,
+            cluster_id: clusterID,
+            name: 'regional-01',
+            management_host: 'regional-01.internal.test',
+            state: 'active',
+            core_version: '2.0.0',
+            enrolled: true,
+            enrolled_at: '2026-09-03T11:00:00Z',
+            last_seen_at: '2026-09-03T12:00:00Z',
+            desired_revision: 4,
+            desired_expires_at: '2026-09-03T12:15:00Z',
+            minimum_core_version: '2.0.0',
+            applied_revision: 4,
+            health_status: 'healthy',
+            version_compatible: true,
+            current_peers: 2,
+            max_peers: 100,
+            transport_states: { wireguard: { status: 'healthy', certified: true } },
+            last_error_code: '',
+            observed_at: '2026-09-03T12:00:00Z',
+            server_id: 'e36f54e9-44b7-48d8-aa12-3c738d9ac134',
+            server_name: 'Regional 01',
+            placement_ready: true,
+            placement_reason: 'ready',
+            identity_public_key: 'must-not-reach-the-view',
+            token_hash: 'must-not-reach-the-view',
+            signature: 'must-not-reach-the-view',
+            ...timestamps,
+          },
+        ],
+        page: 1,
+        page_size: 50,
+        total: 1,
+      })
+
+      expect(clusters.items[0].name).toBe('caribbean')
+      expect(nodes.items[0]).not.toHaveProperty('identity_public_key')
+      expect(nodes.items[0]).not.toHaveProperty('token_hash')
+      expect(nodes.items[0]).not.toHaveProperty('signature')
+    })
+
+    it('rejects inconsistent counts, capacity and placement state', () => {
+      expect(
+        AdminClusterPageSchema.safeParse({
+          items: [
+            {
+              id: clusterID,
+              name: 'invalid',
+              region: 'test',
+              state: 'active',
+              policy_labels: {},
+              is_principal: false,
+              node_count: 1,
+              active_node_count: 2,
+              healthy_node_count: 0,
+              ...timestamps,
+            },
+          ],
+          page: 1,
+          page_size: 20,
+          total: 1,
+        }).success,
+      ).toBe(false)
+
+      const baseNode = {
+        id: nodeID,
+        cluster_id: clusterID,
+        name: 'regional-01',
+        management_host: 'regional-01.internal.test',
+        state: 'active',
+        core_version: '2.0.0',
+        enrolled: true,
+        enrolled_at: '2026-09-03T11:00:00Z',
+        last_seen_at: '2026-09-03T12:00:00Z',
+        desired_revision: 4,
+        desired_expires_at: '2026-09-03T12:15:00Z',
+        minimum_core_version: '2.0.0',
+        applied_revision: 4,
+        health_status: 'healthy',
+        version_compatible: true,
+        current_peers: 101,
+        max_peers: 100,
+        transport_states: {},
+        last_error_code: '',
+        observed_at: '2026-09-03T12:00:00Z',
+        server_id: null,
+        server_name: '',
+        placement_ready: true,
+        placement_reason: 'server_unbound',
+        ...timestamps,
+      }
+      expect(
+        AdminCoreNodePageSchema.safeParse({
+          items: [baseNode],
+          page: 1,
+          page_size: 50,
+          total: 1,
+        }).success,
+      ).toBe(false)
+    })
+
+    it('accepts only canonical one-use enrollment tokens', () => {
+      expect(
+        NodeEnrollmentTokenSchema.safeParse({
+          node_id: nodeID,
+          token: 'A'.repeat(43),
+          expires_at: '2026-09-03T12:15:00Z',
+        }).success,
+      ).toBe(true)
+      expect(
+        NodeEnrollmentTokenSchema.safeParse({
+          node_id: nodeID,
+          token: 'plaintext token with spaces',
+          expires_at: '2026-09-03T12:15:00Z',
+        }).success,
+      ).toBe(false)
     })
   })
 })

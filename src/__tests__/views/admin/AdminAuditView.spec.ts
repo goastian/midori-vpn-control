@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { shallowMount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import AdminAuditView from '@/views/admin/AdminAuditView.vue'
+import AsyncState from '@/components/AsyncState.vue'
+import ResourceSkeleton from '@/components/ResourceSkeleton.vue'
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -13,7 +15,7 @@ vi.mock('@/lib/api', () => ({
   },
   setAccessToken: vi.fn(),
   clearAccessToken: vi.fn(),
-  onAccessTokenRefreshed: vi.fn(),
+  onAccessTokenChanged: vi.fn(),
   initFromStoredRefreshToken: vi.fn().mockResolvedValue(null),
   exchangeCode: vi.fn(),
 }))
@@ -24,7 +26,8 @@ const mockLogs = [
     user_id: 'u1',
     user_email: 'alice@example.com',
     action: 'peer.connect',
-    meta: { device: 'laptop', server: 'US East' },
+    metadata: { device: 'laptop', server: 'US East' },
+    ip_address: '192.0.2.10',
     created_at: '2024-06-01T10:00:00Z',
   },
   {
@@ -32,10 +35,13 @@ const mockLogs = [
     user_id: 'u2',
     user_email: 'bob@example.com',
     action: 'admin.user.ban',
-    meta: { reason: 'abuse' },
+    metadata: { reason: 'abuse' },
+    ip_address: '',
     created_at: '2024-06-01T11:00:00Z',
   },
 ]
+
+const page = <T>(items: T[]) => ({ items, page: 1, page_size: 50, total: items.length })
 
 describe('AdminAuditView', () => {
   beforeEach(() => {
@@ -45,18 +51,20 @@ describe('AdminAuditView', () => {
 
   it('shows loading spinner while fetching', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockReturnValue(new Promise(() => {}))
+    vi.mocked(api.validated).mockReturnValue(new Promise(() => {}))
 
     const wrapper = shallowMount(AdminAuditView, {
       global: { plugins: [createPinia()] },
     })
 
-    expect(wrapper.find('.animate-spin').exists()).toBe(true)
+    expect(wrapper.findComponent(ResourceSkeleton).props('title')).toBe(
+      'Cargando el historial de auditoría…',
+    )
   })
 
   it('renders audit log rows after successful load', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockResolvedValue(mockLogs)
+    vi.mocked(api.validated).mockResolvedValue(page(mockLogs))
 
     const wrapper = shallowMount(AdminAuditView, {
       global: { plugins: [createPinia()] },
@@ -64,14 +72,14 @@ describe('AdminAuditView', () => {
 
     await flushPromises()
 
-    expect(wrapper.find('.animate-spin').exists()).toBe(false)
+    expect(wrapper.findComponent(AsyncState).exists()).toBe(false)
     expect(wrapper.text()).toContain('alice@example.com')
     expect(wrapper.text()).toContain('bob@example.com')
   })
 
   it('shows empty state when there are no logs', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockResolvedValue([])
+    vi.mocked(api.validated).mockResolvedValue(page([]))
 
     const wrapper = shallowMount(AdminAuditView, {
       global: { plugins: [createPinia()] },
@@ -79,12 +87,12 @@ describe('AdminAuditView', () => {
 
     await flushPromises()
 
-    expect(wrapper.find('.animate-spin').exists()).toBe(false)
+    expect(wrapper.findComponent(AsyncState).props('kind')).toBe('empty')
   })
 
   it('does not crash when api throws', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockRejectedValue(new Error('Network error'))
+    vi.mocked(api.validated).mockRejectedValue(new Error('Network error'))
 
     const wrapper = shallowMount(AdminAuditView, {
       global: { plugins: [createPinia()] },
@@ -97,7 +105,7 @@ describe('AdminAuditView', () => {
 
   it('includes action filter in query when actionFilter is set', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockResolvedValue(mockLogs)
+    vi.mocked(api.validated).mockResolvedValue(page(mockLogs))
 
     const wrapper = shallowMount(AdminAuditView, {
       global: { plugins: [createPinia()] },
@@ -111,14 +119,15 @@ describe('AdminAuditView', () => {
     await vm.loadLogs()
     await flushPromises()
 
-    expect(vi.mocked(api.get)).toHaveBeenCalledWith(
+    expect(vi.mocked(api.validated)).toHaveBeenCalledWith(
       expect.stringContaining('action=peer.connect'),
+      expect.anything(),
     )
   })
 
   it('calls api with no action filter when actionFilter is empty', async () => {
     const { api } = await import('@/lib/api')
-    vi.mocked(api.get).mockResolvedValue([])
+    vi.mocked(api.validated).mockResolvedValue(page([]))
 
     shallowMount(AdminAuditView, {
       global: { plugins: [createPinia()] },
@@ -127,7 +136,21 @@ describe('AdminAuditView', () => {
     await flushPromises()
 
     // The initial call should not have an action query parameter
-    const calls = vi.mocked(api.get).mock.calls
-    expect(calls[0][0]).toBe('/api/v1/admin/audit-logs')
+    const calls = vi.mocked(api.validated).mock.calls
+    expect(calls[0][0]).toContain('/api/v1/admin/audit-logs')
+    expect(calls[0][0]).not.toContain('action=')
+  })
+
+  it('associates an accessible label with the action filter', async () => {
+    const { api } = await import('@/lib/api')
+    vi.mocked(api.validated).mockResolvedValue(page([]))
+
+    const wrapper = shallowMount(AdminAuditView, {
+      global: { plugins: [createPinia()] },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('label[for="audit-action-filter"]').text()).toContain('Filtrar')
+    expect(wrapper.find('#audit-action-filter').exists()).toBe(true)
   })
 })
