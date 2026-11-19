@@ -16,7 +16,7 @@ onMounted(async () => {
   const returnedState = route.query.state as string
 
   if (error) {
-    errorMsg.value = route.query.error_description as string || error
+    errorMsg.value = (route.query.error_description as string) || error
     return
   }
 
@@ -48,7 +48,7 @@ onMounted(async () => {
       <div v-if="errorMsg" class="bg-red-50 text-red-700 rounded-lg p-6 max-w-md">
         <h2 class="text-lg font-semibold mb-2">{{ t('authCallback.title') }}</h2>
         <p class="text-sm">{{ errorMsg }}</p>
-        <router-link to="/dashboard" class="mt-4 inline-block text-midori-600 hover:underline text-sm">
+        <router-link to="/login" class="mt-4 inline-block text-midori-600 hover:underline text-sm">
           {{ t('authCallback.backToLogin') }}
         </router-link>
       </div>

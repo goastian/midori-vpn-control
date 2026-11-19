@@ -1,16 +1,77 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useDarkMode } from '../composables/useDarkMode'
 import LanguageSelector from './LanguageSelector.vue'
 import { useLocale } from '../lib/i18n'
+import BrandLogo from './BrandLogo.vue'
+import AppIcon from './AppIcon.vue'
 
 const auth = useAuthStore()
 const route = useRoute()
 const { isDark, toggle: toggleDark } = useDarkMode()
 const { t } = useLocale()
 const mobileOpen = ref(false)
+const menuButton = ref<HTMLButtonElement | null>(null)
+const closeButton = ref<HTMLButtonElement | null>(null)
+const drawer = ref<HTMLElement | null>(null)
+const previousOverflow = ref('')
+let desktopMedia: MediaQueryList | undefined
+
+function closeOnDesktop(event: MediaQueryListEvent) {
+  if (event.matches) closeMobile()
+}
+
+onMounted(() => {
+  desktopMedia = window.matchMedia('(min-width: 1024px)')
+  desktopMedia.addEventListener('change', closeOnDesktop)
+})
+
+watch(
+  mobileOpen,
+  async (open) => {
+    if (open) {
+      previousOverflow.value = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      await nextTick()
+      closeButton.value?.focus({ preventScroll: true })
+    } else {
+      document.body.style.overflow = previousOverflow.value
+      menuButton.value?.focus({ preventScroll: true })
+    }
+  },
+  { flush: 'post' },
+)
+watch(
+  () => route.path,
+  () => {
+    mobileOpen.value = false
+  },
+)
+onUnmounted(() => {
+  desktopMedia?.removeEventListener('change', closeOnDesktop)
+  if (mobileOpen.value) document.body.style.overflow = previousOverflow.value
+})
+
+function focusDrawer() {
+  if (mobileOpen.value) closeButton.value?.focus({ preventScroll: true })
+}
+
+function trapFocus(event: KeyboardEvent) {
+  if (!mobileOpen.value || event.key !== 'Tab') return
+  const elements = drawer.value?.querySelectorAll<HTMLElement>('a[href], button, select')
+  if (!elements?.length) return
+  const first = elements[0]
+  const last = elements[elements.length - 1]
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
 
 const navGroups = computed(() => {
   const groups = [
@@ -73,145 +134,94 @@ function closeMobile() {
 </script>
 
 <template>
-  <header class="sticky top-0 z-30 border-b border-slate-200/70 bg-white/85 px-4 py-3 backdrop-blur lg:hidden dark:border-slate-700 dark:bg-slate-900/85">
-    <div class="flex items-center justify-between">
-      <router-link to="/dashboard" class="text-lg font-semibold tracking-tight text-midori-700">
-        MidoriVPN
-      </router-link>
-      <button
-        class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"
-        @click="mobileOpen = true"
-        :aria-label="t('nav.openMenu')"
-      >
-        <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-          <path d="M3 5.5a.75.75 0 01.75-.75h12.5a.75.75 0 010 1.5H3.75A.75.75 0 013 5.5zm0 4.5a.75.75 0 01.75-.75h12.5a.75.75 0 010 1.5H3.75A.75.75 0 013 10zm.75 3.75a.75.75 0 000 1.5h8.5a.75.75 0 000-1.5h-8.5z" />
-        </svg>
-      </button>
-    </div>
+  <header class="app-mobile-header">
+    <router-link to="/dashboard" aria-label="MidoriVPN"><BrandLogo /></router-link>
+    <button
+      ref="menuButton"
+      class="mobile-menu-toggle"
+      :aria-label="t('nav.openMenu')"
+      :aria-expanded="mobileOpen"
+      aria-controls="app-navigation"
+      @click="mobileOpen = true"
+    >
+      <AppIcon name="menu" />
+    </button>
   </header>
 
-  <aside class="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-slate-200/80 bg-white/90 p-4 backdrop-blur lg:flex lg:flex-col dark:border-slate-700 dark:bg-slate-900/90">
-    <div class="flex items-center justify-between px-2 pb-5">
-      <router-link to="/dashboard" class="text-2xl font-semibold tracking-tight text-midori-700 dark:text-midori-400">
-        {{ t('common.appName') }}
-      </router-link>
-      <div class="flex items-center gap-2">
+  <button
+    v-if="mobileOpen"
+    class="sidebar-backdrop lg:hidden"
+    :aria-label="t('nav.closeMenu')"
+    tabindex="-1"
+    @click="closeMobile"
+  ></button>
+  <aside
+    id="app-navigation"
+    ref="drawer"
+    class="app-sidebar"
+    :class="{ 'is-open': mobileOpen }"
+    :role="mobileOpen ? 'dialog' : undefined"
+    :aria-modal="mobileOpen || undefined"
+    :aria-label="t('nav.general')"
+    @transitionend.self="focusDrawer"
+    @keydown.esc="closeMobile"
+    @keydown="trapFocus"
+  >
+    <div class="sidebar-brand">
+      <div>
+        <router-link to="/dashboard" @click="closeMobile"><BrandLogo /></router-link>
+        <p class="sidebar-brand-caption">{{ t('nav.controlPanel') }} · Astian</p>
+      </div>
+      <button
+        ref="closeButton"
+        class="sidebar-close"
+        :aria-label="t('nav.closeMenu')"
+        @click="closeMobile"
+      >
+        <AppIcon name="close" />
+      </button>
+    </div>
+    <nav class="sidebar-navigation" :aria-label="t('nav.general')">
+      <section v-for="group in navGroups" :key="group.title" class="sidebar-group">
+        <h2 class="sidebar-group-title">{{ group.title }}</h2>
+        <router-link
+          v-for="item in group.items"
+          :key="item.path"
+          :to="item.path"
+          class="sidebar-item"
+          :aria-current="isItemActive(item.path) ? 'page' : undefined"
+          @click="closeMobile"
+        >
+          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path :d="iconPath(item.icon)" />
+          </svg>
+          <span>{{ item.name }}</span>
+        </router-link>
+      </section>
+    </nav>
+    <div class="sidebar-settings">
+      <div class="sidebar-preferences">
         <LanguageSelector />
         <button
+          class="theme-toggle"
+          :aria-label="isDark ? t('theme.switchToLight') : t('theme.switchToDark')"
           @click="toggleDark"
-          class="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-          :title="isDark ? t('theme.switchToLight') : t('theme.switchToDark')"
         >
-          <svg v-if="isDark" class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd" />
-          </svg>
-          <svg v-else class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-          </svg>
+          <AppIcon :name="isDark ? 'sun' : 'moon'" />
         </button>
       </div>
-    </div>
-
-    <nav class="flex-1 space-y-6 overflow-y-auto pr-1">
-      <section v-for="group in navGroups" :key="group.title">
-        <p class="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
-          {{ group.title }}
-        </p>
-        <div class="space-y-1">
-          <router-link
-            v-for="item in group.items"
-            :key="item.path"
-            :to="item.path"
-            class="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition"
-            :class="isItemActive(item.path)
-              ? 'bg-midori-600 text-white shadow-lg shadow-midori-900/20'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100'"
-          >
-            <svg class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-              <path :d="iconPath(item.icon)" />
-            </svg>
-            <span>{{ item.name }}</span>
-          </router-link>
+      <div class="sidebar-account">
+        <span class="account-avatar" aria-hidden="true">{{
+          (auth.user?.display_name || auth.user?.email || 'M').slice(0, 1).toUpperCase()
+        }}</span>
+        <div class="account-details">
+          <p :title="auth.user?.email">{{ auth.user?.email }}</p>
+          <span>{{ auth.isAdmin ? t('common.roleAdmin') : t('common.roleUser') }}</span>
         </div>
-      </section>
-
-      <div class="rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
-        <p class="truncate text-sm font-semibold text-slate-700 dark:text-slate-200">{{ auth.user?.email }}</p>
-        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ auth.isAdmin ? t('common.roleAdmin') : t('common.roleUser') }}</p>
-        <button
-          @click="auth.logout()"
-          class="mt-3 w-full rounded-xl border border-rose-200 px-3 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 dark:border-rose-700/60 dark:text-rose-300 dark:hover:bg-rose-900/30"
-        >
-          {{ t('common.signOut') }}
-        </button>
       </div>
-    </nav>
+      <button class="sidebar-logout" @click="auth.logout()">
+        <AppIcon name="logout" />{{ t('common.signOut') }}
+      </button>
+    </div>
   </aside>
-
-  <transition name="fade">
-    <div v-if="mobileOpen" class="fixed inset-0 z-50 lg:hidden">
-      <button class="absolute inset-0 bg-slate-900/55" @click="closeMobile" aria-label="Cerrar menu"></button>
-      <aside class="absolute inset-y-0 left-0 w-72 border-r border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-        <div class="flex items-center justify-between px-2 pb-4">
-          <router-link to="/dashboard" class="text-xl font-semibold text-midori-700 dark:text-midori-400" @click="closeMobile">
-            {{ t('common.appName') }}
-          </router-link>
-          <button class="rounded-xl p-2 text-slate-500 dark:text-slate-300" @click="closeMobile" :aria-label="t('nav.closeMenu')">
-            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M5.22 5.22a.75.75 0 011.06 0L10 8.94l3.72-3.72a.75.75 0 111.06 1.06L11.06 10l3.72 3.72a.75.75 0 11-1.06 1.06L10 11.06l-3.72 3.72a.75.75 0 11-1.06-1.06L8.94 10 5.22 6.28a.75.75 0 010-1.06z" />
-            </svg>
-          </button>
-        </div>
-
-        <div class="space-y-4">
-          <LanguageSelector />
-          <button
-            @click="toggleDark"
-            class="flex w-full items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300"
-          >
-            {{ t('theme.label') }}
-            <span>{{ isDark ? t('theme.dark') : t('theme.light') }}</span>
-          </button>
-
-          <section v-for="group in navGroups" :key="group.title">
-            <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">{{ group.title }}</p>
-            <div class="space-y-1">
-              <router-link
-                v-for="item in group.items"
-                :key="item.path"
-                :to="item.path"
-                class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium"
-                :class="isItemActive(item.path)
-                  ? 'bg-midori-600 text-white'
-                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
-                @click="closeMobile"
-              >
-                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path :d="iconPath(item.icon)" /></svg>
-                {{ item.name }}
-              </router-link>
-            </div>
-          </section>
-
-          <button
-            @click="auth.logout()"
-            class="w-full rounded-xl border border-rose-200 px-3 py-2 text-sm font-medium text-rose-600 dark:border-rose-700/60 dark:text-rose-300"
-          >
-            {{ t('common.signOut') }}
-          </button>
-        </div>
-      </aside>
-    </div>
-  </transition>
 </template>
-
-<style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-</style>

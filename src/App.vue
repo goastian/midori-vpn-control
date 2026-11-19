@@ -3,9 +3,11 @@ import { RouterView, useRoute } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 import { useAuthStore } from './stores/auth'
 import { computed } from 'vue'
+import { useLocale } from './lib/i18n'
 
 const auth = useAuthStore()
 const route = useRoute()
+const { t } = useLocale()
 
 const isFullPage = computed(() => route.meta?.fullPage === true)
 </script>
@@ -17,19 +19,18 @@ const isFullPage = computed(() => route.meta?.fullPage === true)
   <!-- Initialization guard: show a neutral spinner until session restore completes.
        This prevents any authenticated shell (NavBar, user email, admin role) from
        briefly flashing to unauthenticated visitors during the async restore window. -->
-  <div v-else-if="!auth.initialized" class="min-h-screen app-shell-bg flex items-center justify-center">
+  <div
+    v-else-if="!auth.initialized"
+    class="min-h-screen app-shell-bg flex items-center justify-center"
+  >
     <div class="h-9 w-9 animate-spin rounded-full border-b-2 border-midori-600"></div>
   </div>
 
   <!-- App shell for authenticated / standard routes -->
   <div v-else class="min-h-screen app-shell-bg text-slate-900 dark:text-slate-100">
+    <a href="#main-content" class="skip-link">{{ t('landing.skipContent') }}</a>
     <NavBar v-if="auth.isAuthenticated" />
-    <main
-      :class="[
-        'mx-auto w-full px-4 py-6 sm:px-6 lg:px-10 lg:py-10',
-        auth.isAuthenticated ? 'max-w-[1800px] lg:pl-[19rem]' : 'max-w-7xl',
-      ]"
-    >
+    <main id="main-content" class="app-main" tabindex="-1">
       <RouterView />
     </main>
   </div>

@@ -34,11 +34,11 @@ describe('NavBar', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('MidoriVPN')
+    expect(wrapper.find('img[alt="MidoriVPN"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Dashboard')
     expect(wrapper.text()).toContain('Servidores')
     expect(wrapper.text()).toContain('Conexiones')
-    expect(wrapper.text()).toContain('Auditoría')
+    expect(wrapper.find('a[href="/admin/audit"]').exists()).toBe(false)
     // Admin items should NOT be visible for non-admin users
     expect(wrapper.text()).not.toContain('Admin Servers')
   })
