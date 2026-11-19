@@ -115,12 +115,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   const initialized = computed(() => bootstrapState.value === 'ready')
   const isAuthenticated = computed(() => !!accessToken.value && user.value !== null)
-  const isAdmin = computed(
-    () =>
-      user.value?.groups?.some(
-        (g) => g === 'vpn-admins' || g === 'admins' || g === 'authentik Admins',
-      ) ?? false,
-  )
+  const isAdmin = computed(() => user.value?.groups?.includes('vpn-admins') ?? false)
 
   async function startLogin() {
     const oidc = await getOIDCConfig()

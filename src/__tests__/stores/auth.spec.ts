@@ -121,7 +121,18 @@ describe('useAuthStore', () => {
     expect(store.isAdmin).toBe(false)
   })
 
-  it('isAdmin is true for authentik Admins group', async () => {
+  it.each([
+    { groups: ['vpn-admins'], expected: true },
+    { groups: ['vpn-users', 'vpn-admins'], expected: true },
+    { groups: ['vpn-users'], expected: false },
+    { groups: ['admins'], expected: false },
+    { groups: ['authentik Admins'], expected: false },
+    { groups: ['vpn-users', 'admins', 'authentik Admins'], expected: false },
+    { groups: ['vpn-admins', 'admins'], expected: true },
+    { groups: ['vpn-admins-extra'], expected: false },
+    { groups: ['VPN-ADMINS'], expected: false },
+    { groups: [], expected: false },
+  ])('isAdmin for $groups is $expected', async ({ groups, expected }) => {
     const { useAuthStore } = await import('@/stores/auth')
     const store = useAuthStore()
     store.user = {
@@ -129,12 +140,12 @@ describe('useAuthStore', () => {
       authentik_uid: 'user-1',
       email: 'alfonso.hernandez@astian.org',
       display_name: 'ponchale',
-      groups: ['authentik Admins'],
+      groups,
       is_banned: false,
       ban_reason: '',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
-    expect(store.isAdmin).toBe(true)
+    expect(store.isAdmin).toBe(expected)
   })
 })

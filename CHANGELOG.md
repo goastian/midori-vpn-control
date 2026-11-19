@@ -12,6 +12,9 @@ All notable changes to Midori VPN Control are documented here.
 
 ### Changed
 
+- Show administrative navigation only for the dedicated `vpn-admins` group;
+  global `admins` and `authentik Admins` membership no longer grants VPN
+  administrator UI access, matching the API authorization policy.
 - Refresh Node 24.22.3/npm 12.2.2, Vue 3.5.45, Router 5.5, Pinia 4.1 and
   VueUse 15 with compatible Vite 8.3.8/Vitest 5.1 and lint/type tooling.
   TypeScript remains on 6.0.3 while TypeScript-ESLint requires a version below 6.1.

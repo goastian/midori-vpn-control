@@ -84,6 +84,43 @@ describe('NavBar', () => {
     expect(wrapper.text()).toContain('Extensiones')
   })
 
+  it.each([
+    { groups: ['admins'], expected: false },
+    { groups: ['authentik Admins'], expected: false },
+    { groups: ['vpn-users', 'admins', 'authentik Admins'], expected: false },
+    { groups: ['vpn-users', 'vpn-admins'], expected: true },
+  ])('admin links for $groups are visible: $expected', async ({ groups, expected }) => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const router = makeRouter()
+    await router.push('/dashboard')
+    await router.isReady()
+
+    const { useAuthStore } = await import('@/stores/auth')
+    const store = useAuthStore()
+    store.user = {
+      id: '53451935-3e31-407b-939f-873924c8a66f',
+      authentik_uid: 'navigation-role-fixture',
+      email: 'roles@test.invalid',
+      display_name: 'Role fixture',
+      groups,
+      is_banned: false,
+      ban_reason: '',
+      created_at: '2026-11-18T00:00:00Z',
+      updated_at: '2026-11-18T00:00:00Z',
+    }
+    const wrapper = mount(NavBar, { global: { plugins: [pinia, router] } })
+    try {
+      expect(wrapper.findAll('a[href^="/admin/"]').length > 0).toBe(expected)
+      expect(wrapper.text()).toContain('Dashboard')
+      await wrapper.get('[aria-controls="mobile-navigation"]').trigger('click')
+      const mobile = wrapper.get('#mobile-navigation')
+      expect(mobile.findAll('a[href^="/admin/"]').length > 0).toBe(expected)
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it('exposes and closes the mobile navigation predictably', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
