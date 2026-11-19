@@ -5,11 +5,13 @@ import ViewErrorBoundary from './components/ViewErrorBoundary.vue'
 import { useAuthStore } from './stores/auth'
 import { useLocale } from './lib/i18n'
 import { computed, watch } from 'vue'
+import { useBrandCopy } from './lib/brand-copy'
 
 const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 const { t } = useLocale()
+const copy = useBrandCopy()
 
 const isFullPage = computed(() => route.meta?.fullPage === true)
 const bypassesBootstrap = computed(() => route.meta?.bootstrapBypass === true)
@@ -97,8 +99,9 @@ watch(
     v-else-if="auth.isAuthenticated"
     class="min-h-screen app-shell-bg text-slate-900 dark:text-slate-100"
   >
+    <a href="#main-content" class="skip-link">{{ copy.skipContent }}</a>
     <NavBar />
-    <main class="mx-auto w-full max-w-[1800px] px-4 py-6 sm:px-6 lg:py-10 lg:pl-[19rem] lg:pr-10">
+    <main id="main-content" class="app-main" tabindex="-1">
       <RouterView v-slot="{ Component, route: viewRoute }">
         <ViewErrorBoundary v-slot="{ retryKey }" :reset-key="viewRoute.fullPath">
           <component :is="Component" :key="`${viewRoute.fullPath}:${retryKey}`" />
