@@ -1,12 +1,20 @@
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
-const isDark = ref(true)
+const isDark = ref(localStorage.getItem('theme') === 'dark')
 
-if (typeof document !== 'undefined') {
-  document.documentElement.classList.add('dark')
-  localStorage.setItem('theme', 'dark')
-}
+watch(
+  isDark,
+  (val) => {
+    document.documentElement.classList.toggle('dark', val)
+    localStorage.setItem('theme', val ? 'dark' : 'light')
+  },
+  { immediate: true },
+)
 
 export function useDarkMode() {
-  return { isDark, toggle: () => {} }
+  function toggle() {
+    isDark.value = !isDark.value
+  }
+
+  return { isDark, toggle }
 }

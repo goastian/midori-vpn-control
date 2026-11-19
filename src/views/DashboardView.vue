@@ -28,7 +28,6 @@ const dashboardLoading = computed(
 
 const dashboardHasError = computed(() => summaryState.value === 'error')
 
-
 const activePercent = computed(() => {
   if (!summary.value) return null
   if (!summary.value.registered_devices) return 0
@@ -182,37 +181,35 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
 
 <template>
   <div class="space-y-6">
-    <section
-      class="relative overflow-hidden rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-2xl shadow-black/40 backdrop-blur-xl"
-    >
-      <div
-        class="absolute -right-14 -top-14 h-40 w-40 rounded-full bg-midori-500/10 blur-2xl"
-      ></div>
-      <div
-        class="absolute -bottom-10 left-1/3 h-32 w-32 rounded-full bg-cyan-500/10 blur-2xl"
-      ></div>
+    <section class="dashboard-intro">
       <div class="relative z-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.2em] text-midori-400">
+          <p
+            class="text-xs font-semibold uppercase tracking-[0.2em] text-midori-700 dark:text-midori-400"
+          >
             {{ t('dashboard.eyebrow') }}
           </p>
-          <h1 class="mt-2 text-3xl font-bold tracking-tight text-white">
+          <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
             {{ t('dashboard.title') }}
           </h1>
-          <p class="mt-2 text-sm text-slate-400">{{ t('dashboard.subtitle') }}</p>
+          <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">
+            {{ t('dashboard.subtitle') }}
+          </p>
         </div>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div
-            class="rounded-2xl border border-slate-700/60 bg-slate-800/80 px-4 py-3 shadow-inner"
+            class="rounded-2xl border border-slate-700/60 bg-slate-100 dark:bg-slate-800/80 px-4 py-3 shadow-inner"
           >
-            <p class="text-xs text-slate-400">{{ t('common.sessionActive') }}</p>
-            <p class="text-sm font-semibold text-slate-200">
+            <p class="text-xs text-slate-600 dark:text-slate-400">
+              {{ t('common.sessionActive') }}
+            </p>
+            <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
               {{ auth.user?.email || t('common.unavailable') }}
             </p>
           </div>
           <button
             type="button"
-            class="rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-midori-600 hover:text-white disabled:cursor-wait disabled:opacity-60"
+            class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-midori-50 disabled:cursor-wait disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
             :disabled="summaryState === 'loading' || summaryState === 'refreshing'"
             @click="loadDashboard"
           >
@@ -237,88 +234,80 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
       >
         {{ t('resourceStatus.dashboardError') }}
       </p>
-      <p v-else-if="summaryState === 'refreshing'" role="status" class="text-sm text-slate-400">
+      <p
+        v-else-if="summaryState === 'refreshing'"
+        role="status"
+        class="text-sm text-slate-600 dark:text-slate-400"
+      >
         {{ t('common.refreshing') }}
       </p>
-      <section
-        class="relative overflow-hidden rounded-[2rem] border border-cyan-400/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(15,23,42,0.9))] p-6 shadow-xl shadow-cyan-950/10 lg:p-8"
-      >
-        <div class="absolute right-0 top-0 h-56 w-56 rounded-full bg-midori-500/10 blur-3xl"></div>
-        <div
-          class="absolute bottom-0 left-1/4 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl"
-        ></div>
-
-        <div
-          class="relative z-10"
-        >
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.26em] text-cyan-300">
-              {{ t('dashboard.desktopDownload.eyebrow') }}
-            </p>
-            <h2 class="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-white lg:text-4xl">
-              {{ t('dashboard.desktopDownload.title') }}
-            </h2>
-            <p class="mt-3 max-w-2xl text-sm leading-7 text-slate-300 lg:text-base">
-              {{ t('dashboard.desktopDownload.subtitle') }}
-            </p>
-
-            <div class="mt-6 flex flex-wrap gap-3">
-              <a href="/download" class="rounded-xl border border-cyan-300/40 px-5 py-3 font-semibold text-cyan-200 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-4">{{ t('landing.footerDownload') }}</a>
-            </div>
-          </div>
-        </div>
+      <section class="desktop-download grain-surface">
+        <p class="eyebrow">{{ t('dashboard.desktopDownload.eyebrow') }}</p>
+        <h2>{{ t('dashboard.desktopDownload.title') }}</h2>
+        <p class="desktop-download-description">{{ t('dashboard.desktopDownload.subtitle') }}</p>
+        <a href="/download" class="vpn-text-link">{{ t('landing.footerDownload') }}</a>
       </section>
 
       <section class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         <article
           v-for="card in dashboardCards"
           :key="card.title"
-          class="rounded-2xl border p-5 shadow-lg shadow-black/20 backdrop-blur-xl transition hover:-translate-y-0.5"
-          :class="{
-            'border-emerald-700/40 bg-emerald-950/30': card.tone === 'emerald',
-            'border-cyan-700/40 bg-cyan-950/30': card.tone === 'cyan',
-            'border-violet-700/40 bg-violet-950/30': card.tone === 'violet',
-            'border-midori-700/40 bg-midori-950/30': card.tone === 'midori',
-            'border-amber-700/40 bg-amber-950/30': card.tone === 'amber',
-            'border-rose-700/40 bg-rose-950/30': card.tone === 'rose',
-          }"
+          class="dashboard-metric rounded-2xl p-5 transition hover:-translate-y-0.5"
         >
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+          <p
+            class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 dark:text-slate-400"
+          >
             {{ card.title }}
           </p>
-          <p class="mt-3 text-3xl font-bold text-white">{{ card.value }}</p>
-          <p class="mt-1 text-xs text-slate-400">{{ card.subtitle }}</p>
+          <p class="mt-3 text-3xl font-bold text-slate-900 dark:text-white">{{ card.value }}</p>
+          <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">{{ card.subtitle }}</p>
         </article>
       </section>
 
       <section v-if="summary" class="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <article
-          class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl xl:col-span-2"
+          class="rounded-3xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl xl:col-span-2"
         >
-          <h2 class="text-lg font-bold text-white">{{ t('dashboard.aggregateTraffic') }}</h2>
-          <p class="text-sm text-slate-400">{{ t('dashboard.aggregateTrafficSubtitle') }}</p>
+          <h2 class="text-lg font-bold text-slate-900 dark:text-white">
+            {{ t('dashboard.aggregateTraffic') }}
+          </h2>
+          <p class="text-sm text-slate-600 dark:text-slate-400">
+            {{ t('dashboard.aggregateTrafficSubtitle') }}
+          </p>
           <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
-              <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
+            <div
+              class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/60 p-5"
+            >
+              <p
+                class="text-xs font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400"
+              >
                 {{ t('common.total') }}
               </p>
-              <p class="mt-2 text-2xl font-bold text-white">
+              <p class="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
                 {{ formatBytes(summary.traffic.bytes_sent + summary.traffic.bytes_received) }}
               </p>
             </div>
-            <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
-              <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
+            <div
+              class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/60 p-5"
+            >
+              <p
+                class="text-xs font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400"
+              >
                 {{ t('dashboard.sentTraffic') }}
               </p>
-              <p class="mt-2 text-2xl font-bold text-cyan-300">
+              <p class="mt-2 text-2xl font-bold text-cyan-700 dark:text-cyan-300">
                 {{ formatBytes(summary.traffic.bytes_sent) }}
               </p>
             </div>
-            <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
-              <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
+            <div
+              class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/60 p-5"
+            >
+              <p
+                class="text-xs font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400"
+              >
                 {{ t('dashboard.receivedTraffic') }}
               </p>
-              <p class="mt-2 text-2xl font-bold text-midori-300">
+              <p class="mt-2 text-2xl font-bold text-midori-700 dark:text-midori-300">
                 {{ formatBytes(summary.traffic.bytes_received) }}
               </p>
             </div>
@@ -326,10 +315,14 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
         </article>
 
         <article
-          class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl"
+          class="rounded-3xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl"
         >
-          <h2 class="text-lg font-bold text-white">{{ t('dashboard.deviceStatus') }}</h2>
-          <p class="mt-1 text-sm text-slate-400">{{ t('dashboard.deviceStatusSubtitle') }}</p>
+          <h2 class="text-lg font-bold text-slate-900 dark:text-white">
+            {{ t('dashboard.deviceStatus') }}
+          </h2>
+          <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            {{ t('dashboard.deviceStatusSubtitle') }}
+          </p>
           <div class="mt-6 flex items-center justify-center">
             <div class="relative">
               <svg viewBox="0 0 120 120" class="h-44 w-44 -rotate-90" aria-hidden="true">
@@ -355,8 +348,10 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
                 />
               </svg>
               <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <p class="text-3xl font-bold text-white">{{ activePercent }}%</p>
-                <p class="text-xs uppercase tracking-[0.2em] text-midori-400">
+                <p class="text-3xl font-bold text-slate-900 dark:text-white">
+                  {{ activePercent }}%
+                </p>
+                <p class="text-xs uppercase tracking-[0.2em] text-midori-700 dark:text-midori-400">
                   {{ t('dashboard.connectedLabel') }}
                 </p>
               </div>
@@ -364,16 +359,24 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
           </div>
           <div class="mt-4 space-y-2 text-sm">
             <div
-              class="flex items-center justify-between rounded-xl border border-slate-700/50 bg-slate-800/80 px-4 py-2.5"
+              class="flex items-center justify-between rounded-xl border border-slate-700/50 bg-slate-100 dark:bg-slate-800/80 px-4 py-2.5"
             >
-              <span class="text-slate-300">{{ t('dashboard.registeredLabel') }}</span>
-              <span class="font-bold text-white">{{ summary.registered_devices }}</span>
+              <span class="text-slate-600 dark:text-slate-300">{{
+                t('dashboard.registeredLabel')
+              }}</span>
+              <span class="font-bold text-slate-900 dark:text-white">{{
+                summary.registered_devices
+              }}</span>
             </div>
             <div
-              class="flex items-center justify-between rounded-xl border border-slate-700/50 bg-slate-800/80 px-4 py-2.5"
+              class="flex items-center justify-between rounded-xl border border-slate-700/50 bg-slate-100 dark:bg-slate-800/80 px-4 py-2.5"
             >
-              <span class="text-slate-300">{{ t('dashboard.connectedLabel') }}</span>
-              <span class="font-bold text-midori-400">{{ summary.connected_devices }}</span>
+              <span class="text-slate-600 dark:text-slate-300">{{
+                t('dashboard.connectedLabel')
+              }}</span>
+              <span class="font-bold text-midori-700 dark:text-midori-400">{{
+                summary.connected_devices
+              }}</span>
             </div>
           </div>
         </article>
@@ -389,22 +392,26 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
 
       <section
         v-if="summary"
-        class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl"
+        class="rounded-3xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900/80 p-6 shadow-xl shadow-black/30 backdrop-blur-xl"
       >
         <div class="mb-4 flex items-center justify-between gap-4">
           <div>
-            <h2 class="text-lg font-bold text-white">{{ t('dashboard.recentSessions') }}</h2>
-            <p class="text-sm text-slate-400">{{ t('dashboard.recentSessionsSubtitle') }}</p>
+            <h2 class="text-lg font-bold text-slate-900 dark:text-white">
+              {{ t('dashboard.recentSessions') }}
+            </h2>
+            <p class="text-sm text-slate-600 dark:text-slate-400">
+              {{ t('dashboard.recentSessionsSubtitle') }}
+            </p>
           </div>
           <span
             v-if="auth.isAdmin"
             class="text-xs font-semibold uppercase tracking-[0.2em]"
             :class="
               websocketState === 'ready'
-                ? 'text-midori-400'
+                ? 'text-midori-700 dark:text-midori-400'
                 : websocketState === 'error'
                   ? 'text-amber-300'
-                  : 'text-slate-400'
+                  : 'text-slate-600 dark:text-slate-400'
             "
             >{{
               websocketState === 'ready'
@@ -419,12 +426,14 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
           <div
             v-for="session in summary.recent_sessions"
             :key="session.id"
-            class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 shadow-sm"
+            class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/60 p-4 shadow-sm"
           >
             <div class="flex items-center justify-between gap-3">
               <div class="min-w-0">
-                <p class="truncate text-sm font-semibold text-white">{{ session.device_name }}</p>
-                <p class="mt-1 text-xs text-slate-400">
+                <p class="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                  {{ session.device_name }}
+                </p>
+                <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">
                   {{ session.server_name }} · {{ session.protocol.toUpperCase() }}
                 </p>
               </div>
@@ -432,14 +441,16 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
                 class="rounded-full border px-2.5 py-1 text-[11px] font-semibold"
                 :class="
                   session.is_active
-                    ? 'border-midori-700/50 bg-midori-950/60 text-midori-300'
-                    : 'border-slate-700 bg-slate-800 text-slate-400'
+                    ? 'border-midori-700/50 bg-midori-950/60 text-midori-700 dark:text-midori-300'
+                    : 'border-slate-700 bg-slate-800 text-slate-600 dark:text-slate-400'
                 "
               >
                 {{ session.is_active ? t('common.active') : t('common.inactive') }}
               </span>
             </div>
-            <p class="mt-3 text-xs font-mono text-midori-300">{{ session.assigned_ip }}</p>
+            <p class="mt-3 text-xs font-mono text-midori-700 dark:text-midori-300">
+              {{ session.assigned_ip }}
+            </p>
             <p class="mt-1 text-xs text-slate-500">
               {{ formatDateTime(session.last_handshake ?? session.created_at) }} · ↑{{
                 formatBytes(session.bytes_sent)
@@ -450,7 +461,7 @@ window.addEventListener(AUTH_LOGOUT_EVENT, closeWsForLogout)
         </div>
         <p
           v-else
-          class="rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-8 text-center text-sm text-slate-400"
+          class="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/40 px-4 py-8 text-center text-sm text-slate-600 dark:text-slate-400"
         >
           {{ t('dashboard.noRecentConnections') }}
         </p>

@@ -40,7 +40,7 @@ describe('NavBar', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('MidoriVPN')
+    expect(wrapper.find('img[alt="MidoriVPN"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Dashboard')
     expect(wrapper.text()).toContain('Servidores')
     expect(wrapper.text()).toContain('Conexiones')
